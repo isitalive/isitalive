@@ -355,9 +355,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               autofocus
             />
             <button type="submit">Check Health</button>
+            ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" style="margin-top:12px"></div>` : ''}
           </form>
         </div>
-        ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" style="margin-top:12px"></div>` : ''}
         <p class="search-hint">Try <code>vercel/next.js</code> or <code>facebook/react</code></p>
       </div>
     </header>
