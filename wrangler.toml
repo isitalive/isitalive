@@ -3,12 +3,16 @@ main = "src/index.ts"
 compatibility_date = "2025-03-14"
 compatibility_flags = ["nodejs_compat"]
 
+# Custom domain
+routes = [
+  { pattern = "isitalive.dev", custom_domain = true }
+]
+
 # Workers KV namespace for caching and rate limiting
 [[kv_namespaces]]
 binding = "CACHE_KV"
-id = "placeholder-will-be-created"
-preview_id = "placeholder-preview"
+id = "660634f39fe641c5b186ac3cb7259ead"
 
-# Secrets (set via `wrangler secret put`):
+# Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
 # - API_KEYS: JSON array of valid paid-tier API keys
