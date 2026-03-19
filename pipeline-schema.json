@@ -1,0 +1,16 @@
+{
+  "fields": [
+    { "name": "repo", "type": "string", "required": true },
+    { "name": "provider", "type": "string", "required": true },
+    { "name": "score", "type": "int32", "required": true },
+    { "name": "verdict", "type": "string", "required": true },
+    { "name": "source", "type": "string", "required": true },
+    { "name": "api_key", "type": "string", "required": false },
+    { "name": "country", "type": "string", "required": false },
+    { "name": "continent", "type": "string", "required": false },
+    { "name": "colo", "type": "string", "required": false },
+    { "name": "cache_status", "type": "string", "required": true },
+    { "name": "client_type", "type": "string", "required": false },
+    { "name": "response_time_ms", "type": "int32", "required": false }
+  ]
+}

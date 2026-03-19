@@ -56,7 +56,7 @@ export function sendCheckEvent(
   const project = `${owner}/${repo}`.toLowerCase();
 
   try {
-    env.ANALYTICS_PIPELINE.send([{
+    env.ISITALIVE_CHECKS_STREAM.send([{
       repo: project,
       provider: result.project.split('/')[0] ?? '',
       score: result.score,

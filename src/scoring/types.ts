@@ -116,7 +116,7 @@ export interface Env {
   RATE_LIMITER: DurableObjectNamespace; // Rate limiting via Durable Object
   RECENT_QUERIES: DurableObjectNamespace; // Recent queries list
   RAW_DATA: R2Bucket;            // Raw GitHub response archive (R2)
-  ANALYTICS_PIPELINE: Pipeline;  // Pipelines → R2 Iceberg table
+  ISITALIVE_CHECKS_STREAM: Pipeline;  // Pipelines → R2 Iceberg table (default/checks)
   GITHUB_TOKEN?: string;
 
   // Cloudflare Turnstile — set via CF dashboard secrets
