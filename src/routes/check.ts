@@ -7,6 +7,7 @@ import type { Env } from '../scoring/types';
 import { GitHubProvider } from '../providers/github';
 import { scoreProject } from '../scoring/engine';
 import { getCached, putCache, cacheControlHeader, TIERS, type Tier } from '../cache/index';
+import { sendCheckEvent, archiveRawData, type CheckEventContext } from '../analytics/events';
 
 const check = new Hono<{ Bindings: Env }>();
 
@@ -58,6 +59,7 @@ function cacheMeta(
 }
 
 check.get('/:provider/:owner/:repo', async (c) => {
+  const startTime = Date.now();
   const { provider, owner, repo } = c.req.param();
 
   // Validate provider
@@ -77,6 +79,14 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const cached = await getCached(c.env, provider, owner, repo, tier);
 
   if ((cached.status === 'l1-hit' || cached.status === 'hit') && cached.result) {
+    // Analytics — WAE event for cache hit
+    const ctx: CheckEventContext = {
+      source: 'api', apiKey: vars.get('apiKeyName') ?? 'anon',
+      cacheStatus: cached.status, responseTimeMs: Date.now() - startTime,
+      cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
+    };
+    c.executionCtx.waitUntil(Promise.resolve(sendCheckEvent(c.env, cached.result, ctx)));
+
     c.header('Cache-Control', cacheControlHeader(tier));
     c.header('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT');
     return c.json({
@@ -86,7 +96,15 @@ check.get('/:provider/:owner/:repo', async (c) => {
   }
 
   if (cached.status === 'stale' && cached.result) {
-    c.executionCtx.waitUntil(revalidate(c.env, provider, owner, repo));
+    const ctx: CheckEventContext = {
+      source: 'api', apiKey: vars.get('apiKeyName') ?? 'anon',
+      cacheStatus: 'stale', responseTimeMs: Date.now() - startTime,
+      cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
+    };
+    c.executionCtx.waitUntil(Promise.all([
+      revalidate(c.env, provider, owner, repo),
+      Promise.resolve(sendCheckEvent(c.env, cached.result, ctx)),
+    ]));
     c.header('Cache-Control', cacheControlHeader(tier));
     c.header('X-Cache', 'STALE');
     return c.json({
@@ -101,7 +119,17 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
     const result = scoreProject(rawData, prov.name);
 
-    c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
+    // Analytics — WAE + R2 on fresh fetch
+    const ctx: CheckEventContext = {
+      source: 'api', apiKey: vars.get('apiKeyName') ?? 'anon',
+      cacheStatus: 'miss', responseTimeMs: Date.now() - startTime,
+      cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
+    };
+    c.executionCtx.waitUntil(Promise.all([
+      putCache(c.env, provider, owner, repo, result),
+      archiveRawData(c.env, provider, owner, repo, rawData._rawResponse),
+      Promise.resolve(sendCheckEvent(c.env, result, ctx)),
+    ]));
 
     const now = new Date().toISOString();
     c.header('Cache-Control', cacheControlHeader(tier));

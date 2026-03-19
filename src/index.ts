@@ -62,9 +62,17 @@ app.get('/.well-known/ai-plugin.json', (c) => {
 });
 
 // ── Health check ──────────────────────────────────────────────────────
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.3.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', version: '0.4.0' }));
 
-export default app;
+// ── Export Worker ─────────────────────────────────────────────────────
+import { handleScheduled } from './cron/handler';
+
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
+    await handleScheduled(env);
+  },
+};
 
 // ── Durable Object exports ────────────────────────────────────────────
 export { RateLimiterDO } from './ratelimit/durableObject';

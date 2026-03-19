@@ -18,6 +18,9 @@ import { errorPage } from '../ui/error';
 import { methodologyPage } from '../ui/methodology';
 import { verifyTurnstile } from '../middleware/turnstile';
 import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries';
+import { sendCheckEvent, archiveRawData, type CheckEventContext } from '../analytics/events';
+import { getTrending } from '../cron/handler';
+import { trendingPage } from '../ui/trending';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -36,6 +39,13 @@ ui.get('/', async (c) => {
 ui.get('/methodology', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
   return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN));
+});
+
+// Trending page — reads from KV (populated by hourly Cron)
+ui.get('/trending', async (c) => {
+  const trending = await getTrending(c.env.CACHE_KV);
+  c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
+  return c.html(trendingPage(trending, c.env.CF_ANALYTICS_TOKEN));
 });
 
 // POST /_check — form submission with Turnstile verification
@@ -66,9 +76,20 @@ ui.post('/_check', verifyTurnstile, async (c) => {
 
 // Shared handler for fetching + rendering a result page
 async function handleCheck(c: any, provider: string, owner: string, repo: string) {
+  const startTime = Date.now();
+
   if (!(provider in providers)) {
     return c.html(errorPage(`Unsupported provider: ${provider}`), 400);
   }
+
+  const analyticsCtx = (): CheckEventContext => ({
+    source: 'browser',
+    apiKey: 'anon',
+    cacheStatus: 'miss',
+    responseTimeMs: Date.now() - startTime,
+    cf: (c.req.raw as any).cf,
+    userAgent: c.req.header('User-Agent') ?? null,
+  });
 
   try {
     const { result: cached, status } = await getCached(c.env, provider, owner, repo);
@@ -81,18 +102,19 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
             const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
             const fresh = scoreProject(rawData, prov.name);
             await putCache(c.env, provider, owner, repo, fresh);
+            // Archive raw data from background revalidation too
+            await archiveRawData(c.env, provider, owner, repo, rawData._rawResponse);
           } catch {}
         })());
       }
-      // Track cached result (non-blocking)
-      c.executionCtx.waitUntil(
+      // Track + analytics (non-blocking)
+      const ctx = { ...analyticsCtx(), cacheStatus: status };
+      c.executionCtx.waitUntil(Promise.all([
         trackRecentQuery(c.env.RECENT_QUERIES, {
-          owner, repo,
-          score: cached.score,
-          verdict: cached.verdict,
-          checkedAt: cached.checkedAt,
+          owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
-      );
+        Promise.resolve(sendCheckEvent(c.env, cached, ctx)),
+      ]));
       return c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN));
     }
 
@@ -100,15 +122,15 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
     const result = scoreProject(rawData, prov.name);
 
-    // Cache the result + track recent query (non-blocking)
+    // Cache + track + analytics + R2 archive (non-blocking)
+    const ctx = analyticsCtx();
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
       trackRecentQuery(c.env.RECENT_QUERIES, {
-        owner, repo,
-        score: result.score,
-        verdict: result.verdict,
-        checkedAt: result.checkedAt,
+        owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
+      archiveRawData(c.env, provider, owner, repo, rawData._rawResponse),
+      Promise.resolve(sendCheckEvent(c.env, result, ctx)),
     ]));
 
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');

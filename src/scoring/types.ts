@@ -85,6 +85,9 @@ export interface RawProjectData {
   ciRunSuccessRate: number | null;
   /** Number of workflow runs in last 30 days */
   ciRunCount: number;
+
+  /** Raw API response for archiving — not used in scoring */
+  _rawResponse?: any;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,11 +104,19 @@ export interface Provider {
 // Worker environment bindings
 // ---------------------------------------------------------------------------
 
+// Pipeline binding type (available in @cloudflare/workers-types/experimental,
+// declared here because the project uses standard types)
+interface Pipeline<T = Record<string, unknown>> {
+  send(records: T[]): Promise<void>;
+}
+
 export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
   RATE_LIMITER: DurableObjectNamespace; // Rate limiting via Durable Object
   RECENT_QUERIES: DurableObjectNamespace; // Recent queries list
+  RAW_DATA: R2Bucket;            // Raw GitHub response archive (R2)
+  ANALYTICS_PIPELINE: Pipeline;  // Pipelines → R2 Iceberg table
   GITHUB_TOKEN?: string;
 
   // Cloudflare Turnstile — set via CF dashboard secrets
@@ -114,6 +125,10 @@ export interface Env {
 
   // Cloudflare Web Analytics — set via CF dashboard
   CF_ANALYTICS_TOKEN?: string;   // public, embedded in HTML beacon
+
+  // R2 SQL API (for Cron trending queries) — read-only scoped token
+  CF_ACCOUNT_ID?: string;
+  CF_R2_SQL_TOKEN?: string;
 }
 
 /** Shape of an API key entry in KEYS_KV */

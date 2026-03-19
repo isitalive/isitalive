@@ -229,6 +229,7 @@ export class GitHubProvider implements Provider {
       lastCiRunDate,
       ciRunSuccessRate,
       ciRunCount,
+      _rawResponse: json.data,
     };
   }
 }
