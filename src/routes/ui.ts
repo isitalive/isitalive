@@ -113,7 +113,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
         trackRecentQuery(c.env.RECENT_QUERIES, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
-        Promise.resolve(sendCheckEvent(c.env, cached, ctx)),
+        sendCheckEvent(c.env, cached, ctx),
       ]));
       return c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN));
     }
@@ -130,7 +130,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
       archiveRawData(c.env, provider, owner, repo, rawData._rawResponse),
-      Promise.resolve(sendCheckEvent(c.env, result, ctx)),
+      sendCheckEvent(c.env, result, ctx),
     ]));
 
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');

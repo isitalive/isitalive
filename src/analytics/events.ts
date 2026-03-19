@@ -47,16 +47,16 @@ export interface CheckEventContext {
  * Send analytics event to the Pipeline (→ R2 Iceberg table).
  * Called on EVERY request (including cache hits) for demand analytics.
  */
-export function sendCheckEvent(
+export async function sendCheckEvent(
   env: Env,
   result: ScoringResult,
   ctx: CheckEventContext,
-): void {
+): Promise<void> {
   const [, owner, repo] = result.project.split('/');
   const project = `${owner}/${repo}`.toLowerCase();
 
   try {
-    env.ISITALIVE_CHECKS_STREAM.send([{
+    await env.ISITALIVE_CHECKS_STREAM.send([{
       repo: project,
       provider: result.project.split('/')[0] ?? '',
       score: result.score,
@@ -70,8 +70,8 @@ export function sendCheckEvent(
       client_type: classifyUserAgent(ctx.userAgent),
       response_time_ms: ctx.responseTimeMs,
     }]);
-  } catch {
-    // Pipeline write failures must never break the request
+  } catch (err) {
+    console.error('Pipeline send failed:', err);
   }
 }
 

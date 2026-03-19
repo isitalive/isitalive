@@ -85,7 +85,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
       cacheStatus: cached.status, responseTimeMs: Date.now() - startTime,
       cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
     };
-    c.executionCtx.waitUntil(Promise.resolve(sendCheckEvent(c.env, cached.result, ctx)));
+    c.executionCtx.waitUntil(sendCheckEvent(c.env, cached.result, ctx));
 
     c.header('Cache-Control', cacheControlHeader(tier));
     c.header('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT');
@@ -103,7 +103,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     };
     c.executionCtx.waitUntil(Promise.all([
       revalidate(c.env, provider, owner, repo),
-      Promise.resolve(sendCheckEvent(c.env, cached.result, ctx)),
+      sendCheckEvent(c.env, cached.result, ctx),
     ]));
     c.header('Cache-Control', cacheControlHeader(tier));
     c.header('X-Cache', 'STALE');
@@ -128,7 +128,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
       archiveRawData(c.env, provider, owner, repo, rawData._rawResponse),
-      Promise.resolve(sendCheckEvent(c.env, result, ctx)),
+      sendCheckEvent(c.env, result, ctx),
     ]));
 
     const now = new Date().toISOString();
