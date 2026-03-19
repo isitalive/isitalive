@@ -57,7 +57,7 @@ export class RecentQueriesDO implements DurableObject {
       this.list = [entry, ...filtered].slice(0, MAX_ENTRIES);
       await this.state.storage.put(STORAGE_KEY, this.list);
 
-      return new Response('ok', { status: 204 });
+      return new Response(null, { status: 204 });
     }
 
     return new Response('Method not allowed', { status: 405 });
