@@ -402,7 +402,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       </div>
 
       ${result.overrideReason ? `<div class="override-notice">⚠️ ${result.overrideReason}</div>` : ''}
-      ${result.cached ? `<div class="cache-notice">Cached result · checked ${result.checkedAt.split('T')[0]}</div>` : ''}
+      ${result.cached ? `<div class="cache-notice">Cached result · checked <time datetime="${result.checkedAt}" id="checkedTime">${result.checkedAt.split('T')[0]}</time></div>` : ''}
     </section>
 
     ${result.signals.length > 0 ? `
@@ -460,6 +460,15 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
             hint.style.opacity = '';
           }, 1500);
         }
+      });
+    }
+    // Localize the checked-at time to user's timezone
+    const timeEl = document.getElementById('checkedTime');
+    if (timeEl) {
+      const d = new Date(timeEl.getAttribute('datetime'));
+      timeEl.textContent = d.toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
       });
     }
   </script>
