@@ -42,8 +42,8 @@ query($owner: String!, $repo: String!, $since: GitTimestamp!) {
       nodes { publishedAt tagName }
     }
 
-    # Recent open issues with last comment date
-    issues(last: 50, states: OPEN, orderBy: { field: UPDATED_AT, direction: DESC }) {
+    # 50 most recently updated open issues
+    issues(first: 50, states: OPEN, orderBy: { field: UPDATED_AT, direction: DESC }) {
       nodes {
         createdAt
         updatedAt
@@ -53,8 +53,8 @@ query($owner: String!, $repo: String!, $since: GitTimestamp!) {
       }
     }
 
-    # Recent open PRs
-    pullRequests(last: 20, states: OPEN, orderBy: { field: CREATED_AT, direction: DESC }) {
+    # 20 newest open PRs
+    pullRequests(first: 20, states: OPEN, orderBy: { field: CREATED_AT, direction: DESC }) {
       nodes { createdAt }
     }
 
