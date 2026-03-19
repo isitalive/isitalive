@@ -72,8 +72,8 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
     </div>
   `).join('');
 
-  const badgeUrl = `/api/badge/github/${owner}/${repo}`;
-  const apiUrl = `/api/check/github/${owner}/${repo}`;
+  const badgeUrl = `https://isitalive.dev/api/badge/github/${owner}/${repo}`;
+  const apiUrl = `https://isitalive.dev/api/check/github/${owner}/${repo}`;
   const githubUrl = `https://github.com/${owner}/${repo}`;
 
   return `<!DOCTYPE html>
