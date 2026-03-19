@@ -1,0 +1,61 @@
+// ---------------------------------------------------------------------------
+// Scoring engine — orchestrates rules and produces the final verdict
+// ---------------------------------------------------------------------------
+
+import type { RawProjectData, ScoringResult, Verdict, ProviderName } from './types';
+import { RULES } from './rules';
+
+/** Map a 0-100 score to a human-readable verdict */
+function toVerdict(score: number): Verdict {
+  if (score >= 80) return 'healthy';
+  if (score >= 60) return 'maintained';
+  if (score >= 40) return 'declining';
+  if (score >= 20) return 'at_risk';
+  return 'abandoned';
+}
+
+/**
+ * Run the full scoring pipeline against raw project data.
+ *
+ * If the project is archived, the score is forced to 0 / "abandoned"
+ * without evaluating any other rules.
+ */
+export function scoreProject(
+  data: RawProjectData,
+  provider: ProviderName,
+): ScoringResult {
+  const project = `${provider}/${data.owner}/${data.name}`;
+  const checkedAt = new Date().toISOString();
+
+  // ── Instant-fail: archived repos ──────────────────────────────────
+  if (data.archived) {
+    return {
+      project,
+      provider,
+      score: 0,
+      verdict: 'abandoned',
+      checkedAt,
+      cached: false,
+      signals: [],
+      overrideReason: 'Repository is archived — score forced to 0.',
+    };
+  }
+
+  // ── Evaluate all rules ────────────────────────────────────────────
+  const signals = RULES.map((rule) => rule.evaluate(data));
+
+  // Weighted sum
+  const score = Math.round(
+    signals.reduce((sum, s) => sum + s.score * s.weight, 0),
+  );
+
+  return {
+    project,
+    provider,
+    score,
+    verdict: toVerdict(score),
+    checkedAt,
+    cached: false,
+    signals,
+  };
+}

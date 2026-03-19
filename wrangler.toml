@@ -1,0 +1,14 @@
+name = "isitalive"
+main = "src/index.ts"
+compatibility_date = "2025-03-14"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers KV namespace for caching and rate limiting
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "placeholder-will-be-created"
+preview_id = "placeholder-preview"
+
+# Secrets (set via `wrangler secret put`):
+# - GITHUB_TOKEN: GitHub personal access token for API auth
+# - API_KEYS: JSON array of valid paid-tier API keys

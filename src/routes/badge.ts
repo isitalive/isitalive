@@ -1,0 +1,97 @@
+// ---------------------------------------------------------------------------
+// /api/badge/:provider/:owner/:repo — SVG health badge for READMEs
+// ---------------------------------------------------------------------------
+
+import { Hono } from 'hono';
+import type { Env } from '../scoring/types';
+import type { Verdict } from '../scoring/types';
+import { GitHubProvider } from '../providers/github';
+import { scoreProject } from '../scoring/engine';
+import { getCached, putCache } from '../cache/index';
+
+const badge = new Hono<{ Bindings: Env }>();
+
+const VERDICT_COLORS: Record<Verdict, string> = {
+  healthy: '#22c55e',
+  maintained: '#eab308',
+  declining: '#f97316',
+  at_risk: '#ef4444',
+  abandoned: '#6b7280',
+};
+
+const VERDICT_LABELS: Record<Verdict, string> = {
+  healthy: 'healthy',
+  maintained: 'maintained',
+  declining: 'declining',
+  at_risk: 'at risk',
+  abandoned: 'abandoned',
+};
+
+function generateSvg(score: number, verdict: Verdict): string {
+  const color = VERDICT_COLORS[verdict];
+  const label = 'is it alive?';
+  const value = `${score} · ${VERDICT_LABELS[verdict]}`;
+  const labelWidth = 80;
+  const valueWidth = 110;
+  const totalWidth = labelWidth + valueWidth;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${label}: ${value}">
+  <title>${label}: ${value}</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="${totalWidth}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelWidth}" height="20" fill="#555"/>
+    <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
+    <rect width="${totalWidth}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+    <text aria-hidden="true" x="${labelWidth / 2}" y="15" fill="#010101" fill-opacity=".3">${label}</text>
+    <text x="${labelWidth / 2}" y="14">${label}</text>
+    <text aria-hidden="true" x="${labelWidth + valueWidth / 2}" y="15" fill="#010101" fill-opacity=".3">${value}</text>
+    <text x="${labelWidth + valueWidth / 2}" y="14">${value}</text>
+  </g>
+</svg>`;
+}
+
+const providers = {
+  github: new GitHubProvider(),
+};
+
+badge.get('/:provider/:owner/:repo', async (c) => {
+  const { provider, owner, repo } = c.req.param();
+
+  if (!(provider in providers)) {
+    return c.text('Unsupported provider', 400);
+  }
+
+  try {
+    // Try cache first
+    let result = await getCached(c.env, provider, owner, repo);
+
+    if (!result) {
+      const prov = providers[provider as keyof typeof providers];
+      const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
+      result = scoreProject(rawData, prov.name);
+      await putCache(c.env, provider, owner, repo, result);
+    }
+
+    const svg = generateSvg(result.score, result.verdict);
+
+    return c.body(svg, 200, {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+    });
+  } catch {
+    // Fallback badge on error
+    const svg = generateSvg(0, 'abandoned');
+    return c.body(svg, 200, {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=300',
+    });
+  }
+});
+
+export { badge };
