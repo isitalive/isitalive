@@ -70,11 +70,11 @@ interface CachedEntry {
 // ---------------------------------------------------------------------------
 
 function kvKey(provider: string, owner: string, repo: string): string {
-  return `${CACHE_PREFIX}${provider}/${owner}/${repo}`;
+  return `${CACHE_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
 }
 
 function l1CacheUrl(provider: string, owner: string, repo: string): string {
-  return `${CACHE_DOMAIN}/${provider}/${owner}/${repo}`;
+  return `${CACHE_DOMAIN}/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
 }
 
 // ---------------------------------------------------------------------------

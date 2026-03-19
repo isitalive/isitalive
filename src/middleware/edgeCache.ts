@@ -32,7 +32,10 @@ export async function edgeCache(c: Context<AppEnv>, next: Next) {
 
   try {
     const cache = caches.default;
-    const cacheKey = new Request(c.req.url, {
+    // Normalize URL to lowercase for case-insensitive cache hits
+    const normalizedUrl = new URL(c.req.url);
+    normalizedUrl.pathname = normalizedUrl.pathname.toLowerCase();
+    const cacheKey = new Request(normalizedUrl.toString(), {
       method: 'GET',
       headers: {},  // Strip request headers so cache key is URL-only
     });
