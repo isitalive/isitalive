@@ -111,13 +111,11 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
     .bg-orb {
       position: fixed;
       border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.12;
       pointer-events: none;
       z-index: 0;
     }
-    .bg-orb-1 { width: 500px; height: 500px; background: ${color}; top: -150px; right: -100px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: var(--accent); bottom: -150px; left: -100px; }
+    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, ${color}22 0%, transparent 70%); top: -150px; right: -100px; }
+    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
       position: relative;
@@ -190,7 +188,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       transition: stroke-dashoffset 1.2s ease-out;
       transform: rotate(-90deg);
       transform-origin: center;
-      filter: drop-shadow(0 0 8px ${color}40);
+      /* drop-shadow removed for iOS perf — filter triggers software rendering */
     }
 
     .gauge-text {

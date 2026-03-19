@@ -39,13 +39,11 @@ export function methodologyPage(analyticsToken?: string): string {
     .bg-orb {
       position: fixed;
       border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.08;
       pointer-events: none;
       z-index: 0;
     }
-    .bg-orb-1 { width: 500px; height: 500px; background: var(--accent); top: -150px; right: -100px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: #22c55e; bottom: -150px; left: -100px; }
+    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%); top: -150px; right: -100px; }
+    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
       position: relative;

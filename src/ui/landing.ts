@@ -44,18 +44,16 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       overflow-x: hidden;
     }
 
-    /* Background gradient orbs */
+    /* Background gradient orbs — use radial-gradient instead of blur() for iOS perf */
     .bg-orb {
       position: fixed;
       border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.15;
       pointer-events: none;
       z-index: 0;
     }
-    .bg-orb-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; left: -150px; }
-    .bg-orb-2 { width: 500px; height: 500px; background: #8b5cf6; bottom: -200px; right: -100px; }
-    .bg-orb-3 { width: 300px; height: 300px; background: var(--green); top: 40%; right: 10%; opacity: 0.08; }
+    .bg-orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%); top: -200px; left: -150px; }
+    .bg-orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%); bottom: -200px; right: -100px; }
+    .bg-orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%); top: 40%; right: 10%; }
 
     .container {
       position: relative;
