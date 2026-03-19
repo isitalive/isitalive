@@ -6,13 +6,31 @@ import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
 import { GitHubProvider } from '../providers/github';
 import { scoreProject } from '../scoring/engine';
-import { getCached, putCache, cacheControlHeader } from '../cache/index';
+import { getCached, putCache, cacheControlHeader, type Tier } from '../cache/index';
 
 const check = new Hono<{ Bindings: Env }>();
 
 const providers = {
   github: new GitHubProvider(),
 };
+
+/** Background revalidation — fetches fresh data and updates KV */
+async function revalidate(
+  env: Env,
+  provider: string,
+  owner: string,
+  repo: string,
+): Promise<void> {
+  try {
+    const prov = providers[provider as keyof typeof providers];
+    if (!prov) return;
+    const rawData = await prov.fetchProject(owner, repo, env.GITHUB_TOKEN);
+    const result = scoreProject(rawData, prov.name);
+    await putCache(env, provider, owner, repo, result);
+  } catch {
+    // Silently fail — stale data is still being served
+  }
+}
 
 check.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param();
@@ -26,24 +44,37 @@ check.get('/:provider/:owner/:repo', async (c) => {
   }
 
   const isPaid = !!(c.get as any)('isPaid');
+  const tier: Tier = isPaid ? 'pro' : 'free'; // TODO: distinguish pro vs enterprise
 
-  // ── Check cache first ───────────────────────────────────────────
-  const cached = await getCached(c.env, provider, owner, repo);
-  if (cached) {
-    c.header('Cache-Control', cacheControlHeader(isPaid));
+  // ── Check cache ─────────────────────────────────────────────────
+  const { result: cached, status } = await getCached(c.env, provider, owner, repo, tier);
+
+  if (status === 'hit' && cached) {
+    // Fresh cache — serve directly
+    c.header('Cache-Control', cacheControlHeader(tier));
+    c.header('X-Cache', 'HIT');
     return c.json(cached);
   }
 
-  // ── Fetch fresh data ────────────────────────────────────────────
+  if (status === 'stale' && cached) {
+    // Stale — serve immediately, revalidate in background
+    c.executionCtx.waitUntil(revalidate(c.env, provider, owner, repo));
+    c.header('Cache-Control', cacheControlHeader(tier));
+    c.header('X-Cache', 'STALE');
+    return c.json(cached);
+  }
+
+  // ── Cache miss — fetch synchronously ────────────────────────────
   try {
     const prov = providers[provider as keyof typeof providers];
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
     const result = scoreProject(rawData, prov.name);
 
-    // Write to cache
-    await putCache(c.env, provider, owner, repo, result, isPaid);
+    // Write to cache (non-blocking)
+    c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
 
-    c.header('Cache-Control', cacheControlHeader(isPaid));
+    c.header('Cache-Control', cacheControlHeader(tier));
+    c.header('X-Cache', 'MISS');
     return c.json(result);
   } catch (err: any) {
     const status = err.message?.includes('not found') ? 404 : 502;

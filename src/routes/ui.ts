@@ -29,14 +29,27 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   }
 
   try {
-    let result = await getCached(c.env, provider, owner, repo);
+    const { result: cached, status } = await getCached(c.env, provider, owner, repo);
 
-    if (!result) {
-      const prov = providers[provider as keyof typeof providers];
-      const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
-      result = scoreProject(rawData, prov.name);
-      await putCache(c.env, provider, owner, repo, result);
+    if (cached && (status === 'hit' || status === 'stale')) {
+      if (status === 'stale') {
+        // Serve stale page, revalidate in background
+        c.executionCtx.waitUntil((async () => {
+          try {
+            const prov = providers[provider as keyof typeof providers];
+            const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
+            const fresh = scoreProject(rawData, prov.name);
+            await putCache(c.env, provider, owner, repo, fresh);
+          } catch {}
+        })());
+      }
+      return c.html(resultPage(cached, owner, repo));
     }
+
+    const prov = providers[provider as keyof typeof providers];
+    const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
+    const result = scoreProject(rawData, prov.name);
+    c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
 
     return c.html(resultPage(result, owner, repo));
   } catch (err: any) {

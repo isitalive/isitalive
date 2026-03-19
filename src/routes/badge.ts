@@ -68,21 +68,34 @@ badge.get('/:provider/:owner/:repo', async (c) => {
   }
 
   try {
-    // Try cache first
-    let result = await getCached(c.env, provider, owner, repo);
+    const { result: cached, status } = await getCached(c.env, provider, owner, repo);
+
+    let result = cached;
+
+    if (status === 'stale' && cached) {
+      // Serve stale, revalidate in background
+      c.executionCtx.waitUntil((async () => {
+        try {
+          const prov = providers[provider as keyof typeof providers];
+          const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
+          const fresh = scoreProject(rawData, prov.name);
+          await putCache(c.env, provider, owner, repo, fresh);
+        } catch {}
+      })());
+    }
 
     if (!result) {
       const prov = providers[provider as keyof typeof providers];
       const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
       result = scoreProject(rawData, prov.name);
-      await putCache(c.env, provider, owner, repo, result);
+      c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
     }
 
     const svg = generateSvg(result.score, result.verdict);
 
     return c.body(svg, 200, {
       'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+      'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
     });
   } catch {
     // Fallback badge on error
