@@ -405,7 +405,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       <p class="api-subtitle">One endpoint. One answer. Perfect for AI agents.</p>
       <div class="code-block">
         <span class="comment">// Check any GitHub project</span><br>
-        <span class="url">GET /api/check/github/vercel/next.js</span><br><br>
+        <span class="url">GET https://isitalive.dev/api/check/github/vercel/next.js</span><br><br>
         <span class="comment">// Response</span><br>
         {<br>
         &nbsp;&nbsp;<span class="key">"score"</span>: <span class="number">92</span>,<br>

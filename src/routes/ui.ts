@@ -15,6 +15,7 @@ import { getCached, putCache } from '../cache/index';
 import { landingPage } from '../ui/landing';
 import { resultPage } from '../ui/result';
 import { errorPage } from '../ui/error';
+import { methodologyPage } from '../ui/methodology';
 import { verifyTurnstile } from '../middleware/turnstile';
 
 const ui = new Hono<{ Bindings: Env }>();
@@ -23,10 +24,16 @@ const providers = {
   github: new GitHubProvider(),
 };
 
-// Landing page — pass the Turnstile site key
+// Landing page
 ui.get('/', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN));
+});
+
+// Methodology page — static per deploy
+ui.get('/methodology', (c) => {
+  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN));
 });
 
 // POST /_check — form submission with Turnstile verification
