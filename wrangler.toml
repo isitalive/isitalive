@@ -16,7 +16,7 @@ id = "660634f39fe641c5b186ac3cb7259ead"
 # Workers KV — API key store (create in CF dashboard, paste ID below)
 [[kv_namespaces]]
 binding = "KEYS_KV"
-id = "REPLACE_WITH_KEYS_KV_NAMESPACE_ID"
+id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 
 # Durable Object — rate limiting
 [[durable_objects.bindings]]
