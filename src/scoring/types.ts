@@ -104,6 +104,9 @@ export interface Env {
   // Cloudflare Turnstile — set via CF dashboard secrets
   TURNSTILE_SITE_KEY?: string;   // public, embedded in HTML
   TURNSTILE_SECRET_KEY?: string; // private, used for server-side verification
+
+  // Cloudflare Web Analytics — set via CF dashboard
+  CF_ANALYTICS_TOKEN?: string;   // public, embedded in HTML beacon
 }
 
 /** Shape of an API key entry in KEYS_KV */

@@ -132,6 +132,14 @@ export type CacheStatus = 'l1-hit' | 'hit' | 'stale' | 'miss';
 export interface CacheResult {
   result: ScoringResult | null;
   status: CacheStatus;
+  /** How old the cached data is in seconds (null if miss or L1 hit) */
+  ageSeconds: number | null;
+  /** ISO timestamp when the data was originally fetched */
+  storedAt: string | null;
+  /** ISO timestamp when this data will become stale for this tier */
+  freshUntil: string | null;
+  /** ISO timestamp when this data expires entirely for this tier */
+  staleUntil: string | null;
 }
 
 export async function getCached(
@@ -144,7 +152,7 @@ export async function getCached(
   // ── L1: Cache API (free, same-datacenter) ─────────────────────
   const l1Result = await getL1(provider, owner, repo);
   if (l1Result) {
-    return { result: l1Result, status: 'l1-hit' };
+    return { result: l1Result, status: 'l1-hit', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
   }
 
   // ── L2: KV (persistent, global) ───────────────────────────────
@@ -152,11 +160,14 @@ export async function getCached(
   const entry = await env.CACHE_KV.get(key, 'json') as CachedEntry | null;
 
   if (!entry) {
-    return { result: null, status: 'miss' };
+    return { result: null, status: 'miss', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
   }
 
-  const ageSeconds = (Date.now() - entry.storedAt) / 1000;
+  const ageSeconds = Math.round((Date.now() - entry.storedAt) / 1000);
   const config = TIERS[tier];
+  const storedAt = new Date(entry.storedAt).toISOString();
+  const freshUntil = new Date(entry.storedAt + config.freshTtl * 1000).toISOString();
+  const staleUntil = new Date(entry.storedAt + config.staleTtl * 1000).toISOString();
 
   if (ageSeconds <= config.freshTtl) {
     // Fresh from KV — also populate L1 for next same-datacenter hit
@@ -164,6 +175,7 @@ export async function getCached(
     return {
       result: { ...entry.result, cached: true },
       status: 'hit',
+      ageSeconds, storedAt, freshUntil, staleUntil,
     };
   }
 
@@ -172,11 +184,12 @@ export async function getCached(
     return {
       result: { ...entry.result, cached: true },
       status: 'stale',
+      ageSeconds, storedAt, freshUntil, staleUntil,
     };
   }
 
   // Too old
-  return { result: null, status: 'miss' };
+  return { result: null, status: 'miss' as const, ageSeconds, storedAt, freshUntil, staleUntil };
 }
 
 // ---------------------------------------------------------------------------

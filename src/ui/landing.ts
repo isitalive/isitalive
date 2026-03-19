@@ -2,7 +2,7 @@
 // Landing page HTML — dark, modern, glassmorphism design
 // ---------------------------------------------------------------------------
 
-export function landingPage(siteKey?: string): string {
+export function landingPage(siteKey?: string, analyticsToken?: string): string {
   const hasTurnstile = !!siteKey;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -435,6 +435,7 @@ export function landingPage(siteKey?: string): string {
       }`}
     });
   </script>
+  ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
 </html>`;
 }

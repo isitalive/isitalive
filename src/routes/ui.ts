@@ -25,9 +25,8 @@ const providers = {
 
 // Landing page — pass the Turnstile site key
 ui.get('/', (c) => {
-  // Landing page is static per deploy — cache aggressively
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
-  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY));
+  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN));
 });
 
 // POST /_check — form submission with Turnstile verification
@@ -64,7 +63,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   try {
     const { result: cached, status } = await getCached(c.env, provider, owner, repo);
 
-    if (cached && (status === 'hit' || status === 'stale')) {
+    if (cached && (status === 'l1-hit' || status === 'hit' || status === 'stale')) {
       if (status === 'stale') {
         c.executionCtx.waitUntil((async () => {
           try {
@@ -75,7 +74,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
           } catch {}
         })());
       }
-      return c.html(resultPage(cached, owner, repo));
+      return c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN));
     }
 
     const prov = providers[provider as keyof typeof providers];
@@ -83,11 +82,9 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const result = scoreProject(rawData, prov.name);
     c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
 
-    // Cache result page HTML at same TTL as the data
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
-    return c.html(resultPage(result, owner, repo));
+    return c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN));
   } catch (err: any) {
-    // Error pages: short cache to allow quick recovery
     c.header('Cache-Control', 'public, max-age=300');
     return c.html(errorPage(err.message), err.message?.includes('not found') ? 404 : 502);
   }

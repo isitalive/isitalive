@@ -52,7 +52,7 @@ function scoreColor(score: number): string {
   return '#6b7280';
 }
 
-export function resultPage(result: ScoringResult, owner: string, repo: string): string {
+export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string): string {
   const color = VERDICT_COLORS[result.verdict];
   const emoji = VERDICT_EMOJI[result.verdict];
   const label = VERDICT_LABELS[result.verdict];
@@ -463,6 +463,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string): 
       });
     }
   </script>
+  ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
 </html>`;
 }
