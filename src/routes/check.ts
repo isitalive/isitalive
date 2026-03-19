@@ -49,10 +49,10 @@ check.get('/:provider/:owner/:repo', async (c) => {
   // ── Check cache ─────────────────────────────────────────────────
   const { result: cached, status } = await getCached(c.env, provider, owner, repo, tier);
 
-  if (status === 'hit' && cached) {
+  if ((status === 'l1-hit' || status === 'hit') && cached) {
     // Fresh cache — serve directly
     c.header('Cache-Control', cacheControlHeader(tier));
-    c.header('X-Cache', 'HIT');
+    c.header('X-Cache', status === 'l1-hit' ? 'L1-HIT' : 'HIT');
     return c.json(cached);
   }
 

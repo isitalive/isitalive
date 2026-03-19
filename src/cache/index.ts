@@ -1,17 +1,24 @@
 // ---------------------------------------------------------------------------
-// Two-tier caching with stale-while-revalidate
+// Three-tier caching with stale-while-revalidate
 //
-// Strategy:
-//   1. KV stores results with metadata (storedAt timestamp)
-//   2. On read, we check if the result is "fresh" or "stale" based on tier
-//   3. Fresh → return immediately
-//   4. Stale → return immediately + trigger background revalidation via waitUntil
-//   5. Missing → fetch synchronously
+// L1: Cloudflare Cache API — free, ~0ms, per-datacenter, volatile
+// L2: Workers KV — $0.50/M reads, ~1ms, globally replicated, persistent
+// SWR: managed via KV storedAt timestamps (Cache API doesn't support SWR)
+//
+// Flow:
+//   1. Check Cache API (L1) — instant, free, same-datacenter
+//   2. Miss → Check KV (L2) — fast, persistent, globally replicated
+//      a. Write result to Cache API for next same-datacenter hit
+//   3. Miss → Fetch from provider, write to both L1 + L2
+//   4. Stale (KV only) → serve + trigger background revalidation
 // ---------------------------------------------------------------------------
 
 import type { ScoringResult, Env } from '../scoring/types';
 
 const CACHE_PREFIX = 'isitalive:v1:';
+
+// Cache API uses a synthetic URL as the key
+const CACHE_DOMAIN = 'https://cache.isitalive.dev';
 
 // ---------------------------------------------------------------------------
 // Tier definitions
@@ -20,29 +27,29 @@ const CACHE_PREFIX = 'isitalive:v1:';
 export type Tier = 'free' | 'pro' | 'enterprise';
 
 interface TierConfig {
-  /** Max age in seconds before a result is considered stale */
+  /** Max age in seconds before a result is considered stale (KV) */
   freshTtl: number;
-  /** Max age in seconds before a stale result is too old to serve at all */
+  /** Max age in seconds before a stale result is too old to serve at all (KV) */
   staleTtl: number;
-  /** Edge Cache-Control max-age */
-  edgeTtl: number;
+  /** Cache API TTL — how long L1 holds the result */
+  l1Ttl: number;
 }
 
 export const TIERS: Record<Tier, TierConfig> = {
   free: {
     freshTtl: 24 * 60 * 60,     // 24h — fresh
     staleTtl: 48 * 60 * 60,     // 48h — serve stale up to 2 days
-    edgeTtl: 24 * 60 * 60,      // 24h edge cache
+    l1Ttl: 24 * 60 * 60,        // 24h in Cache API
   },
   pro: {
     freshTtl: 1 * 60 * 60,      // 1h fresh
     staleTtl: 6 * 60 * 60,      // 6h stale window
-    edgeTtl: 1 * 60 * 60,       // 1h edge cache
+    l1Ttl: 1 * 60 * 60,         // 1h in Cache API
   },
   enterprise: {
     freshTtl: 15 * 60,           // 15min fresh
     staleTtl: 1 * 60 * 60,      // 1h stale window
-    edgeTtl: 15 * 60,           // 15min edge cache
+    l1Ttl: 15 * 60,             // 15min in Cache API
   },
 };
 
@@ -50,7 +57,7 @@ export const TIERS: Record<Tier, TierConfig> = {
 const KV_MAX_TTL = 48 * 60 * 60; // 48h
 
 // ---------------------------------------------------------------------------
-// Stored shape (wraps ScoringResult with metadata)
+// Stored shape (wraps ScoringResult with metadata for KV)
 // ---------------------------------------------------------------------------
 
 interface CachedEntry {
@@ -59,18 +66,68 @@ interface CachedEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Cache key
+// Cache keys
 // ---------------------------------------------------------------------------
 
-function cacheKey(provider: string, owner: string, repo: string): string {
+function kvKey(provider: string, owner: string, repo: string): string {
   return `${CACHE_PREFIX}${provider}/${owner}/${repo}`;
 }
 
+function l1CacheUrl(provider: string, owner: string, repo: string): string {
+  return `${CACHE_DOMAIN}/${provider}/${owner}/${repo}`;
+}
+
 // ---------------------------------------------------------------------------
-// Cache read — returns result + freshness status
+// L1: Cache API helpers
 // ---------------------------------------------------------------------------
 
-export type CacheStatus = 'hit' | 'stale' | 'miss';
+async function getL1(
+  provider: string,
+  owner: string,
+  repo: string,
+): Promise<ScoringResult | null> {
+  try {
+    const cache = caches.default;
+    const url = l1CacheUrl(provider, owner, repo);
+    const response = await cache.match(new Request(url));
+    if (!response) return null;
+    const result = await response.json() as ScoringResult;
+    return { ...result, cached: true };
+  } catch {
+    return null; // Cache API not available (e.g. local dev)
+  }
+}
+
+async function putL1(
+  provider: string,
+  owner: string,
+  repo: string,
+  result: ScoringResult,
+  tier: Tier = 'free',
+): Promise<void> {
+  try {
+    const cache = caches.default;
+    const url = l1CacheUrl(provider, owner, repo);
+    const ttl = TIERS[tier].l1Ttl;
+
+    const response = new Response(JSON.stringify(result), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${ttl}`,
+      },
+    });
+
+    await cache.put(new Request(url), response);
+  } catch {
+    // Cache API not available — silently skip
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cache read — three-tier lookup
+// ---------------------------------------------------------------------------
+
+export type CacheStatus = 'l1-hit' | 'hit' | 'stale' | 'miss';
 
 export interface CacheResult {
   result: ScoringResult | null;
@@ -84,7 +141,14 @@ export async function getCached(
   repo: string,
   tier: Tier = 'free',
 ): Promise<CacheResult> {
-  const key = cacheKey(provider, owner, repo);
+  // ── L1: Cache API (free, same-datacenter) ─────────────────────
+  const l1Result = await getL1(provider, owner, repo);
+  if (l1Result) {
+    return { result: l1Result, status: 'l1-hit' };
+  }
+
+  // ── L2: KV (persistent, global) ───────────────────────────────
+  const key = kvKey(provider, owner, repo);
   const entry = await env.CACHE_KV.get(key, 'json') as CachedEntry | null;
 
   if (!entry) {
@@ -95,7 +159,8 @@ export async function getCached(
   const config = TIERS[tier];
 
   if (ageSeconds <= config.freshTtl) {
-    // Fresh — serve directly
+    // Fresh from KV — also populate L1 for next same-datacenter hit
+    await putL1(provider, owner, repo, entry.result, tier);
     return {
       result: { ...entry.result, cached: true },
       status: 'hit',
@@ -103,19 +168,19 @@ export async function getCached(
   }
 
   if (ageSeconds <= config.staleTtl) {
-    // Stale but still servable — caller should trigger background revalidation
+    // Stale — serve + caller triggers background revalidation
     return {
       result: { ...entry.result, cached: true },
       status: 'stale',
     };
   }
 
-  // Too old — treat as miss
+  // Too old
   return { result: null, status: 'miss' };
 }
 
 // ---------------------------------------------------------------------------
-// Cache write
+// Cache write — writes to both L1 and L2
 // ---------------------------------------------------------------------------
 
 export async function putCache(
@@ -124,24 +189,31 @@ export async function putCache(
   owner: string,
   repo: string,
   result: ScoringResult,
+  tier: Tier = 'free',
 ): Promise<void> {
-  const key = cacheKey(provider, owner, repo);
+  const key = kvKey(provider, owner, repo);
   const entry: CachedEntry = {
     result,
     storedAt: Date.now(),
   };
 
-  await env.CACHE_KV.put(key, JSON.stringify(entry), {
-    expirationTtl: KV_MAX_TTL,
-  });
+  // Write to both tiers concurrently
+  await Promise.all([
+    // L2: KV (persistent)
+    env.CACHE_KV.put(key, JSON.stringify(entry), {
+      expirationTtl: KV_MAX_TTL,
+    }),
+    // L1: Cache API (free, same-datacenter)
+    putL1(provider, owner, repo, result, tier),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
-// Cache-Control header with stale-while-revalidate
+// Cache-Control header for downstream (browser/CDN)
 // ---------------------------------------------------------------------------
 
 export function cacheControlHeader(tier: Tier): string {
   const config = TIERS[tier];
-  const swr = config.staleTtl - config.freshTtl; // stale window
-  return `public, max-age=${config.edgeTtl}, s-maxage=${config.edgeTtl}, stale-while-revalidate=${swr}`;
+  const swr = config.staleTtl - config.freshTtl;
+  return `public, max-age=${config.l1Ttl}, s-maxage=${config.l1Ttl}, stale-while-revalidate=${swr}`;
 }
