@@ -2,7 +2,9 @@
 // Landing page HTML — dark, modern, glassmorphism design
 // ---------------------------------------------------------------------------
 
-export function landingPage(siteKey?: string, analyticsToken?: string): string {
+import type { RecentQuery } from '../cache/recentQueries';
+
+export function landingPage(siteKey?: string, analyticsToken?: string, recentQueries: RecentQuery[] = []): string {
   const hasTurnstile = !!siteKey;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -193,6 +195,53 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       color: var(--text-secondary);
     }
 
+    /* ── Recent queries ──────────────────────── */
+    .recent-section {
+      margin-top: 32px;
+      text-align: center;
+    }
+
+    .recent-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .recent-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .recent-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 6px 14px;
+      text-decoration: none;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .recent-chip:hover {
+      border-color: rgba(255,255,255,0.2);
+      color: var(--text-primary);
+    }
+
+    .recent-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
     /* ── Features ─────────────────────────────── */
     .features {
       display: grid;
@@ -365,6 +414,26 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         <p class="search-hint">Try <code>vercel/next.js</code> or <code>facebook/react</code></p>
       </div>
     </header>
+
+    ${recentQueries.length > 0 ? `
+    <div class="recent-section">
+      <div class="recent-label">Recently checked</div>
+      <div class="recent-list">
+        ${recentQueries.map(q => {
+          const dotColor = q.verdict === 'healthy' ? '#22c55e'
+            : q.verdict === 'maintained' ? '#eab308'
+            : q.verdict === 'declining' ? '#f97316'
+            : q.verdict === 'at_risk' ? '#ef4444'
+            : '#6b7280';
+          return `<a href="/${q.owner}/${q.repo}" class="recent-chip">`
+            + `<span class="recent-dot" style="background:${dotColor}"></span>`
+            + `${q.owner}/${q.repo}`
+            + `<span style="color:var(--text-muted)">${q.score}</span>`
+            + `</a>`;
+        }).join('')}
+      </div>
+    </div>
+    ` : ''}
 
     <section class="features">
       <div class="feature">

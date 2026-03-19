@@ -17,6 +17,7 @@ import { resultPage } from '../ui/result';
 import { errorPage } from '../ui/error';
 import { methodologyPage } from '../ui/methodology';
 import { verifyTurnstile } from '../middleware/turnstile';
+import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -24,10 +25,11 @@ const providers = {
   github: new GitHubProvider(),
 };
 
-// Landing page
-ui.get('/', (c) => {
-  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
-  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN));
+// Landing page — show recent queries
+ui.get('/', async (c) => {
+  const recent = await getRecentQueries(c.env.CACHE_KV);
+  c.header('Cache-Control', 'public, max-age=60, s-maxage=60');
+  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN, recent));
 });
 
 // Methodology page — static per deploy
@@ -82,13 +84,32 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
           } catch {}
         })());
       }
+      // Track cached result (non-blocking)
+      c.executionCtx.waitUntil(
+        trackRecentQuery(c.env.CACHE_KV, {
+          owner, repo,
+          score: cached.score,
+          verdict: cached.verdict,
+          checkedAt: cached.checkedAt,
+        }),
+      );
       return c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN));
     }
 
     const prov = providers[provider as keyof typeof providers];
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
     const result = scoreProject(rawData, prov.name);
-    c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
+
+    // Cache the result + track recent query (non-blocking)
+    c.executionCtx.waitUntil(Promise.all([
+      putCache(c.env, provider, owner, repo, result),
+      trackRecentQuery(c.env.CACHE_KV, {
+        owner, repo,
+        score: result.score,
+        verdict: result.verdict,
+        checkedAt: result.checkedAt,
+      }),
+    ]));
 
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
     return c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN));
