@@ -139,7 +139,13 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     .search-box form {
       display: flex;
+      flex-wrap: wrap;
       gap: 0;
+    }
+
+    .search-box .cf-turnstile {
+      flex-basis: 100%;
+      margin-top: 8px;
     }
 
     .search-box input {
