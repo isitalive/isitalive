@@ -32,7 +32,8 @@ ui.get('/', (c) => {
 // POST /_check — form submission with Turnstile verification
 // This redirects to the result page after verifying the human
 ui.post('/_check', verifyTurnstile, async (c) => {
-  const body = await c.req.parseBody();
+  // Body already parsed by turnstile middleware — use the stored copy
+  const body = (c as any).get('parsedBody') ?? await c.req.parseBody();
   const input = (body['repo'] as string || '').trim();
 
   if (!input) {

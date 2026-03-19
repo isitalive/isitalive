@@ -13,28 +13,35 @@ import type { Env } from '../scoring/types';
 
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
+type AppEnv = { Bindings: Env; Variables: { parsedBody?: Record<string, string> } };
+
 /**
  * Verify a Turnstile token from the request.
  * Only applied to web UI form submissions, NOT the API.
  *
  * If TURNSTILE_SECRET_KEY is not configured, verification is skipped
  * (allows running locally without Turnstile set up).
+ *
+ * NOTE: This middleware parses the request body and stores it in context
+ * via c.set('parsedBody', ...) so downstream handlers can access it
+ * without double-parsing (the body stream can only be read once).
  */
 export async function verifyTurnstile(
-  c: Context<{ Bindings: Env }>,
+  c: Context<AppEnv>,
   next: Next,
 ) {
   const secretKey = c.env.TURNSTILE_SECRET_KEY;
+
+  // Parse body once and store for downstream handlers
+  const body = await c.req.parseBody().catch(() => ({})) as Record<string, string>;
+  (c as any).set('parsedBody', body);
 
   // Skip if Turnstile not configured (local dev, staging)
   if (!secretKey) {
     return next();
   }
 
-  // Token comes from the form submission (query param or POST body)
-  const token =
-    c.req.query('cf-turnstile-response') ??
-    (await c.req.parseBody().catch(() => ({})) as Record<string, string>)['cf-turnstile-response'];
+  const token = c.req.query('cf-turnstile-response') ?? body['cf-turnstile-response'];
 
   if (!token) {
     return c.html(errorHtml('Please complete the verification challenge.'), 403);
