@@ -77,8 +77,14 @@ export interface RawProjectData {
   // Bus factor — % of recent commits from top contributor
   topContributorCommitShare: number; // 0-1
 
-  // CI presence
+  // CI presence and activity
   hasCi: boolean;
+  /** ISO-8601 date of the most recent workflow run (null if no runs) */
+  lastCiRunDate: string | null;
+  /** Success rate of recent workflow runs (0-1, null if no runs) */
+  ciRunSuccessRate: number | null;
+  /** Number of workflow runs in last 30 days */
+  ciRunCount: number;
 }
 
 // ---------------------------------------------------------------------------

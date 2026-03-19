@@ -166,6 +166,51 @@ export class GitHubProvider implements Provider {
     // ── CI presence ─────────────────────────────────────────────────
     const hasCi = r.ciCheck?.__typename === 'Tree';
 
+    // ── CI activity (REST API — Actions workflow runs) ──────────────
+    let lastCiRunDate: string | null = null;
+    let ciRunSuccessRate: number | null = null;
+    let ciRunCount = 0;
+
+    if (hasCi) {
+      try {
+        const runsRes = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=30&status=completed`,
+          {
+            headers: {
+              'Authorization': `bearer ${token}`,
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'isitalive/0.1',
+            },
+          },
+        );
+        if (runsRes.ok) {
+          const runsJson = await runsRes.json() as any;
+          const runs: any[] = runsJson.workflow_runs ?? [];
+
+          // Filter to last 30 days
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          const recentRuns = runs.filter(
+            (run: any) => new Date(run.created_at) >= thirtyDaysAgo,
+          );
+
+          ciRunCount = recentRuns.length;
+
+          if (runs.length > 0) {
+            lastCiRunDate = runs[0].created_at ?? null;
+          }
+
+          if (recentRuns.length > 0) {
+            const successful = recentRuns.filter(
+              (run: any) => run.conclusion === 'success',
+            ).length;
+            ciRunSuccessRate = successful / recentRuns.length;
+          }
+        }
+      } catch {
+        // Non-critical — fall back to hasCi boolean
+      }
+    }
+
     return {
       archived: r.isArchived,
       name: r.name,
@@ -181,6 +226,9 @@ export class GitHubProvider implements Provider {
       recentContributorCount,
       topContributorCommitShare,
       hasCi,
+      lastCiRunDate,
+      ciRunSuccessRate,
+      ciRunCount,
     };
   }
 }

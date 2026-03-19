@@ -340,16 +340,18 @@ export function methodologyPage(analyticsToken?: string): string {
 
     <div class="signal-card">
       <div class="signal-card-header">
-        <span class="signal-card-title">CI/CD</span>
+        <span class="signal-card-title">CI/CD Activity</span>
         <span class="signal-card-weight">5%</span>
       </div>
-      <p>Whether GitHub Actions workflows exist in the repository. Having CI indicates the project follows engineering best practices. <em>Future improvement: check actual workflow run status and frequency.</em></p>
+      <p>Multi-factor assessment of CI/CD health. Checks for workflow file presence, recency of last run, run frequency in the last 30 days, and success rate of recent runs.</p>
       <table class="scoring-table">
-        <tr><th>Status</th><th>Score</th></tr>
-        <tr><td>Workflows present</td><td>100</td></tr>
-        <tr><td>No workflows</td><td>0</td></tr>
+        <tr><th>Factor</th><th>Max Points</th></tr>
+        <tr><td>Workflows present</td><td>30</td></tr>
+        <tr><td>Last run within 7 days</td><td>30</td></tr>
+        <tr><td>30+ runs/month</td><td>20</td></tr>
+        <tr><td>90%+ success rate</td><td>20</td></tr>
       </table>
-      <p class="data-source">Source: object(expression: ".github/workflows")</p>
+      <p class="data-source">Source: object(expression: ".github/workflows") + REST /actions/runs</p>
     </div>
 
     <h2>Verdicts</h2>

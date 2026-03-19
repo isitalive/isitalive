@@ -176,18 +176,74 @@ export const RULES: Rule[] = [
     },
   },
 
-  // ── Has CI/CD ────────────────────────────────────────────────────────
+  // ── CI/CD Activity ──────────────────────────────────────────────────
   {
-    name: 'hasCi',
+    name: 'ciActivity',
     label: 'CI/CD',
     weight: 0.05,
     evaluate(data) {
-      const score = data.hasCi ? 100 : 0;
+      // No workflows at all → 0
+      if (!data.hasCi) {
+        return {
+          name: this.name,
+          label: this.label,
+          value: 'none',
+          score: 0,
+          weight: this.weight,
+        };
+      }
+
+      // Has workflows but no run data → base score for having CI
+      if (data.ciRunCount === 0 && !data.lastCiRunDate) {
+        return {
+          name: this.name,
+          label: this.label,
+          value: 'configured',
+          score: 30,
+          weight: this.weight,
+        };
+      }
+
+      // Multi-factor scoring:
+      //   30pts — workflows exist (already passed)
+      //   30pts — last run recency
+      //   20pts — run frequency (past 30 days)
+      //   20pts — success rate
+      let score = 30;
+
+      // Recency of last run (30pts)
+      if (data.lastCiRunDate) {
+        const days = daysAgo(data.lastCiRunDate) ?? 999;
+        if (days <= 7) score += 30;
+        else if (days <= 30) score += 20;
+        else if (days <= 90) score += 10;
+      }
+
+      // Run frequency — 30+ runs/month = full marks (20pts)
+      if (data.ciRunCount >= 30) score += 20;
+      else if (data.ciRunCount >= 10) score += 15;
+      else if (data.ciRunCount >= 3) score += 10;
+      else if (data.ciRunCount >= 1) score += 5;
+
+      // Success rate (20pts)
+      if (data.ciRunSuccessRate !== null) {
+        if (data.ciRunSuccessRate >= 0.9) score += 20;
+        else if (data.ciRunSuccessRate >= 0.7) score += 15;
+        else if (data.ciRunSuccessRate >= 0.5) score += 10;
+        else score += 5;
+      }
+
+      // Build a display value
+      const successPct = data.ciRunSuccessRate !== null
+        ? `${Math.round(data.ciRunSuccessRate * 100)}% pass`
+        : 'no data';
+      const displayValue = `${data.ciRunCount} runs/30d · ${successPct}`;
+
       return {
         name: this.name,
         label: this.label,
-        value: data.hasCi,
-        score,
+        value: displayValue,
+        score: Math.min(100, score),
         weight: this.weight,
       };
     },
