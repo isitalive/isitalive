@@ -66,3 +66,6 @@ enabled = true
 enabled = true
 invocation_logs = true  # Log every invocation
 head_sampling_rate = 1  # 100% sampling (reduce in prod if costs are high)
+
+[observability.traces]
+enabled = true
