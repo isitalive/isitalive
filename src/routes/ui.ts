@@ -25,6 +25,8 @@ const providers = {
 
 // Landing page — pass the Turnstile site key
 ui.get('/', (c) => {
+  // Landing page is static per deploy — cache aggressively
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY));
 });
 
@@ -81,8 +83,12 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const result = scoreProject(rawData, prov.name);
     c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
 
+    // Cache result page HTML at same TTL as the data
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
     return c.html(resultPage(result, owner, repo));
   } catch (err: any) {
+    // Error pages: short cache to allow quick recovery
+    c.header('Cache-Control', 'public, max-age=300');
     return c.html(errorPage(err.message), err.message?.includes('not found') ? 404 : 502);
   }
 }
