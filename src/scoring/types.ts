@@ -97,12 +97,19 @@ export interface Provider {
 
 export interface Env {
   CACHE_KV: KVNamespace;
+  KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
+  RATE_LIMITER: DurableObjectNamespace; // Rate limiting via Durable Object
   GITHUB_TOKEN?: string;
-
-  // API key auth — JSON object: { "key": { "tier": "free|pro|enterprise", "name": "..." } }
-  API_KEYS?: string;
 
   // Cloudflare Turnstile — set via CF dashboard secrets
   TURNSTILE_SITE_KEY?: string;   // public, embedded in HTML
   TURNSTILE_SECRET_KEY?: string; // private, used for server-side verification
+}
+
+/** Shape of an API key entry in KEYS_KV */
+export interface ApiKeyEntry {
+  tier: 'free' | 'pro' | 'enterprise';
+  name: string;
+  active: boolean;
+  created?: string;
 }

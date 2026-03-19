@@ -1,35 +1,29 @@
 // ---------------------------------------------------------------------------
-// API key authentication middleware — tiered access
+// API key authentication middleware — KV-backed
 //
-// Keys are stored as a JSON object in the API_KEYS secret:
-// {
-//   "sk_abc123": { "tier": "free", "name": "My Bot" },
-//   "sk_xyz789": { "tier": "pro",  "name": "CI Pipeline" },
-//   "sk_ent001": { "tier": "enterprise", "name": "ACME Corp" }
-// }
+// Keys are stored in the KEYS_KV namespace, managed via CF dashboard:
 //
-// OSS-safe: the actual keys live in CF secrets, not in code.
+//   Key:   sk_abc123
+//   Value: { "tier": "pro", "name": "ACME Corp", "active": true, "created": "2026-03-19" }
+//
+// To add a key: go to Workers & Pages → KV → KEYS_KV → Add entry
+// To revoke:   set "active": false or delete the key
+//
+// OSS-safe: actual API key values only exist in KV, never in code.
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono';
-import type { Env } from '../scoring/types';
+import type { Env, ApiKeyEntry } from '../scoring/types';
 import type { Tier } from '../cache/index';
-
-interface ApiKeyEntry {
-  tier: Tier;
-  name: string;
-}
-
-type ApiKeyStore = Record<string, ApiKeyEntry>;
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } };
 
 /**
- * API key auth — checks Bearer token and sets tier + key name.
+ * API key auth — looks up Bearer token in KV and sets tier + key name.
  * Unauthenticated requests default to 'free' tier.
  */
 export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
-  // Default to free tier
+  // Default to free tier, unauthenticated
   c.set('tier', 'free');
   c.set('keyName', null);
 
@@ -37,26 +31,17 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 
   if (authHeader?.startsWith('Bearer ')) {
     const key = authHeader.slice(7);
-    const store = parseApiKeys(c.env.API_KEYS);
-    const entry = store[key];
 
-    if (entry) {
-      c.set('tier', entry.tier);
-      c.set('keyName', entry.name);
+    // Look up the key in KV
+    const entry = await c.env.KEYS_KV.get(key, 'json') as ApiKeyEntry | null;
+
+    if (entry && entry.active !== false) {
+      c.set('tier', (entry.tier || 'free') as Tier);
+      c.set('keyName', entry.name || key.slice(0, 8));
     }
-    // Invalid keys silently fall through to free tier —
-    // don't reveal whether a key exists or not (OSS-safe)
+    // Invalid/inactive keys silently fall through to free tier —
+    // doesn't reveal whether a key exists (OSS-safe)
   }
 
   return next();
-}
-
-function parseApiKeys(raw?: string): ApiKeyStore {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
-  } catch {
-    return {};
-  }
 }

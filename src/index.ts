@@ -16,11 +16,11 @@ const app = new Hono<{ Bindings: Env }>();
 // ── Global middleware ─────────────────────────────────────────────────
 app.use('*', cors({
   origin: '*',
-  allowMethods: ['GET', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
   maxAge: 86400,
 }));
 
-// Auth first (sets isPaid flag), then rate limit (skips if isPaid)
+// Auth first (sets tier), then rate limit (uses tier for limits)
 app.use('/api/*', apiKeyAuth);
 app.use('/api/*', rateLimit);
 
@@ -32,6 +32,9 @@ app.route('/api/badge', badge);
 app.route('/', ui);
 
 // ── Health check ──────────────────────────────────────────────────────
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.1.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', version: '0.2.0' }));
 
 export default app;
+
+// ── Durable Object exports ────────────────────────────────────────────
+export { RateLimiterDO } from './ratelimit/durableObject';

@@ -8,11 +8,26 @@ routes = [
   { pattern = "isitalive.dev", custom_domain = true }
 ]
 
-# Workers KV namespace for caching and rate limiting
+# Workers KV — response cache
 [[kv_namespaces]]
 binding = "CACHE_KV"
 id = "660634f39fe641c5b186ac3cb7259ead"
 
+# Workers KV — API key store (create in CF dashboard, paste ID below)
+[[kv_namespaces]]
+binding = "KEYS_KV"
+id = "REPLACE_WITH_KEYS_KV_NAMESPACE_ID"
+
+# Durable Object — rate limiting
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiterDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiterDO"]
+
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
-# - API_KEYS: JSON array of valid paid-tier API keys
+# - TURNSTILE_SITE_KEY: Cloudflare Turnstile public key
+# - TURNSTILE_SECRET_KEY: Cloudflare Turnstile secret key
