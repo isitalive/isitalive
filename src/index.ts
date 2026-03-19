@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './scoring/types';
+import { edgeCache } from './middleware/edgeCache';
 import { apiKeyAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
 import { check } from './routes/check';
@@ -20,7 +21,10 @@ app.use('*', cors({
   maxAge: 86400,
 }));
 
-// Auth first (sets tier), then rate limit (uses tier for limits)
+// Edge cache — full response caching (outermost, before all logic)
+app.use('*', edgeCache);
+
+// Auth + rate limit for API routes only
 app.use('/api/*', apiKeyAuth);
 app.use('/api/*', rateLimit);
 
@@ -32,7 +36,7 @@ app.route('/api/badge', badge);
 app.route('/', ui);
 
 // ── Health check ──────────────────────────────────────────────────────
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.2.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', version: '0.3.0' }));
 
 export default app;
 
