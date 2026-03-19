@@ -1,5 +1,10 @@
 // ---------------------------------------------------------------------------
 // Web UI routes — landing page and result pages
+//
+// Turnstile protects the search form submission (POST /_check).
+// Direct URL visits (GET /:owner/:repo) are not gated — they're shareable
+// links and always hit cache. The POST form submission is what triggers
+// fresh GitHub API calls.
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
@@ -10,6 +15,7 @@ import { getCached, putCache } from '../cache/index';
 import { landingPage } from '../ui/landing';
 import { resultPage } from '../ui/result';
 import { errorPage } from '../ui/error';
+import { verifyTurnstile } from '../middleware/turnstile';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -17,9 +23,34 @@ const providers = {
   github: new GitHubProvider(),
 };
 
-// Landing page
+// Landing page — pass the Turnstile site key
 ui.get('/', (c) => {
-  return c.html(landingPage());
+  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY));
+});
+
+// POST /_check — form submission with Turnstile verification
+// This redirects to the result page after verifying the human
+ui.post('/_check', verifyTurnstile, async (c) => {
+  const body = await c.req.parseBody();
+  const input = (body['repo'] as string || '').trim();
+
+  if (!input) {
+    return c.redirect('/');
+  }
+
+  // Parse input: "owner/repo", "github.com/owner/repo", or full URL
+  let path = input
+    .replace(/^https?:\/\//, '')
+    .replace(/^(www\.)?github\.com\//, '')
+    .replace(/\.git$/, '')
+    .replace(/\/+$/, '');
+
+  const parts = path.split('/');
+  if (parts.length >= 2) {
+    return c.redirect(`/${parts[0]}/${parts[1]}`);
+  }
+
+  return c.redirect('/');
 });
 
 // Shared handler for fetching + rendering a result page
@@ -33,7 +64,6 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
     if (cached && (status === 'hit' || status === 'stale')) {
       if (status === 'stale') {
-        // Serve stale page, revalidate in background
         c.executionCtx.waitUntil((async () => {
           try {
             const prov = providers[provider as keyof typeof providers];

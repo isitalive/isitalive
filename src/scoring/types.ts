@@ -98,5 +98,11 @@ export interface Provider {
 export interface Env {
   CACHE_KV: KVNamespace;
   GITHUB_TOKEN?: string;
-  API_KEYS?: string; // JSON array of valid keys
+
+  // API key auth — JSON object: { "key": { "tier": "free|pro|enterprise", "name": "..." } }
+  API_KEYS?: string;
+
+  // Cloudflare Turnstile — set via CF dashboard secrets
+  TURNSTILE_SITE_KEY?: string;   // public, embedded in HTML
+  TURNSTILE_SECRET_KEY?: string; // private, used for server-side verification
 }

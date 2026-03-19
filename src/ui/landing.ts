@@ -2,7 +2,8 @@
 // Landing page HTML — dark, modern, glassmorphism design
 // ---------------------------------------------------------------------------
 
-export function landingPage(): string {
+export function landingPage(siteKey?: string): string {
+  const hasTurnstile = !!siteKey;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -342,10 +343,11 @@ export function landingPage(): string {
 
       <div class="search-container">
         <div class="search-box">
-          <form id="searchForm" action="/" method="GET">
+          <form id="searchForm" action="/_check" method="POST">
             <input
               type="text"
               id="searchInput"
+              name="repo"
               placeholder="owner/repo  (e.g. vercel/next.js)"
               autocomplete="off"
               spellcheck="false"
@@ -354,6 +356,7 @@ export function landingPage(): string {
             <button type="submit">Check Health</button>
           </form>
         </div>
+        ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" style="margin-top:12px"></div>` : ''}
         <p class="search-hint">Try <code>vercel/next.js</code> or <code>facebook/react</code></p>
       </div>
     </header>
@@ -411,26 +414,24 @@ export function landingPage(): string {
     </footer>
   </div>
 
+  ${hasTurnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}
   <script>
     document.getElementById('searchForm').addEventListener('submit', function(e) {
-      e.preventDefault();
       const input = document.getElementById('searchInput').value.trim();
-      if (!input) return;
+      if (!input) { e.preventDefault(); return; }
 
-      // Parse input: could be "owner/repo", "github.com/owner/repo", or full URL
-      let path = input;
-
-      // Strip protocol and domain
-      path = path.replace(/^https?:\\/\\//, '');
-      path = path.replace(/^(www\\.)?github\\.com\\//, '');
-
-      // Remove trailing slashes and .git
-      path = path.replace(/\\.git$/, '').replace(/\\/+$/, '');
+      ${hasTurnstile ? `// Let the form POST with Turnstile token — server handles redirect` : `
+      // No Turnstile (local dev) — do client-side redirect
+      e.preventDefault();
+      let path = input
+        .replace(/^https?:\\/\\//, '')
+        .replace(/^(www\\.)?github\\.com\\//, '')
+        .replace(/\\.git$/, '').replace(/\\/+$/, '');
 
       const parts = path.split('/');
       if (parts.length >= 2) {
-        window.location.href = '/github/' + parts[0] + '/' + parts[1];
-      }
+        window.location.href = '/' + parts[0] + '/' + parts[1];
+      }`}
     });
   </script>
 </body>
