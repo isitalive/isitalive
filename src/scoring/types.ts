@@ -105,6 +105,7 @@ export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
   RATE_LIMITER: DurableObjectNamespace; // Rate limiting via Durable Object
+  RECENT_QUERIES: DurableObjectNamespace; // Recent queries list
   GITHUB_TOKEN?: string;
 
   // Cloudflare Turnstile — set via CF dashboard secrets

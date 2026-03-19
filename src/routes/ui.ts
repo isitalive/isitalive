@@ -27,7 +27,7 @@ const providers = {
 
 // Landing page — show recent queries
 ui.get('/', async (c) => {
-  const recent = await getRecentQueries(c.env.CACHE_KV);
+  const recent = await getRecentQueries(c.env.RECENT_QUERIES);
   c.header('Cache-Control', 'public, max-age=60, s-maxage=60');
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN, recent));
 });
@@ -86,7 +86,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       }
       // Track cached result (non-blocking)
       c.executionCtx.waitUntil(
-        trackRecentQuery(c.env.CACHE_KV, {
+        trackRecentQuery(c.env.RECENT_QUERIES, {
           owner, repo,
           score: cached.score,
           verdict: cached.verdict,
@@ -103,7 +103,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     // Cache the result + track recent query (non-blocking)
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
-      trackRecentQuery(c.env.CACHE_KV, {
+      trackRecentQuery(c.env.RECENT_QUERIES, {
         owner, repo,
         score: result.score,
         verdict: result.verdict,

@@ -23,9 +23,18 @@ id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 name = "RATE_LIMITER"
 class_name = "RateLimiterDO"
 
+# Durable Object — recent queries list
+[[durable_objects.bindings]]
+name = "RECENT_QUERIES"
+class_name = "RecentQueriesDO"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RateLimiterDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RecentQueriesDO"]
 
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
