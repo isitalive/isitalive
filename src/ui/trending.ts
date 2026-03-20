@@ -209,15 +209,22 @@ export function trendingPage(analyticsToken?: string): string {
       return v.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
     }
 
+    // Normalize old verdict values stored in KV before the rename
+    function normalizeVerdict(v) {
+      var REMAP = { declining: 'inactive', at_risk: 'dormant', abandoned: 'unmaintained' };
+      return REMAP[v] || v;
+    }
+
     function renderCard(r, i) {
-      const color = VERDICT_COLORS[r.lastVerdict] || '#6b7280';
-      return '<a href="/' + r.repo + '" class="repo-card" id="trending-' + (i+1) + '">'
+      var verdict = normalizeVerdict(r.lastVerdict);
+      const color = VERDICT_COLORS[verdict] || '#6b7280';
+      return '<a href="/github/' + r.repo + '" class="repo-card" id="trending-' + (i+1) + '">'
         + '<span class="repo-rank">#' + (i+1) + '</span>'
         + '<div class="repo-info">'
         + '<div class="repo-name">' + r.repo + '</div>'
         + '<div class="repo-meta">' + r.checks + ' check' + (r.checks !== 1 ? 's' : '') + ' today</div>'
         + '</div>'
-        + '<span class="repo-verdict" style="background:' + color + '20;color:' + color + '">' + verdictLabel(r.lastVerdict) + '</span>'
+        + '<span class="repo-verdict" style="background:' + color + '20;color:' + color + '">' + verdictLabel(verdict) + '</span>'
         + '<span class="repo-score" style="color:' + color + '">' + r.avgScore + '</span>'
         + '</a>';
     }

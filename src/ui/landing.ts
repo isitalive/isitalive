@@ -460,7 +460,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       font-family: 'SF Mono', Menlo, monospace;
       font-size: 0.72rem;
       color: var(--text-secondary);
-      overflow-x: auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
       text-align: left;
     }
