@@ -1,0 +1,322 @@
+// ---------------------------------------------------------------------------
+// Audit scorer — cache-first scoring with time budget
+//
+// 1. Hash the manifest content → check for a cached full audit result
+// 2. If miss, batch-check KV for individual dep scores
+// 3. Score uncached deps in parallel within a time budget
+// 4. Use waitUntil to prime cache in the background after responding
+// ---------------------------------------------------------------------------
+
+import type { ResolvedDep } from './resolver';
+import type { Env, ScoringResult } from '../scoring/types';
+import { getCached, putCache, type Tier } from '../cache/index';
+import { GitHubProvider } from '../providers/github';
+import { scoreProject } from '../scoring/engine';
+
+const github = new GitHubProvider();
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface AuditDep {
+  /** Original package name */
+  name: string;
+  /** Version from manifest */
+  version: string;
+  /** Dev dependency? */
+  dev: boolean;
+  /** Ecosystem */
+  ecosystem: 'npm' | 'go';
+  /** Resolved GitHub path (e.g. "zitadel/zitadel") or null */
+  github: string | null;
+  /** Health score 0-100, or null if pending/unresolved */
+  score: number | null;
+  /** Verdict, or "pending"/"unresolved" */
+  verdict: string;
+  /** If unresolved, why */
+  unresolvedReason?: string;
+}
+
+export interface AuditResult {
+  /** SHA-256 hash of the manifest content — usable as ETag */
+  auditHash: string;
+  /** Whether all resolvable deps were scored */
+  complete: boolean;
+  /** Manifest format */
+  format: string;
+  /** Counts */
+  scored: number;
+  total: number;
+  pending: number;
+  unresolved: number;
+  /** If incomplete, suggested wait before retry (ms) */
+  retryAfterMs?: number;
+  /** Aggregate stats (only over scored deps) */
+  summary: {
+    healthy: number;
+    stable: number;
+    degraded: number;
+    critical: number;
+    unmaintained: number;
+    avgScore: number;
+  };
+  /** Per-dependency results */
+  dependencies: AuditDep[];
+}
+
+const AUDIT_CACHE_PREFIX = 'audit:result:';
+const AUDIT_CACHE_TTL = 6 * 60 * 60; // 6 hours
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Score resolved dependencies with a time budget.
+ * Returns scored results and a `complete` flag.
+ *
+ * @param deps       Resolved dependencies
+ * @param format     Original manifest format
+ * @param contentHash SHA-256 of the raw manifest content
+ * @param env        Worker env bindings
+ * @param ctx        Execution context for waitUntil
+ * @param budgetMs   Time budget in ms (default ~24s)
+ */
+export async function scoreAudit(
+  deps: ResolvedDep[],
+  format: string,
+  contentHash: string,
+  env: Env,
+  ctx: ExecutionContext,
+  budgetMs = 24_000,
+): Promise<AuditResult> {
+  const start = Date.now();
+
+  // ── 1. Check for a cached full audit by manifest hash ──────────────
+  const auditCacheKey = `${AUDIT_CACHE_PREFIX}${contentHash}`;
+  const cachedAudit = await env.CACHE_KV.get(auditCacheKey);
+  if (cachedAudit) {
+    const parsed = JSON.parse(cachedAudit) as AuditResult;
+    if (parsed.complete) return parsed;
+    // Partial cached result — we'll try to complete it below
+  }
+
+  // ── 2. Separate resolvable from unresolvable ───────────────────────
+  const resolvable = deps.filter((d) => d.github !== null);
+  const unresolvedDeps: AuditDep[] = deps
+    .filter((d) => d.github === null)
+    .map((d) => ({
+      name: d.name,
+      version: d.version,
+      dev: d.dev,
+      ecosystem: d.ecosystem,
+      github: null,
+      score: null,
+      verdict: 'unresolved',
+      unresolvedReason: d.unresolvedReason,
+    }));
+
+  // ── 3. Batch check KV cache for existing scores ────────────────────
+  const cacheChecks = await Promise.allSettled(
+    resolvable.map(async (dep) => {
+      const { owner, repo } = dep.github!;
+      const cached = await getCached(env, 'github', owner, repo, 'free' as Tier);
+      return { dep, cached };
+    }),
+  );
+
+  const scored: AuditDep[] = [];
+  const uncached: ResolvedDep[] = [];
+
+  for (const result of cacheChecks) {
+    if (result.status === 'rejected') continue;
+    const { dep, cached } = result.value;
+
+    if ((cached.status === 'hit' || cached.status === 'l1-hit' || cached.status === 'stale') && cached.result) {
+      scored.push(depToAudit(dep, cached.result));
+    } else {
+      uncached.push(dep);
+    }
+  }
+
+  // ── 4. Score uncached deps within time budget ──────────────────────
+  const remaining: AuditDep[] = [];
+  const batchSize = 10;
+  let timedOut = false;
+
+  for (let i = 0; i < uncached.length; i += batchSize) {
+    // Check time budget before each batch
+    const elapsed = Date.now() - start;
+    if (elapsed > budgetMs) {
+      timedOut = true;
+      // Add remaining as pending
+      for (let j = i; j < uncached.length; j++) {
+        remaining.push({
+          name: uncached[j].name,
+          version: uncached[j].version,
+          dev: uncached[j].dev,
+          ecosystem: uncached[j].ecosystem,
+          github: `${uncached[j].github!.owner}/${uncached[j].github!.repo}`,
+          score: null,
+          verdict: 'pending',
+        });
+      }
+      break;
+    }
+
+    const batch = uncached.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(async (dep) => {
+        const { owner, repo } = dep.github!;
+        try {
+          const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
+          const result = scoreProject(rawData, 'github');
+          // Cache in background
+          ctx.waitUntil(putCache(env, 'github', owner, repo, result));
+          return { dep, result };
+        } catch {
+          return { dep, result: null };
+        }
+      }),
+    );
+
+    for (const r of results) {
+      if (r.status === 'rejected') continue;
+      const { dep, result } = r.value;
+      if (result) {
+        scored.push(depToAudit(dep, result));
+      } else {
+        remaining.push({
+          name: dep.name,
+          version: dep.version,
+          dev: dep.dev,
+          ecosystem: dep.ecosystem,
+          github: `${dep.github!.owner}/${dep.github!.repo}`,
+          score: null,
+          verdict: 'pending',
+        });
+      }
+    }
+
+    // Brief pause between batches to avoid GitHub secondary rate limits
+    if (i + batchSize < uncached.length && !timedOut) {
+      await sleep(100);
+    }
+  }
+
+  // ── 5. Build result ────────────────────────────────────────────────
+  const allDeps = [...scored, ...remaining, ...unresolvedDeps];
+  // Sort: scored first (by score desc), then pending, then unresolved
+  allDeps.sort((a, b) => {
+    if (a.score !== null && b.score !== null) return b.score - a.score;
+    if (a.score !== null) return -1;
+    if (b.score !== null) return 1;
+    return 0;
+  });
+
+  const complete = remaining.length === 0;
+  const scoredCount = scored.length;
+  const pendingCount = remaining.length;
+
+  const summary = buildSummary(scored);
+
+  const auditResult: AuditResult = {
+    auditHash: contentHash,
+    complete,
+    format,
+    scored: scoredCount,
+    total: deps.length,
+    pending: pendingCount,
+    unresolved: unresolvedDeps.length,
+    summary,
+    dependencies: allDeps,
+  };
+
+  if (!complete) {
+    auditResult.retryAfterMs = 2000;
+  }
+
+  // ── 6. Cache the full audit result if complete ─────────────────────
+  if (complete) {
+    ctx.waitUntil(
+      env.CACHE_KV.put(auditCacheKey, JSON.stringify(auditResult), {
+        expirationTtl: AUDIT_CACHE_TTL,
+      }),
+    );
+  }
+
+  // If incomplete, use waitUntil to continue scoring in background
+  if (!complete && remaining.length > 0) {
+    ctx.waitUntil(scoreRemainingInBackground(remaining, env));
+  }
+
+  return auditResult;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function depToAudit(dep: ResolvedDep, result: ScoringResult): AuditDep {
+  return {
+    name: dep.name,
+    version: dep.version,
+    dev: dep.dev,
+    ecosystem: dep.ecosystem,
+    github: `${dep.github!.owner}/${dep.github!.repo}`,
+    score: result.score,
+    verdict: result.verdict,
+  };
+}
+
+function buildSummary(scored: AuditDep[]) {
+  const counts = { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0 };
+  let totalScore = 0;
+
+  for (const d of scored) {
+    if (d.verdict in counts) {
+      counts[d.verdict as keyof typeof counts]++;
+    }
+    totalScore += d.score ?? 0;
+  }
+
+  return {
+    ...counts,
+    avgScore: scored.length > 0 ? Math.round(totalScore / scored.length) : 0,
+  };
+}
+
+/**
+ * Continue scoring deps in the background via waitUntil.
+ * This primes the KV cache so the next call returns instantly.
+ */
+async function scoreRemainingInBackground(
+  remaining: AuditDep[],
+  env: Env,
+): Promise<void> {
+  for (const dep of remaining) {
+    if (!dep.github) continue;
+    const [owner, repo] = dep.github.split('/');
+    try {
+      const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
+      const result = scoreProject(rawData, 'github');
+      await putCache(env, 'github', owner, repo, result);
+    } catch {
+      // Best effort — will be scored on next call
+    }
+  }
+}
+
+/** Hash manifest content using SHA-256 */
+export async function hashManifest(content: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

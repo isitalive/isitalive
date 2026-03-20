@@ -5,6 +5,7 @@ import { apiKeyAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
 import { check } from './routes/check';
 import { badge } from './routes/badge';
+import { audit } from './routes/audit';
 import { ui } from './routes/ui';
 import { openApiSpec } from './routes/openapi';
 import { llmsTxt, llmsFullTxt } from './routes/llms';
@@ -23,6 +24,7 @@ app.use('/api/*', rateLimit);
 
 app.route('/api/check', check);
 app.route('/api/badge', badge);
+app.route('/api/audit', audit);
 app.route('/', ui);
 
 app.get('/openapi.json', (c) => {
