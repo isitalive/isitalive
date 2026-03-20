@@ -45,6 +45,19 @@ export interface ScoringResult {
   signals: SignalResult[];
   /** If archived, this explains the instant override */
   overrideReason?: string;
+  /** Project metadata for display on result page */
+  metadata?: ProjectMetadata;
+}
+
+/** Metadata for display on the result page (not used in scoring) */
+export interface ProjectMetadata {
+  description: string | null;
+  license: string | null;
+  homepageUrl: string | null;
+  language: string | null;
+  languageColor: string | null;
+  stars: number;
+  forks: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +74,12 @@ export interface RawProjectData {
   forks: number;
   defaultBranch: string;
 
+  // Metadata (not used in scoring, passed through to result page)
+  license: string | null;
+  homepageUrl: string | null;
+  language: string | null;
+  languageColor: string | null;
+
   // Temporal signals
   lastCommitDate: string | null;   // ISO-8601
   lastReleaseDate: string | null;  // ISO-8601
@@ -70,6 +89,11 @@ export interface RawProjectData {
 
   // PR responsiveness — median age in days of recent open PRs
   prResponsivenessMedianDays: number | null;
+
+  // Issue & PR counts — for distinguishing "inbox zero" from "ghost town"
+  openIssueCount: number;
+  closedIssueCount: number;
+  openPrCount: number;
 
   // Contributors — unique authors with commits in last 90 days
   recentContributorCount: number;

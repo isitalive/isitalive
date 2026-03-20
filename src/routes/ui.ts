@@ -11,15 +11,16 @@ import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
 import { GitHubProvider } from '../providers/github';
 import { scoreProject } from '../scoring/engine';
-import { getCached, putCache } from '../cache/index';
+import { getCached, putCache, trackFirstSeen, getFirstSeen } from '../cache/index';
 import { landingPage } from '../ui/landing';
 import { resultPage } from '../ui/result';
 import { errorPage } from '../ui/error';
 import { methodologyPage } from '../ui/methodology';
+import { changelogPage } from '../ui/changelog';
 import { verifyTurnstile } from '../middleware/turnstile';
 import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries';
 import { sendCheckEvent, archiveRawData, type CheckEventContext } from '../analytics/events';
-import { getTrending } from '../cron/handler';
+import { getTrending, getSitemapRepos } from '../cron/handler';
 import { trendingPage } from '../ui/trending';
 
 const ui = new Hono<{ Bindings: Env }>();
@@ -27,6 +28,37 @@ const ui = new Hono<{ Bindings: Env }>();
 const providers = {
   github: new GitHubProvider(),
 };
+
+// Sitemap — dynamic XML based on top repos
+ui.get('/sitemap.xml', async (c) => {
+  const repos = await getSitemapRepos(c.env.CACHE_KV);
+  const baseUrl = 'https://isitalive.dev';
+  
+  const staticPages = [
+    '',
+    '/trending',
+    '/methodology',
+    '/changelog',
+  ];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${staticPages.map(page => `  <url>
+    <loc>${baseUrl}${page}</loc>
+    <changefreq>${page === '' ? 'daily' : 'weekly'}</changefreq>
+    <priority>${page === '' ? '1.0' : '0.8'}</priority>
+  </url>`).join('\n')}
+${repos.map(repo => `  <url>
+    <loc>${baseUrl}/${repo}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+  c.header('Content-Type', 'application/xml');
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+  return c.text(xml);
+});
 
 // Landing page — show recent queries
 ui.get('/', async (c) => {
@@ -43,9 +75,16 @@ ui.get('/methodology', (c) => {
 
 // Trending page — reads from KV (populated by hourly Cron)
 ui.get('/trending', async (c) => {
-  const trending = await getTrending(c.env.CACHE_KV);
+  const trendingRepos = await getTrending(c.env.CACHE_KV);
+  console.log(`UI (Trending): fetched ${trendingRepos.length} repos from KV`);
   c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
-  return c.html(trendingPage(trending, c.env.CF_ANALYTICS_TOKEN));
+  return c.html(trendingPage(trendingRepos, c.env.CF_ANALYTICS_TOKEN));
+});
+
+// Changelog page — static per deploy
+ui.get('/changelog', (c) => {
+  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  return c.html(changelogPage(c.env.CF_ANALYTICS_TOKEN));
 });
 
 // POST /_check — form submission with Turnstile verification
@@ -77,6 +116,19 @@ ui.post('/_check', verifyTurnstile, async (c) => {
 // Shared handler for fetching + rendering a result page
 async function handleCheck(c: any, provider: string, owner: string, repo: string) {
   const startTime = Date.now();
+
+  // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
+  const cache = caches.default;
+  // Use a pristine request object to avoid poisoning cache with auth headers
+  const cacheKey = new Request(c.req.url);
+
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) {
+    console.log(`⚡ Cache HIT for: ${c.req.url}`);
+    return cachedResponse;
+  }
+
+  console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`);
 
   if (!(provider in providers)) {
     return c.html(errorPage(`Unsupported provider: ${provider}`), 400);
@@ -115,7 +167,10 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
         }),
         sendCheckEvent(c.env, cached, ctx),
       ]));
-      return c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN));
+      const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo);
+      const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed));
+      c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+      return response;
     }
 
     const prov = providers[provider as keyof typeof providers];
@@ -126,6 +181,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const ctx = analyticsCtx();
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
+      trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
       trackRecentQuery(c.env.RECENT_QUERIES, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
@@ -133,11 +189,23 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       sendCheckEvent(c.env, result, ctx),
     ]));
 
+    const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo);
+    
+    // 4. Create the Hono response
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
-    return c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN));
+    const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed));
+
+    // 5. Put a CLONED copy into the cache without blocking the user response
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+
+    // 6. Return original response
+    return response;
   } catch (err: any) {
     c.header('Cache-Control', 'public, max-age=300');
-    return c.html(errorPage(err.message), err.message?.includes('not found') ? 404 : 502);
+    const isNotFound = err.message?.includes('not found');
+    const status = isNotFound ? 404 : 502;
+    const message = isNotFound ? 'Project not found' : 'Failed to fetch project data. Please try again later.';
+    return c.html(errorPage(message), status);
   }
 }
 

@@ -43,6 +43,25 @@ export const RULES: Rule[] = [
     weight: 0.25,
     evaluate(data) {
       const days = daysAgo(data.lastCommitDate);
+
+      // Stability override: if it's been over a year but the project has
+      // 0 open issues/PRs and a history of closed issues, it's "finished",
+      // not "abandoned". Think: legendary utility packages.
+      if (
+        days !== null && days > 365 &&
+        data.openIssueCount === 0 &&
+        data.openPrCount === 0 &&
+        data.closedIssueCount > 10
+      ) {
+        return {
+          name: this.name,
+          label: this.label,
+          value: 'stable / complete',
+          score: 100,
+          weight: this.weight,
+        };
+      }
+
       const score = freshnessScore(days, [
         [30, 100],
         [90, 75],
@@ -88,18 +107,23 @@ export const RULES: Rule[] = [
     weight: 0.10,
     evaluate(data) {
       const days = data.issueStalenessMedianDays;
-      // No open issues is a good sign (or the project just doesn't use issues)
-      const score = days === null
-        ? 75
-        : freshnessScore(days, [
-            [7, 100],
-            [30, 75],
-            [90, 50],
-          ], 25);
+      let score: number;
+
+      if (days === null) {
+        // Differentiate "inbox zero hero" from "ghost town"
+        score = data.closedIssueCount > 0 ? 100 : 75;
+      } else {
+        score = freshnessScore(days, [
+          [7, 100],
+          [30, 75],
+          [90, 50],
+        ], 25);
+      }
+
       return {
         name: this.name,
         label: this.label,
-        value: days !== null ? `${days}d median` : 'no issues',
+        value: days !== null ? `${days}d median` : (data.closedIssueCount > 0 ? 'inbox zero' : 'no issues'),
         score,
         weight: this.weight,
       };
@@ -113,17 +137,23 @@ export const RULES: Rule[] = [
     weight: 0.15,
     evaluate(data) {
       const days = data.prResponsivenessMedianDays;
-      const score = days === null
-        ? 75
-        : freshnessScore(days, [
-            [7, 100],
-            [30, 75],
-            [90, 50],
-          ], 25);
+      let score: number;
+
+      if (days === null) {
+        // No open PRs: if they've closed issues before, they're on top of it
+        score = data.closedIssueCount > 0 ? 100 : 75;
+      } else {
+        score = freshnessScore(days, [
+          [7, 100],
+          [30, 75],
+          [90, 50],
+        ], 25);
+      }
+
       return {
         name: this.name,
         label: this.label,
-        value: days !== null ? `${days}d median` : 'no PRs',
+        value: days !== null ? `${days}d median` : (data.openPrCount === 0 ? 'inbox zero' : 'no PRs'),
         score,
         weight: this.weight,
       };
@@ -180,7 +210,7 @@ export const RULES: Rule[] = [
   {
     name: 'ciActivity',
     label: 'CI/CD',
-    weight: 0.05,
+    weight: 0.10,
     evaluate(data) {
       // No workflows at all → 0
       if (!data.hasCi) {
@@ -257,10 +287,21 @@ export const RULES: Rule[] = [
     evaluate(data) {
       const share = data.topContributorCommitShare;
       let score: number;
-      if (share < 0.5) score = 100;
-      else if (share < 0.7) score = 75;
-      else if (share < 0.9) score = 50;
-      else score = 25;
+
+      // Solo-maintainer forgiveness: small projects (<1000 stars)
+      // with a single maintainer are normal, not risky.
+      if (share >= 0.9 && data.stars < 1000) {
+        score = 85;
+      } else if (share < 0.5) {
+        score = 100;
+      } else if (share < 0.7) {
+        score = 75;
+      } else if (share < 0.9) {
+        score = 50;
+      } else {
+        score = 25;
+      }
+
       return {
         name: this.name,
         label: this.label,

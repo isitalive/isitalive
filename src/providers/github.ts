@@ -16,6 +16,9 @@ query($owner: String!, $repo: String!, $since: GitTimestamp!) {
     isArchived
     stargazerCount
     forkCount
+    homepageUrl
+    licenseInfo { spdxId name }
+    primaryLanguage { name color }
 
     # Last commit on default branch
     defaultBranchRef {
@@ -44,6 +47,7 @@ query($owner: String!, $repo: String!, $since: GitTimestamp!) {
 
     # 50 most recently updated open issues
     issues(first: 50, states: OPEN, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      totalCount
       nodes {
         createdAt
         updatedAt
@@ -53,8 +57,14 @@ query($owner: String!, $repo: String!, $since: GitTimestamp!) {
       }
     }
 
+    # Closed issue count — distinguishes "inbox zero" from "ghost town"
+    closedIssues: issues(states: CLOSED) {
+      totalCount
+    }
+
     # 20 newest open PRs
     pullRequests(first: 20, states: OPEN, orderBy: { field: CREATED_AT, direction: DESC }) {
+      totalCount
       nodes { createdAt }
     }
 
@@ -219,10 +229,17 @@ export class GitHubProvider implements Provider {
       stars: r.stargazerCount,
       forks: r.forkCount,
       defaultBranch: r.defaultBranchRef?.name ?? 'main',
+      license: r.licenseInfo?.spdxId ?? r.licenseInfo?.name ?? null,
+      homepageUrl: r.homepageUrl || null,
+      language: r.primaryLanguage?.name ?? null,
+      languageColor: r.primaryLanguage?.color ?? null,
       lastCommitDate,
       lastReleaseDate,
       issueStalenessMedianDays,
       prResponsivenessMedianDays,
+      openIssueCount: r.issues?.totalCount ?? 0,
+      closedIssueCount: r.closedIssues?.totalCount ?? 0,
+      openPrCount: r.pullRequests?.totalCount ?? 0,
       recentContributorCount,
       topContributorCommitShare,
       hasCi,

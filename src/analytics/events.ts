@@ -55,24 +55,24 @@ export async function sendCheckEvent(
   const [, owner, repo] = result.project.split('/');
   const project = `${owner}/${repo}`.toLowerCase();
 
-  try {
-    await env.ISITALIVE_CHECKS_STREAM.send([{
-      repo: project,
-      provider: result.project.split('/')[0] ?? '',
-      score: result.score,
-      verdict: result.verdict,
-      source: ctx.source,
-      api_key: ctx.apiKey,
-      country: ctx.cf?.country ?? 'XX',
-      continent: ctx.cf?.continent ?? 'XX',
-      colo: ctx.cf?.colo ?? 'XX',
-      cache_status: ctx.cacheStatus,
-      client_type: classifyUserAgent(ctx.userAgent),
-      response_time_ms: ctx.responseTimeMs,
-    }]);
-  } catch (err) {
-    console.error('Pipeline send failed:', err);
-  }
+    try {
+      await env.ISITALIVE_CHECKS_STREAM.send([{
+        repo: project,
+        provider: result.project.split('/')[0] ?? '',
+        score: result.score,
+        verdict: result.verdict,
+        source: ctx.source,
+        api_key: ctx.apiKey,
+        country: ctx.cf?.country ?? 'XX',
+        continent: ctx.cf?.continent ?? 'XX',
+        colo: ctx.cf?.colo ?? 'XX',
+        cache_status: ctx.cacheStatus,
+        client_type: classifyUserAgent(ctx.userAgent),
+        response_time_ms: ctx.responseTimeMs,
+      }]);
+    } catch (err) {
+      console.error(`Pipeline: send failed for ${project}:`, err);
+    }
 }
 
 /**

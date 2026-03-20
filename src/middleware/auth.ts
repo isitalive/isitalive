@@ -37,7 +37,7 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 
     if (entry && entry.active !== false) {
       c.set('tier', (entry.tier || 'free') as Tier);
-      c.set('keyName', entry.name || key.slice(0, 8));
+      c.set('keyName', entry.name || 'unnamed');
     }
     // Invalid/inactive keys silently fall through to free tier —
     // doesn't reveal whether a key exists (OSS-safe)

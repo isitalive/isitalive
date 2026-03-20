@@ -2,7 +2,8 @@
 // Result page HTML — shows score gauge, verdict, signal breakdown
 // ---------------------------------------------------------------------------
 
-import type { ScoringResult, Verdict } from '../scoring/types';
+import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
+import { navbarHtml, footerHtml } from './components';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
@@ -52,7 +53,57 @@ function scoreColor(score: number): string {
   return '#6b7280';
 }
 
-export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string): string {
+function formatNumber(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(n);
+}
+
+function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, repo: string, firstIndexed?: string | null): string {
+  if (!meta) return '';
+
+  const pills: string[] = [];
+  const ghUrl = `https://github.com/${owner}/${repo}`;
+
+  // Language
+  if (meta.language) {
+    const dotColor = meta.languageColor || '#8b8b9e';
+    pills.push(`<span class="meta-pill"><span class="lang-dot" style="background:${dotColor}"></span>${meta.language}</span>`);
+  }
+
+  // License
+  if (meta.license && meta.license !== 'NOASSERTION') {
+    pills.push(`<span class="meta-pill">© ${meta.license}</span>`);
+  }
+
+  // Website
+  if (meta.homepageUrl) {
+    const display = meta.homepageUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    pills.push(`<a class="meta-pill" href="${meta.homepageUrl}" target="_blank" rel="noopener">🌐 ${display}</a>`);
+  }
+
+  // Repo link
+  pills.push(`<a class="meta-pill" href="${ghUrl}" target="_blank" rel="noopener">GitHub</a>`);
+
+  // Stars & forks
+  pills.push(`<span class="meta-pill">⭐ ${formatNumber(meta.stars)}</span>`);
+  pills.push(`<span class="meta-pill">🍴 ${formatNumber(meta.forks)}</span>`);
+
+  // First indexed date
+  if (firstIndexed) {
+    const date = firstIndexed.split('T')[0];
+    pills.push(`<span class="meta-pill">📅 Tracking since ${date}</span>`);
+  }
+
+  return `
+    <section class="meta-card">
+      ${meta.description ? `<div class="meta-description">${meta.description}</div>` : ''}
+      <div class="meta-pills">
+        ${pills.join('\n        ')}
+      </div>
+    </section>`;
+}
+
+export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string, firstIndexed?: string | null): string {
   const color = VERDICT_COLORS[result.verdict];
   const emoji = VERDICT_EMOJI[result.verdict];
   const label = VERDICT_LABELS[result.verdict];
@@ -125,31 +176,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       padding: 0 24px;
     }
 
-    /* ── Nav ──────────────────────────────── */
-    nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 24px 0;
-    }
 
-    nav a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: 0.85rem;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-
-    nav a:hover { color: var(--text-primary); }
-
-    .nav-logo {
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
 
     /* ── Score Hero ───────────────────────── */
     .hero {
@@ -363,9 +390,59 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       font-size: 0.75rem;
     }
 
+    /* ── Metadata Card ──────────────────── */
+    .meta-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+    }
+
+    .meta-description {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .meta-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 5px 14px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    a.meta-pill:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+
+    .lang-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
     @media (max-width: 640px) {
       .hero { padding: 24px 0 36px; }
-      .signals, .embed-section { padding: 20px; }
+      .signals, .embed-section, .meta-card { padding: 20px; }
     }
   </style>
 </head>
@@ -374,10 +451,8 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
   <div class="bg-orb bg-orb-2"></div>
 
   <div class="container">
-    <nav>
-      <a href="/" class="nav-logo">Is It Alive</a>
-      <a href="/">← Check another</a>
-    </nav>
+    ${navbarHtml}
+
 
     <section class="hero">
       <div class="project-name">
@@ -402,6 +477,8 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       ${result.overrideReason ? `<div class="override-notice">⚠️ ${result.overrideReason}</div>` : ''}
       ${result.cached ? `<div class="cache-notice">Cached result · checked <time datetime="${result.checkedAt}" id="checkedTime">${result.checkedAt.split('T')[0]}</time></div>` : ''}
     </section>
+
+    ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
 
     ${result.signals.length > 0 ? `
     <section class="signals">
@@ -438,9 +515,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       </div>
     </section>
 
-    <footer>
-      <p>Checked at ${result.checkedAt.split('T')[0]} · Powered by Cloudflare Workers</p>
-    </footer>
+    ${footerHtml}
   </div>
 
   <script>

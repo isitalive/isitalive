@@ -2,7 +2,7 @@
 // Scoring engine — orchestrates rules and produces the final verdict
 // ---------------------------------------------------------------------------
 
-import type { RawProjectData, ScoringResult, Verdict, ProviderName } from './types';
+import type { RawProjectData, ScoringResult, Verdict, ProviderName, ProjectMetadata } from './types';
 import { RULES } from './rules';
 
 /** Map a 0-100 score to a human-readable verdict */
@@ -27,6 +27,17 @@ export function scoreProject(
   const project = `${provider}/${data.owner}/${data.name}`;
   const checkedAt = new Date().toISOString();
 
+  // Build metadata once (shared by both paths)
+  const metadata: ProjectMetadata = {
+    description: data.description,
+    license: data.license,
+    homepageUrl: data.homepageUrl,
+    language: data.language,
+    languageColor: data.languageColor,
+    stars: data.stars,
+    forks: data.forks,
+  };
+
   // ── Instant-fail: archived repos ──────────────────────────────────
   if (data.archived) {
     return {
@@ -38,6 +49,7 @@ export function scoreProject(
       cached: false,
       signals: [],
       overrideReason: 'Repository is archived — score forced to 0.',
+      metadata,
     };
   }
 
@@ -57,5 +69,6 @@ export function scoreProject(
     checkedAt,
     cached: false,
     signals,
+    metadata,
   };
 }

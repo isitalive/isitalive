@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { TrendingRepo } from '../cron/handler';
+import { navbarHtml, footerHtml } from './components';
 
 function verdictColor(verdict: string): string {
   switch (verdict) {
@@ -62,18 +63,10 @@ export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): st
       z-index: 1;
       max-width: 720px;
       margin: 0 auto;
-      padding: 48px 20px;
+      padding: 0 20px 48px;
     }
 
-    .back-link {
-      display: inline-block;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 0.8rem;
-      margin-bottom: 24px;
-      transition: color 0.2s;
-    }
-    .back-link:hover { color: var(--text-secondary); }
+
 
     h1 {
       font-size: 1.6rem;
@@ -175,7 +168,7 @@ export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): st
   <div class="bg-orb b"></div>
 
   <div class="container">
-    <a href="/" class="back-link">← Back to Is It Alive?</a>
+    ${navbarHtml}
     <h1>🔥 Trending</h1>
     <p class="subtitle">Most checked projects in the last 24 hours</p>
 
@@ -201,6 +194,7 @@ export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): st
       }).join('')}
     </div>
     `}
+    ${footerHtml}
   </div>
 
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}

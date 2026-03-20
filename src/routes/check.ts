@@ -62,6 +62,19 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const startTime = Date.now();
   const { provider, owner, repo } = c.req.param();
 
+  // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
+  const cache = caches.default;
+  // Use a pristine request object to avoid poisoning cache with auth headers
+  const cacheKey = new Request(c.req.url);
+
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) {
+    console.log(`⚡ Cache HIT for: ${c.req.url}`);
+    return cachedResponse;
+  }
+
+  console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`);
+
   // Validate provider
   if (!(provider in providers)) {
     return c.json(
@@ -81,37 +94,46 @@ check.get('/:provider/:owner/:repo', async (c) => {
   if ((cached.status === 'l1-hit' || cached.status === 'hit') && cached.result) {
     // Analytics — WAE event for cache hit
     const ctx: CheckEventContext = {
-      source: 'api', apiKey: vars.get('apiKeyName') ?? 'anon',
+      source: 'api', apiKey: vars.get('keyName') ?? 'anon',
       cacheStatus: cached.status, responseTimeMs: Date.now() - startTime,
       cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
     };
     c.executionCtx.waitUntil(sendCheckEvent(c.env, cached.result, ctx));
 
-    c.header('Cache-Control', cacheControlHeader(tier));
-    c.header('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT');
-    return c.json({
+    const response = c.json({
       ...cached.result,
       ...cacheMeta(cached.status, tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     });
+
+    response.headers.set('Cache-Control', cacheControlHeader(tier));
+    response.headers.set('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT');
+
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+    return response;
   }
 
   if (cached.status === 'stale' && cached.result) {
     const ctx: CheckEventContext = {
-      source: 'api', apiKey: vars.get('apiKeyName') ?? 'anon',
+      source: 'api', apiKey: vars.get('keyName') ?? 'anon',
       cacheStatus: 'stale', responseTimeMs: Date.now() - startTime,
       cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
     };
-    c.executionCtx.waitUntil(Promise.all([
-      revalidate(c.env, provider, owner, repo),
-      sendCheckEvent(c.env, cached.result, ctx),
-    ]));
-    c.header('Cache-Control', cacheControlHeader(tier));
-    c.header('X-Cache', 'STALE');
-    return c.json({
-      ...cached.result,
-      ...cacheMeta('stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
-    });
-  }
+      c.executionCtx.waitUntil(Promise.all([
+        revalidate(c.env, provider, owner, repo),
+        sendCheckEvent(c.env, cached.result, ctx),
+      ]));
+
+      const response = c.json({
+        ...cached.result,
+        ...cacheMeta('stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
+      });
+
+      response.headers.set('Cache-Control', cacheControlHeader(tier));
+      response.headers.set('X-Cache', 'STALE');
+
+      c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+      return response;
+    }
 
   // ── Cache miss — fetch synchronously ────────────────────────────
   try {
@@ -121,7 +143,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
     // Analytics — WAE + R2 on fresh fetch
     const ctx: CheckEventContext = {
-      source: 'api', apiKey: vars.get('apiKeyName') ?? 'anon',
+      source: 'api', apiKey: vars.get('keyName') ?? 'anon',
       cacheStatus: 'miss', responseTimeMs: Date.now() - startTime,
       cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null,
     };
@@ -132,15 +154,26 @@ check.get('/:provider/:owner/:repo', async (c) => {
     ]));
 
     const now = new Date().toISOString();
-    c.header('Cache-Control', cacheControlHeader(tier));
-    c.header('X-Cache', 'MISS');
-    return c.json({
+    
+    // 4. Create the Hono JSON response
+    const response = c.json({
       ...result,
       ...cacheMeta('miss', tier, 0, now, now, now),
     });
+
+    // 5. Force Cloudflare to cache this JSON (explicitly set on the response object)
+    response.headers.set('Cache-Control', cacheControlHeader(tier));
+    response.headers.set('X-Cache', 'MISS');
+
+    // 6. Put a CLONED copy into the cache
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+
+    // 7. Return original response
+    return response;
   } catch (err: any) {
     const status = err.message?.includes('not found') ? 404 : 502;
-    return c.json({ error: err.message }, status);
+    const message = status === 404 ? 'Project not found' : 'Failed to fetch project data';
+    return c.json({ error: message }, status);
   }
 });
 

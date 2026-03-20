@@ -230,3 +230,39 @@ export function cacheControlHeader(tier: Tier): string {
   const swr = config.staleTtl - config.freshTtl;
   return `public, max-age=${config.l1Ttl}, s-maxage=${config.l1Ttl}, stale-while-revalidate=${swr}`;
 }
+
+// ---------------------------------------------------------------------------
+// First-seen tracking — records when a repo was first indexed
+// ---------------------------------------------------------------------------
+
+const FIRST_SEEN_PREFIX = 'isitalive:first-seen:';
+
+/**
+ * Record the first time we ever saw a repo (idempotent — only writes once).
+ */
+export async function trackFirstSeen(
+  kv: KVNamespace,
+  provider: string,
+  owner: string,
+  repo: string,
+): Promise<void> {
+  const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  const existing = await kv.get(key);
+  if (!existing) {
+    await kv.put(key, new Date().toISOString());
+  }
+}
+
+/**
+ * Get the first time a repo was indexed (null if never seen).
+ */
+export async function getFirstSeen(
+  kv: KVNamespace,
+  provider: string,
+  owner: string,
+  repo: string,
+): Promise<string | null> {
+  const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  return await kv.get(key);
+}
+

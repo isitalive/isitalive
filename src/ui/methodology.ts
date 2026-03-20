@@ -2,6 +2,8 @@
 // Methodology page — explains how the health score is calculated
 // ---------------------------------------------------------------------------
 
+import { navbarHtml, footerHtml } from './components';
+
 export function methodologyPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -53,15 +55,7 @@ export function methodologyPage(analyticsToken?: string): string {
       padding: 0 24px;
     }
 
-    nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 24px 0;
-    }
-    nav a { color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: color 0.2s; }
-    nav a:hover { color: var(--text-primary); }
-    .nav-logo { font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+
 
     h1 {
       font-size: 2rem;
@@ -208,10 +202,7 @@ export function methodologyPage(analyticsToken?: string): string {
   <div class="bg-orb bg-orb-2"></div>
 
   <div class="container">
-    <nav>
-      <a href="/" class="nav-logo">Is It Alive</a>
-      <a href="/">← Check a project</a>
-    </nav>
+    ${navbarHtml}
 
     <h1>How We Score</h1>
     <p class="intro">Every project is evaluated across 8 weighted signals pulled from the GitHub GraphQL API. The signals are combined into a single score from 0 to 100, then mapped to a human-readable verdict.</p>
@@ -402,9 +393,7 @@ export function methodologyPage(analyticsToken?: string): string {
 
     <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">During the <strong>stale</strong> window, you'll receive the cached result immediately while a background refresh runs. After the stale window, a fresh fetch is triggered synchronously.</p>
 
-    <footer>
-      <p><a href="/">← Check a project</a> &nbsp;·&nbsp; <a href="https://github.com/isitaltive/isitalive">Source on GitHub</a></p>
-    </footer>
+    ${footerHtml}
   </div>
   ${analyticsToken ? '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"' + analyticsToken + '"}\'></script>' : ''}
 </body>

@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { RecentQuery } from '../cache/recentQueries';
+import { navbarHtml, footerHtml } from './components';
 
 export function landingPage(siteKey?: string, analyticsToken?: string, recentQueries: RecentQuery[] = []): string {
   const hasTurnstile = !!siteKey;
@@ -15,8 +16,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
   <meta name="description" content="Instantly check if an open-source project is actively maintained or abandoned. Fast, cached, API-ready.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"></noscript>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -60,9 +62,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
     .container {
       position: relative;
       z-index: 1;
-      max-width: 720px;
+      max-width: 1000px;
       margin: 0 auto;
-      padding: 0 24px;
+      padding: 0 40px;
     }
 
     /* ── Header ─────────────────────────────── */
@@ -121,14 +123,21 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
     /* ── Search ─────────────────────────────── */
     .search-container {
       margin-top: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
     }
 
     .search-box {
-      position: relative;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 6px;
+      border-radius: 20px;
+      padding: 8px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0;
       transition: border-color 0.3s, box-shadow 0.3s;
     }
 
@@ -137,15 +146,17 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
       box-shadow: 0 0 0 4px var(--accent-glow);
     }
 
-    .search-box form {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0;
+    #searchForm {
+      width: 100%;
+      max-width: 1200px;
     }
 
-    .search-box .cf-turnstile {
-      flex-basis: 100%;
-      margin-top: 8px;
+
+
+    .cf-turnstile {
+      display: flex;
+      justify-content: center;
+      margin-top: 16px;
     }
 
     .search-box input {
@@ -155,8 +166,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
       outline: none;
       color: var(--text-primary);
       font-family: 'Inter', sans-serif;
-      font-size: 1rem;
-      padding: 14px 20px;
+      font-size: 1.2rem;
+      padding: 20px 28px;
       caret-color: var(--accent);
     }
 
@@ -168,13 +179,14 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
       background: var(--accent);
       color: #fff;
       border: none;
-      border-radius: 12px;
-      padding: 14px 28px;
+      border-radius: 14px;
+      padding: 18px 36px;
       font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
+      font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      transition: all 0.2s;
+      white-space: nowrap;
     }
 
     .search-box button:hover { background: #5558e6; }
@@ -376,11 +388,85 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
 
     /* ── Responsive ─────────────────────────── */
     @media (max-width: 640px) {
-      header { padding: 80px 0 40px; }
+      header { padding: 60px 0 40px; }
       .features { grid-template-columns: 1fr; }
       .signals-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 480px) {
       .search-box form { flex-direction: column; }
-      .search-box button { width: 100%; }
+      .search-box button { width: 100%; border-radius: 12px; margin-top: 8px; }
+      .search-box { padding: 8px; border-radius: 16px; }
+      .search-box input { padding: 12px 16px; }
+      h1 { font-size: 1.8rem; }
+      .subtitle { font-size: 0.9rem; }
+    }
+
+    /* ── Loading transition ──────────────────── */
+    .loading-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), #a78bfa, var(--accent));
+      background-size: 200% 100%;
+      width: 0;
+      z-index: 9999;
+      transition: width 0.4s ease;
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .loading-bar.active {
+      width: 85%;
+      transition: width 8s cubic-bezier(0.1, 0.05, 0, 1);
+    }
+
+    .loading-bar.done {
+      width: 100%;
+      transition: width 0.2s ease;
+    }
+
+    .search-box.loading {
+      animation: boxPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes boxPulse {
+      0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+      50% { box-shadow: 0 0 0 8px transparent; }
+    }
+
+    .search-box button .btn-text { display: inline; }
+    .search-box button .btn-spinner { display: none; }
+
+    .search-box button.loading .btn-text { display: none; }
+    .search-box button.loading .btn-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    .search-box button.loading {
+      pointer-events: none;
+      opacity: 0.8;
+      min-width: 140px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    body.navigating {
+      opacity: 0.6;
+      transition: opacity 0.3s ease;
     }
   </style>
 </head>
@@ -390,27 +476,30 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
   <div class="bg-orb bg-orb-3"></div>
 
   <div class="container">
+    ${navbarHtml}
     <header>
-      <div class="logo"><span class="pulse"></span> IS IT ALIVE</div>
+
       <h1>Is this project safe to depend on?</h1>
       <p class="subtitle">Instantly check the health of any open-source project. One query, one score, one answer.</p>
 
       <div class="search-container">
-        <div class="search-box">
-          <form id="searchForm" action="/_check" method="POST">
+        <form action="/_check" method="POST" id="searchForm">
+          <div class="search-box" id="searchBox">
             <input
               type="text"
-              id="searchInput"
               name="repo"
-              placeholder="owner/repo  (e.g. vercel/next.js)"
-              autocomplete="off"
-              spellcheck="false"
+              id="searchInput"
+              placeholder="owner/repo (e.g. vercel/next.js)"
+              required
               autofocus
             />
-            <button type="submit">Check Health</button>
-            ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" style="margin-top:12px"></div>` : ''}
-          </form>
-        </div>
+            <button type="submit" id="searchBtn">
+              <span class="btn-text">Check Health</span>
+              <span class="btn-spinner"></span>
+            </button>
+          </div>
+          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible"></div>` : ''}
+        </form>
         <p class="search-hint">Try <code>vercel/next.js</code> or <code>facebook/react</code></p>
       </div>
     </header>
@@ -462,7 +551,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
         <div class="signal-item"><span class="signal-weight">10%</span> Issue staleness</div>
         <div class="signal-item"><span class="signal-weight">10%</span> Contributor diversity</div>
         <div class="signal-item"><span class="signal-weight">10%</span> Bus factor risk</div>
-        <div class="signal-item"><span class="signal-weight">5%</span> CI/CD presence</div>
+        <div class="signal-item"><span class="signal-weight">10%</span> CI/CD presence</div>
         <div class="signal-item"><span class="signal-weight">5%</span> Community size</div>
       </div>
     </section>
@@ -483,16 +572,25 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
       </div>
     </section>
 
-    <footer>
-      <p>Built with Cloudflare Workers &amp; Hono &nbsp;·&nbsp; <a href="https://github.com">GitHub</a></p>
-    </footer>
+    ${footerHtml}
   </div>
+
+  <div class="loading-bar" id="loadingBar"></div>
 
   ${hasTurnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}
   <script>
     document.getElementById('searchForm').addEventListener('submit', function(e) {
       const input = document.getElementById('searchInput').value.trim();
       if (!input) { e.preventDefault(); return; }
+
+      // Show loading state
+      var btn = document.getElementById('searchBtn');
+      var box = document.getElementById('searchBox');
+      var bar = document.getElementById('loadingBar');
+      btn.classList.add('loading');
+      box.classList.add('loading');
+      bar.classList.add('active');
+      document.getElementById('searchInput').readOnly = true;
 
       ${hasTurnstile ? `// Let the form POST with Turnstile token — server handles redirect` : `
       // No Turnstile (local dev) — do client-side redirect
@@ -504,8 +602,32 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
 
       const parts = path.split('/');
       if (parts.length >= 2) {
-        window.location.href = '/' + parts[0] + '/' + parts[1];
+        document.body.classList.add('navigating');
+        setTimeout(function() {
+          window.location.href = '/' + parts[0] + '/' + parts[1];
+        }, 300);
       }`}
+    });
+
+    // If we're navigating away (form POST redirect), show fade
+    window.addEventListener('beforeunload', function() {
+      document.body.classList.add('navigating');
+      var bar = document.getElementById('loadingBar');
+      if (bar) bar.classList.add('done');
+    });
+
+    // Reset loading state when navigating back (bfcache restore)
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted) {
+        document.body.classList.remove('navigating');
+        var btn = document.getElementById('searchBtn');
+        var box = document.getElementById('searchBox');
+        var bar = document.getElementById('loadingBar');
+        if (btn) btn.classList.remove('loading');
+        if (box) box.classList.remove('loading');
+        if (bar) { bar.classList.remove('active', 'done'); bar.style.width = '0'; }
+        document.getElementById('searchInput').readOnly = false;
+      }
     });
   </script>
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}

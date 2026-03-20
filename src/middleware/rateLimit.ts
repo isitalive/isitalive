@@ -1,30 +1,32 @@
 // ---------------------------------------------------------------------------
 // Rate limiting middleware — Durable Object backed
 //
-// Tier limits (per hour):
-//   - Unauthenticated (no key): 10 req/hr
-//   - Free key:                 100 req/hr
-//   - Pro key:                  1,000 req/hr
-//   - Enterprise key:           10,000 req/hr
+// Tier limits (per minute):
+//   - Unauthenticated (no key): 60 req/min
+//   - Free key:                 60 req/min
+//   - Pro key:                  120 req/min
+//   - Enterprise key:           600 req/min
 //
-// Each unique rate-limit key gets its own Durable Object instance
-// with an atomic sliding window counter.
+// Unauthenticated limit is generous because most responses are served from
+// KV cache (~1ms, no GitHub API calls). The edge cache layer would bypass
+// the rate limiter entirely for cached responses, but the Cache API may not
+// be functional on all zones — this higher limit compensates.
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono';
 import type { Env } from '../scoring/types';
 import type { Tier } from '../cache/index';
 
-const WINDOW_MS = 3600 * 1000; // 1 hour
+const WINDOW_MS = 60 * 1000; // 1 minute
 
 const TIER_LIMITS: Record<Tier, number> = {
-  free: 100,
-  pro: 1000,
-  enterprise: 10000,
+  free: 60,
+  pro: 120,
+  enterprise: 600,
 };
 
 /** Unauthenticated (no API key) limit */
-const UNAUTHENTICATED_LIMIT = 10;
+const UNAUTHENTICATED_LIMIT = 60;
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } };
 
@@ -32,11 +34,10 @@ type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null }
  * Rate limiter using Durable Objects for atomic, strongly consistent counters.
  */
 export async function rateLimit(c: Context<AppEnv>, next: Next) {
-  const tier: Tier = c.get('tier');
   const keyName = c.get('keyName');
-  const isAuthenticated = keyName !== null;
-
-  const limit = isAuthenticated ? TIER_LIMITS[tier] : UNAUTHENTICATED_LIMIT;
+  const isAuthenticated = !!c.get('keyName');
+  const tier = (c.get('tier') || 'free') as Tier;
+  const limitValue = isAuthenticated ? (TIER_LIMITS[tier] || TIER_LIMITS['free']) : UNAUTHENTICATED_LIMIT;
 
   // Rate limit key: by API key name if authenticated, by IP if not
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
@@ -47,7 +48,7 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
   const stub = c.env.RATE_LIMITER.get(id);
 
   const doRes = await stub.fetch(
-    new Request(`https://rate-limiter.internal/check?limit=${limit}&window=${WINDOW_MS}`),
+    new Request(`https://rate-limiter.internal/check?limit=${limitValue}&window=${WINDOW_MS}`),
   );
   const result = await doRes.json() as {
     allowed: boolean;
@@ -73,8 +74,8 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
         remaining: 0,
         retryAfterSeconds: Math.ceil(result.resetMs / 1000),
         message: isAuthenticated
-          ? `Upgrade to a higher tier for more requests. Current: ${tier} (${limit}/hr).`
-          : 'Add an API key (Authorization: Bearer <key>) for higher limits. Register at isitalive.dev.',
+          ? `Upgrade to a higher tier for more requests. Current: ${tier} (${result.limit}/min).`
+          : `Add an API key for higher limits. Current (unauthenticated): ${result.limit}/min.`,
       },
       429,
     );
