@@ -5,12 +5,12 @@
 /** Supported source-code hosting / registry providers */
 export type ProviderName = 'github' | 'npm' | 'pypi' | 'crates' | 'kernel';
 
-/** Human-readable health verdict — describes observed state, not trajectory */
+/** Human-readable health verdict — describes dependency risk, not just activity */
 export type Verdict =
   | 'healthy'       // 80-100
-  | 'maintained'    // 60-79
-  | 'stale'         // 40-59
-  | 'dormant'       // 20-39
+  | 'stable'        // 60-79
+  | 'degraded'      // 40-59
+  | 'critical'      // 20-39
   | 'unmaintained'; // 0-19
 
 /** Result of a single scoring signal */

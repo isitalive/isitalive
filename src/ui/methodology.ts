@@ -358,17 +358,17 @@ export function methodologyPage(analyticsToken?: string): string {
       </div>
       <div class="verdict-chip">
         <div class="emoji">🟡</div>
-        <div class="name" style="color: #eab308">Maintained</div>
+        <div class="name" style="color: #eab308">Stable</div>
         <div class="range">60 – 79</div>
       </div>
       <div class="verdict-chip">
         <div class="emoji">🟠</div>
-        <div class="name" style="color: #f97316">Stale</div>
+        <div class="name" style="color: #f97316">Degraded</div>
         <div class="range">40 – 59</div>
       </div>
       <div class="verdict-chip">
         <div class="emoji">🔴</div>
-        <div class="name" style="color: #ef4444">Dormant</div>
+        <div class="name" style="color: #ef4444">Critical</div>
         <div class="range">20 – 39</div>
       </div>
       <div class="verdict-chip">

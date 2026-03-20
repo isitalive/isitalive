@@ -25,7 +25,7 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 
 **Response fields:**
 - \`score\` (0-100): Weighted health score
-- \`verdict\`: healthy | maintained | stale | dormant | unmaintained
+- \`verdict\`: healthy | stable | degraded | critical | unmaintained
 - \`signals[]\`: Individual metrics (last_commit, issue_staleness, pr_responsiveness, etc.)
 - \`cache.nextRefreshSeconds\`: When to re-poll for fresh data
 

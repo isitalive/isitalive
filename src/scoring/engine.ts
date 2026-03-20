@@ -8,9 +8,9 @@ import { RULES } from './rules';
 /** Map a 0-100 score to a human-readable verdict */
 function toVerdict(score: number): Verdict {
   if (score >= 80) return 'healthy';
-  if (score >= 60) return 'maintained';
-  if (score >= 40) return 'stale';
-  if (score >= 20) return 'dormant';
+  if (score >= 60) return 'stable';
+  if (score >= 40) return 'degraded';
+  if (score >= 20) return 'critical';
   return 'unmaintained';
 }
 

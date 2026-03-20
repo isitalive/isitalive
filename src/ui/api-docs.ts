@@ -342,9 +342,9 @@ export function apiDocsPage(analyticsToken?: string): string {
     <table class="verdict-table">
       <tr><th>Score</th><th>Verdict</th><th>Meaning</th></tr>
       <tr><td>80–100</td><td style="color: #22c55e">🟢 healthy</td><td>Actively maintained with strong signals</td></tr>
-      <tr><td>60–79</td><td style="color: #eab308">🟡 maintained</td><td>Regular activity, some signals lagging</td></tr>
-      <tr><td>40–59</td><td style="color: #f97316">🟠 stale</td><td>Reduced freshness across most signals</td></tr>
-      <tr><td>20–39</td><td style="color: #ef4444">🔴 dormant</td><td>Very little recent activity</td></tr>
+      <tr><td>60–79</td><td style="color: #eab308">🟡 stable</td><td>Generally safe, some signals imperfect</td></tr>
+      <tr><td>40–59</td><td style="color: #f97316">🟠 degraded</td><td>Caution advised — red flags detected</td></tr>
+      <tr><td>20–39</td><td style="color: #ef4444">🔴 critical</td><td>High risk — severe neglect detected</td></tr>
       <tr><td>0–19</td><td style="color: #6b7280">⚫ unmaintained</td><td>No meaningful activity detected</td></tr>
     </table>
 

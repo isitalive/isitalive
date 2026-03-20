@@ -8,34 +8,37 @@ import type { Trend } from '../ingest/processor';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
-  maintained: '#eab308',
-  stale: '#f97316',
-  dormant: '#ef4444',
+  stable: '#eab308',
+  degraded: '#f97316',
+  critical: '#ef4444',
   unmaintained: '#6b7280',
 };
 
 const VERDICT_EMOJI: Record<Verdict, string> = {
   healthy: '🟢',
-  maintained: '🟡',
-  stale: '🟠',
-  dormant: '🔴',
+  stable: '🟡',
+  degraded: '🟠',
+  critical: '🔴',
   unmaintained: '⚫',
 };
 
 const VERDICT_LABELS: Record<Verdict, string> = {
   healthy: 'Healthy',
-  maintained: 'Maintained',
-  stale: 'Stale',
-  dormant: 'Dormant',
+  stable: 'Stable',
+  degraded: 'Degraded',
+  critical: 'Critical',
   unmaintained: 'Unmaintained',
 };
 
 /** Normalize legacy verdict values from KV cache */
 const VERDICT_NORMALIZE: Record<string, Verdict> = {
-  declining: 'stale',
-  inactive: 'stale',
-  at_risk: 'dormant',
+  declining: 'degraded',
+  inactive: 'degraded',
+  stale: 'degraded',
+  at_risk: 'critical',
+  dormant: 'critical',
   abandoned: 'unmaintained',
+  maintained: 'stable',
 };
 function normalizeVerdict(v: string): Verdict {
   return (VERDICT_NORMALIZE[v] as Verdict) || (v as Verdict);

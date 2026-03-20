@@ -352,8 +352,11 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       }
 
       .badge-cta h2 { font-size: 1.3rem; }
+      .badge-snippets { max-width: 100%; }
       .snippet-block { flex-direction: column; align-items: stretch; gap: 8px; }
-      .snippet-label { min-width: unset; }
+      .snippet-label { min-width: unset; text-align: center; }
+      .snippet-code { font-size: 0.65rem; min-width: 0; }
+      .copy-btn { align-self: center; }
     }
 
     /* ── Loading transition ──────────────────── */
@@ -670,7 +673,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       if (!queries || !queries.length) return;
       var section = document.getElementById('recentSection');
       var list = document.getElementById('recentList');
-      var COLORS = { healthy:'#22c55e', maintained:'#eab308', stale:'#f97316', dormant:'#ef4444', unmaintained:'#6b7280' };
+      var COLORS = { healthy:'#22c55e', stable:'#eab308', degraded:'#f97316', critical:'#ef4444', unmaintained:'#6b7280' };
       list.innerHTML = queries.map(function(q) {
         var c = COLORS[q.verdict] || '#6b7280';
         return '<a href="/github/' + q.owner + '/' + q.repo + '" class="recent-chip">'

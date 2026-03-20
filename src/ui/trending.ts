@@ -199,9 +199,9 @@ export function trendingPage(analyticsToken?: string): string {
   <script>
     const VERDICT_COLORS = {
       healthy: '#22c55e',
-      maintained: '#eab308',
-      stale: '#f97316',
-      dormant: '#ef4444',
+      stable: '#eab308',
+      degraded: '#f97316',
+      critical: '#ef4444',
       unmaintained: '#6b7280',
     };
 
@@ -209,9 +209,9 @@ export function trendingPage(analyticsToken?: string): string {
       return v.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
     }
 
-    // Normalize old verdict values stored in KV before the rename
+    // Normalize old verdict values stored in KV
     function normalizeVerdict(v) {
-      var REMAP = { declining: 'stale', inactive: 'stale', at_risk: 'dormant', abandoned: 'unmaintained' };
+      var REMAP = { declining:'degraded', inactive:'degraded', stale:'degraded', at_risk:'critical', dormant:'critical', abandoned:'unmaintained', maintained:'stable' };
       return REMAP[v] || v;
     }
 
