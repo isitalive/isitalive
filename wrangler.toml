@@ -41,6 +41,12 @@ simple = { limit = 600, period = 60 }
 tag = "v3"
 deleted_classes = ["RateLimiterDO", "RecentQueriesDO"]
 
+# Workflows — durable ingest pipeline
+[[workflows]]
+name = "ingest-workflow"
+binding = "INGEST_WORKFLOW"
+class_name = "IngestWorkflow"
+
 # R2 — raw GitHub response archive (permanent source of truth)
 [[r2_buckets]]
 binding = "RAW_DATA"

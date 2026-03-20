@@ -14,19 +14,10 @@
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../scoring/types';
-import { GitHubProvider } from '../providers/github';
-import { scoreProject } from '../scoring/engine';
-import { sendCheckEvent, archiveRawData, type CheckEventContext } from '../analytics/events';
-import { putCache } from '../cache/index';
-import { processRepos } from '../ingest/processor';
-import { r2SqlSource } from '../ingest/sources/r2-sql';
-import { gitHubTrendingSource } from '../ingest/sources/github';
 
 const R2_SQL_ENDPOINT = 'https://api.sql.cloudflarestorage.com/api/v1/accounts';
 const TRENDING_KV_KEY = 'isitalive:trending';
 const SITEMAP_KV_KEY = 'isitalive:sitemap_repos';
-const SNAPSHOT_MAX_REPOS = 200;  // Max repos to re-check daily
-const SCORE_HISTORY_MAX = 90;   // Keep ~90 days of history per repo
 
 export interface TrendingRepo {
   repo: string;       // "owner/repo"
@@ -176,35 +167,20 @@ export async function getSitemapRepos(kv: KVNamespace): Promise<string[]> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Daily Snapshot — re-check top repos and build score history
-// ---------------------------------------------------------------------------
 
-/** A single point in a repo's score time-series */
-export interface ScoreSnapshot {
-  date: string;     // YYYY-MM-DD
-  score: number;    // 0-100
-  verdict: string;  // e.g. "healthy"
-}
-
-const github = new GitHubProvider();
 
 /**
  * Daily snapshot handler — re-checks top N repos from the pipeline.
  * Returns the number of repos successfully snapshotted.
  */
 async function handleDailySnapshot(env: Env): Promise<number> {
-  console.log('Cron (Daily): starting snapshot run');
+  console.log('Cron (Daily): dispatching ingest workflow');
 
-  // Gather repos from all configured sources
-  const [topRepos, trendingRepos] = await Promise.all([
-    r2SqlSource.getRepos(env),
-    gitHubTrendingSource.getRepos(env),
-  ]);
+  // Fire-and-forget — the Workflow runs asynchronously with durable steps
+  const instance = await env.INGEST_WORKFLOW.create({
+    params: { trigger: 'daily' as const },
+  });
 
-  const allRepos = [...topRepos, ...trendingRepos];
-  console.log(`Cron (Daily): found ${topRepos.length} R2 repos and ${trendingRepos.length} GitHub Trending repos`);
-
-  // Process them through the shared processor
-  return processRepos(env, allRepos);
+  console.log(`Cron (Daily): workflow instance created: ${instance.id}`);
+  return 0; // Actual count tracked inside the Workflow
 }

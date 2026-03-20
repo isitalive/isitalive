@@ -47,7 +47,7 @@ export async function processRepos(env: Env, repos: string[]): Promise<number> {
   return successCount;
 }
 
-async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean> {
+export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean> {
   const parts = repoSlug.split('/');
   if (parts.length < 2) return false;
   const [owner, repo] = parts;

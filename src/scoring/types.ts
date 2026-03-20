@@ -137,7 +137,6 @@ interface Pipeline<T = Record<string, unknown>> {
 export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
-  RATE_LIMITER: DurableObjectNamespace; // Rate limiting via Durable Object
   RATE_LIMITER_FREE: RateLimit;
   RATE_LIMITER_PRO: RateLimit;
   RATE_LIMITER_ENTERPRISE: RateLimit;
@@ -155,6 +154,9 @@ export interface Env {
   // R2 SQL API (for Cron trending queries) — read-only scoped token
   CF_ACCOUNT_ID?: string;
   CF_R2_SQL_TOKEN?: string;
+
+  // Workflows — durable ingest pipeline
+  INGEST_WORKFLOW: Workflow;
 }
 
 /** Shape of an API key entry in KEYS_KV */

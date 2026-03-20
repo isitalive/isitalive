@@ -80,4 +80,5 @@ export default {
   },
 };
 
-
+// ── Workflow exports ──────────────────────────────────────────────────
+export { IngestWorkflow } from './ingest/workflow';
