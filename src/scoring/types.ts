@@ -157,6 +157,9 @@ export interface Env {
 
   // Workflows — durable ingest pipeline
   INGEST_WORKFLOW: Workflow;
+
+  // Queues — unified event bus
+  EVENTS_QUEUE: Queue;
 }
 
 /** Shape of an API key entry in KEYS_KV */

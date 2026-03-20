@@ -11,17 +11,18 @@ import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
 import { GitHubProvider } from '../providers/github';
 import { scoreProject } from '../scoring/engine';
-import { getCached, putCache, trackFirstSeen, getFirstSeen } from '../cache/index';
+import { getCached, putCache, getFirstSeen } from '../cache/index';
 import { landingPage } from '../ui/landing';
 import { resultPage } from '../ui/result';
 import { errorPage } from '../ui/error';
 import { methodologyPage } from '../ui/methodology';
 import { changelogPage } from '../ui/changelog';
 import { verifyTurnstile } from '../middleware/turnstile';
-import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries';
-import { sendCheckEvent, archiveRawData, type CheckEventContext } from '../analytics/events';
+import { getRecentQueries } from '../cache/recentQueries';
+import type { CheckEventContext } from '../analytics/events';
 import { getTrending, getSitemapRepos } from '../cron/handler';
 import { trendingPage } from '../ui/trending';
+import type { QueueMessage } from '../queue/types';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -154,19 +155,22 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
             const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
             const fresh = scoreProject(rawData, prov.name);
             await putCache(c.env, provider, owner, repo, fresh);
-            // Archive raw data from background revalidation too
-            await archiveRawData(c.env, provider, owner, repo, rawData._rawResponse);
+            // Archive raw data from background revalidation via queue
+            await c.env.EVENTS_QUEUE.send({ type: 'archive-raw', data: {
+              provider, owner, repo, rawResponse: rawData._rawResponse,
+            }} satisfies QueueMessage);
           } catch {}
         })());
       }
-      // Track + analytics (non-blocking)
-      const ctx = { ...analyticsCtx(), cacheStatus: status };
-      c.executionCtx.waitUntil(Promise.all([
-        trackRecentQuery(c.env.CACHE_KV, {
-          owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
-        }),
-        sendCheckEvent(c.env, cached, ctx),
-      ]));
+      // Track + analytics via Queue (fire-and-forget)
+      const ctx: CheckEventContext = { ...analyticsCtx(), cacheStatus: status };
+      c.executionCtx.waitUntil(
+        c.env.EVENTS_QUEUE.send({ type: 'recent-query', data: {
+            owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
+        }} satisfies QueueMessage).then(() =>
+          c.env.EVENTS_QUEUE.send({ type: 'check-event', data: { result: cached, ctx } } satisfies QueueMessage)
+        ),
+      );
       const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo);
       const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed));
       c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
@@ -177,16 +181,18 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
     const result = scoreProject(rawData, prov.name);
 
-    // Cache + track + analytics + R2 archive (non-blocking)
+    // Cache + queue events (non-blocking)
     const ctx = analyticsCtx();
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
-      trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-      trackRecentQuery(c.env.CACHE_KV, {
+      c.env.EVENTS_QUEUE.send({ type: 'first-seen', data: { provider, owner, repo } } satisfies QueueMessage),
+      c.env.EVENTS_QUEUE.send({ type: 'recent-query', data: {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
-      }),
-      archiveRawData(c.env, provider, owner, repo, rawData._rawResponse),
-      sendCheckEvent(c.env, result, ctx),
+      }} satisfies QueueMessage),
+      c.env.EVENTS_QUEUE.send({ type: 'archive-raw', data: {
+        provider, owner, repo, rawResponse: rawData._rawResponse,
+      }} satisfies QueueMessage),
+      c.env.EVENTS_QUEUE.send({ type: 'check-event', data: { result, ctx } } satisfies QueueMessage),
     ]));
 
     const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo);

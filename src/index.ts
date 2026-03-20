@@ -69,6 +69,8 @@ app.get('/health', (c) => c.json({ status: 'ok', version: '0.4.0' }));
 
 // ── Export Worker ─────────────────────────────────────────────────────
 import { handleScheduled } from './cron/handler';
+import { handleQueueBatch } from './queue/consumer';
+import type { QueueMessage } from './queue/types';
 
 export default {
   fetch: app.fetch,
@@ -77,6 +79,9 @@ export default {
     const trigger = event.cron === '0 6 * * *' ? 'daily' : 'hourly';
     console.log(`Cron: triggered (${trigger}) at ${new Date(event.scheduledTime).toISOString()}`);
     await handleScheduled(env, trigger);
+  },
+  async queue(batch: MessageBatch<QueueMessage>, env: Env) {
+    await handleQueueBatch(batch, env);
   },
 };
 

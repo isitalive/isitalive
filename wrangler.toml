@@ -57,6 +57,16 @@ bucket_name = "isitalive-raw"
 pipeline = "1bc79833401a4e438d2c3794d0a5565d"
 binding = "ISITALIVE_CHECKS_STREAM"
 
+# Queues — unified event bus (recent queries, analytics, first-seen, archives)
+[[queues.producers]]
+binding = "EVENTS_QUEUE"
+queue = "isitalive-events"
+
+[[queues.consumers]]
+queue = "isitalive-events"
+max_batch_size = 100
+max_batch_timeout = 5
+
 # Cron Triggers — hourly trending + daily snapshot (6 AM UTC)
 [triggers]
 crons = ["*/10 * * * *", "0 6 * * *"]
