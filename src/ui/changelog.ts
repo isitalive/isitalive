@@ -1,90 +1,11 @@
 // ---------------------------------------------------------------------------
-// Changelog page — rendered from structured data
+// Changelog page — static HTML shell with client-side infinite scroll
+//
+// The HTML shell is edge-cached. Changelog data is hydrated client-side
+// via fetch('/api/changelog?page=1&limit=5') with infinite scroll loading.
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml } from './components';
-
-interface ChangeEntry {
-  type: 'added' | 'changed' | 'fixed' | 'removed';
-  text: string;
-}
-
-interface Version {
-  version: string;
-  date: string;
-  entries: ChangeEntry[];
-}
-
-const typeConfig = {
-  added:   { label: 'Added',   color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-  changed: { label: 'Changed', color: '#eab308', bg: 'rgba(234,179,8,0.12)' },
-  fixed:   { label: 'Fixed',   color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
-  removed: { label: 'Removed', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
-};
-
-// ---- Changelog data — add new versions at the top ----
-const changelog: Version[] = [
-  {
-    version: '0.3.0',
-    date: '2026-03-20',
-    entries: [
-      { type: 'added', text: 'Loading transition with spinner, progress bar, and page fade' },
-      { type: 'added', text: 'This changelog page' },
-      { type: 'fixed', text: 'Loading state persisting when navigating back via browser history' },
-      { type: 'fixed', text: 'GitHub org typo in footer link' },
-    ],
-  },
-  {
-    version: '0.2.0',
-    date: '2026-03-20',
-    entries: [
-      { type: 'added', text: 'Scoring engine with 8 weighted signals' },
-      { type: 'added', text: 'Stability override for finished / complete projects' },
-      { type: 'added', text: 'Solo-maintainer forgiveness for small repos' },
-      { type: 'added', text: 'Inbox-zero recognition for clean repos' },
-      { type: 'changed', text: 'CI/CD weight increased from 5% to 10% (fixes weight sum bug)' },
-      { type: 'changed', text: 'Rate limits switched from per-hour to per-minute' },
-      { type: 'fixed', text: 'Clean repos being penalized for having zero open issues' },
-    ],
-  },
-  {
-    version: '0.1.0',
-    date: '2026-03-19',
-    entries: [
-      { type: 'added', text: 'Landing page with search and recent queries' },
-      { type: 'added', text: 'Health check result pages with score breakdown' },
-      { type: 'added', text: 'Trending page powered by R2 SQL + hourly cron' },
-      { type: 'added', text: 'Methodology page explaining all 8 signals' },
-      { type: 'added', text: 'REST API with tiered API key access' },
-      { type: 'added', text: 'Cloudflare Turnstile bot protection' },
-      { type: 'added', text: 'KV caching with stale-while-revalidate' },
-      { type: 'added', text: 'Analytics pipeline (Iceberg / R2)' },
-      { type: 'added', text: 'Dynamic sitemap generation' },
-    ],
-  },
-];
-
-function renderEntries(entries: ChangeEntry[]): string {
-  const grouped = new Map<string, ChangeEntry[]>();
-  for (const e of entries) {
-    const list = grouped.get(e.type) || [];
-    list.push(e);
-    grouped.set(e.type, list);
-  }
-
-  let html = '';
-  for (const [type, items] of grouped) {
-    const cfg = typeConfig[type as keyof typeof typeConfig];
-    html += `
-      <div class="change-group">
-        <span class="change-badge" style="color: ${cfg.color}; background: ${cfg.bg}">${cfg.label}</span>
-        <ul>
-          ${items.map(i => `<li>${i.text}</li>`).join('\n          ')}
-        </ul>
-      </div>`;
-  }
-  return html;
-}
 
 export function changelogPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -187,7 +108,7 @@ export function changelogPage(analyticsToken?: string): string {
     }
 
     /* ── Timeline line ── */
-    .version-card::before {
+    .version-card + .version-card::before {
       content: '';
       position: absolute;
       left: 46px;
@@ -196,7 +117,6 @@ export function changelogPage(analyticsToken?: string): string {
       height: 24px;
       background: var(--border);
     }
-    .version-card:first-child::before { display: none; }
 
     /* ── Change groups ── */
     .change-group {
@@ -238,6 +158,49 @@ export function changelogPage(analyticsToken?: string): string {
       font-size: 1rem;
     }
 
+    /* ── Loading skeleton ── */
+    .skeleton-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .skeleton-bar {
+      height: 12px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ── Load more ── */
+    .load-more {
+      text-align: center;
+      padding: 20px 0;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+    .load-more-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-secondary);
+      padding: 10px 28px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .load-more-btn:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+
     footer {
       text-align: center;
       padding: 60px 0 40px;
@@ -262,17 +225,131 @@ export function changelogPage(analyticsToken?: string): string {
     <h1>Changelog</h1>
     <p class="intro">What's new, improved, and fixed in Is It Alive?</p>
 
-    ${changelog.map(v => `
-    <div class="version-card">
-      <div class="version-header">
-        <span class="version-tag">v${v.version}</span>
-        <span class="version-date">${v.date}</span>
-      </div>
-      ${renderEntries(v.entries)}
-    </div>`).join('\n')}
+    <div id="changelogList">
+      ${Array.from({ length: 2 }, () => `
+      <div class="skeleton-card">
+        <div style="display:flex;gap:12px;margin-bottom:16px">
+          <div class="skeleton-bar" style="width:70px;height:24px;margin:0"></div>
+          <div class="skeleton-bar" style="width:100px;height:14px;margin:auto 0"></div>
+        </div>
+        <div class="skeleton-bar" style="width:40%"></div>
+        <div class="skeleton-bar" style="width:80%"></div>
+        <div class="skeleton-bar" style="width:65%"></div>
+        <div class="skeleton-bar" style="width:50%"></div>
+      </div>`).join('')}
+    </div>
+
+    <div id="loadMore" style="display:none" class="load-more">
+      <button class="load-more-btn" id="loadMoreBtn">Load more</button>
+    </div>
+
+    <div id="endMsg" style="display:none" class="load-more">That's everything so far.</div>
 
     ${footerHtml}
   </div>
+
+  <script>
+    var TYPE_CONFIG = {
+      added:   { label: 'Added',   color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+      changed: { label: 'Changed', color: '#eab308', bg: 'rgba(234,179,8,0.12)' },
+      fixed:   { label: 'Fixed',   color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+      removed: { label: 'Removed', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+    };
+
+    function groupEntries(entries) {
+      var groups = {};
+      entries.forEach(function(e) {
+        if (!groups[e.type]) groups[e.type] = [];
+        groups[e.type].push(e);
+      });
+      return groups;
+    }
+
+    function renderVersion(v) {
+      var grouped = groupEntries(v.entries);
+      var groupsHtml = '';
+      for (var type in grouped) {
+        var cfg = TYPE_CONFIG[type] || TYPE_CONFIG.added;
+        var items = grouped[type].map(function(e) { return '<li>' + e.text + '</li>'; }).join('');
+        groupsHtml += '<div class="change-group">'
+          + '<span class="change-badge" style="color:' + cfg.color + ';background:' + cfg.bg + '">' + cfg.label + '</span>'
+          + '<ul>' + items + '</ul>'
+          + '</div>';
+      }
+      return '<div class="version-card">'
+        + '<div class="version-header">'
+        + '<span class="version-tag">v' + v.version + '</span>'
+        + '<span class="version-date">' + v.date + '</span>'
+        + '</div>'
+        + groupsHtml
+        + '</div>';
+    }
+
+    var page = 1;
+    var PAGE_SIZE = 5;
+    var loading = false;
+    var allLoaded = false;
+    var listEl = document.getElementById('changelogList');
+    var loadMoreEl = document.getElementById('loadMore');
+    var loadMoreBtn = document.getElementById('loadMoreBtn');
+    var endMsgEl = document.getElementById('endMsg');
+
+    function loadPage() {
+      if (loading || allLoaded) return;
+      loading = true;
+      loadMoreBtn.textContent = 'Loading…';
+
+      fetch('/api/changelog?page=' + page + '&limit=' + PAGE_SIZE)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          // First load — clear skeletons
+          if (page === 1) listEl.innerHTML = '';
+
+          if (!data.versions || data.versions.length === 0) {
+            allLoaded = true;
+            loadMoreEl.style.display = 'none';
+            endMsgEl.style.display = '';
+            return;
+          }
+
+          listEl.innerHTML += data.versions.map(renderVersion).join('');
+          page++;
+          loadMoreBtn.textContent = 'Load more';
+
+          if (!data.hasMore) {
+            allLoaded = true;
+            loadMoreEl.style.display = 'none';
+            endMsgEl.style.display = '';
+          } else {
+            loadMoreEl.style.display = '';
+          }
+        })
+        .catch(function() {
+          loadMoreBtn.textContent = 'Failed — tap to retry';
+        })
+        .finally(function() {
+          loading = false;
+        });
+    }
+
+    loadMoreBtn.addEventListener('click', loadPage);
+
+    // Infinite scroll — load when near bottom
+    var scrollTimer;
+    window.addEventListener('scroll', function() {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(function() {
+        if (allLoaded || loading) return;
+        var scrollBottom = window.innerHeight + window.scrollY;
+        if (scrollBottom >= document.body.offsetHeight - 300) {
+          loadPage();
+        }
+      }, 100);
+    });
+
+    // Initial load
+    loadPage();
+  </script>
   ${analyticsToken ? '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"' + analyticsToken + '"}\'></script>' : ''}
 </body>
 </html>`;

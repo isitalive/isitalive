@@ -23,6 +23,8 @@ import type { CheckEventContext } from '../analytics/events';
 import { getTrending, getSitemapRepos } from '../cron/handler';
 import { trendingPage } from '../ui/trending';
 import type { QueueMessage } from '../queue/types';
+import { parseChangelog as parseChangelogMd } from '../changelog/parser';
+import changelogMd from '../../CHANGELOG.md';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -125,10 +127,24 @@ ui.get('/api/trending', async (c) => {
   return c.json(repos);
 });
 
-// Changelog page — static per deploy
+// Changelog page — static HTML shell (data hydrated client-side)
 ui.get('/changelog', (c) => {
-  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
   return c.html(changelogPage(c.env.CF_ANALYTICS_TOKEN));
+});
+
+// Changelog API — paginated JSON endpoint
+ui.get('/api/changelog', (c) => {
+  const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
+  const limit = Math.min(20, Math.max(1, parseInt(c.req.query('limit') || '5', 10)));
+
+  const all = parseChangelogMd(changelogMd);
+  const start = (page - 1) * limit;
+  const versions = all.slice(start, start + limit);
+  const hasMore = start + limit < all.length;
+
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+  return c.json({ versions, page, hasMore, total: all.length });
 });
 
 // POST /_check — form submission with Turnstile verification

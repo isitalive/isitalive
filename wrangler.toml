@@ -3,6 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2025-03-14"
 compatibility_flags = ["nodejs_compat"]
 
+# Module rules — import .md files as text
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+
 # Custom domain
 routes = [
   { pattern = "isitalive.dev", custom_domain = true }
