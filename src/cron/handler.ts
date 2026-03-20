@@ -18,6 +18,9 @@ import { GitHubProvider } from '../providers/github';
 import { scoreProject } from '../scoring/engine';
 import { sendCheckEvent, archiveRawData, type CheckEventContext } from '../analytics/events';
 import { putCache } from '../cache/index';
+import { processRepos } from '../ingest/processor';
+import { r2SqlSource } from '../ingest/sources/r2-sql';
+import { gitHubTrendingSource } from '../ingest/sources/github';
 
 const R2_SQL_ENDPOINT = 'https://api.sql.cloudflarestorage.com/api/v1/accounts';
 const TRENDING_KV_KEY = 'isitalive:trending';
@@ -193,162 +196,15 @@ const github = new GitHubProvider();
 async function handleDailySnapshot(env: Env): Promise<number> {
   console.log('Cron (Daily): starting snapshot run');
 
-  // 1. Get the most-queried repos from the Pipeline data
-  const repos = await queryTopRepos(env);
-  console.log(`Cron (Daily): found ${repos.length} repos to snapshot`);
+  // Gather repos from all configured sources
+  const [topRepos, trendingRepos] = await Promise.all([
+    r2SqlSource.getRepos(env),
+    gitHubTrendingSource.getRepos(env),
+  ]);
 
-  if (repos.length === 0) return 0;
+  const allRepos = [...topRepos, ...trendingRepos];
+  console.log(`Cron (Daily): found ${topRepos.length} R2 repos and ${trendingRepos.length} GitHub Trending repos`);
 
-  // 2. Process in batches of 10 (concurrency limit to avoid GitHub rate limits)
-  let successCount = 0;
-  const batchSize = 10;
-
-  for (let i = 0; i < repos.length; i += batchSize) {
-    const batch = repos.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(repo => snapshotRepo(env, repo)),
-    );
-
-    for (const r of results) {
-      if (r.status === 'fulfilled' && r.value) successCount++;
-    }
-
-    // Small delay between batches to be kind to GitHub API
-    if (i + batchSize < repos.length) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-  }
-
-  console.log(`Cron (Daily): snapshotted ${successCount}/${repos.length} repos`);
-  return successCount;
-}
-
-/**
- * Query R2 SQL for the most-queried repos (all-time) for snapshot.
- */
-async function queryTopRepos(env: Env): Promise<string[]> {
-  const sql = `
-    SELECT repo, count(*) as checkCount
-    FROM default.checks
-    GROUP BY repo
-    ORDER BY count(*) DESC
-    LIMIT ${SNAPSHOT_MAX_REPOS}
-  `;
-
-  const bucketName = 'isitalive-data';
-  const res = await fetch(
-    `${R2_SQL_ENDPOINT}/${env.CF_ACCOUNT_ID}/r2-sql/query/${bucketName}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.CF_R2_SQL_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query: sql }),
-    },
-  );
-
-  if (!res.ok) {
-    console.error(`Cron (Daily): R2 SQL error ${res.status}`);
-    return [];
-  }
-
-  const json = await res.json() as any;
-  const rows = json.result?.rows ?? [];
-  return rows.map((row: any) => row.repo as string);
-}
-
-/**
- * Snapshot a single repo: fetch, score, archive, update history.
- */
-async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean> {
-  const parts = repoSlug.split('/');
-  if (parts.length < 2) return false;
-  const [owner, repo] = parts;
-
-  try {
-    // Fetch fresh data from GitHub
-    const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
-    const result = scoreProject(rawData, github.name);
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-    // Fire-and-forget: cache result, archive raw data, send pipeline event
-    await Promise.all([
-      // Update the cache so users get fresh data
-      putCache(env, 'github', owner, repo, result),
-
-      // Archive raw GitHub JSON to R2
-      archiveRawData(env, 'github', owner, repo, rawData._rawResponse),
-
-      // Send snapshot event to Pipeline (Iceberg)
-      sendCheckEvent(env, result, {
-        source: 'cron-daily',
-        apiKey: 'system',
-        cacheStatus: 'miss',
-        responseTimeMs: 0,
-        userAgent: 'isitalive-cron/1.0',
-      }),
-
-      // Append to per-repo score history in KV
-      appendScoreHistory(env.CACHE_KV, repoSlug, {
-        date: today,
-        score: result.score,
-        verdict: result.verdict,
-      }),
-    ]);
-
-    return true;
-  } catch (err) {
-    console.error(`Cron (Daily): failed to snapshot ${repoSlug}:`, err);
-    return false;
-  }
-}
-
-/**
- * Append a score snapshot to the repo's history in KV.
- * Keeps the last SCORE_HISTORY_MAX entries (rolling window).
- */
-async function appendScoreHistory(
-  kv: KVNamespace,
-  repoSlug: string,
-  snapshot: ScoreSnapshot,
-): Promise<void> {
-  const key = `isitalive:history:${repoSlug.toLowerCase()}`;
-
-  // Read existing history
-  let history: ScoreSnapshot[] = [];
-  try {
-    const existing = await kv.get(key, 'json') as ScoreSnapshot[] | null;
-    history = existing ?? [];
-  } catch {}
-
-  // Deduplicate by date (only one entry per day)
-  history = history.filter(h => h.date !== snapshot.date);
-
-  // Append new snapshot and trim to max
-  history.push(snapshot);
-  if (history.length > SCORE_HISTORY_MAX) {
-    history = history.slice(history.length - SCORE_HISTORY_MAX);
-  }
-
-  await kv.put(key, JSON.stringify(history), {
-    expirationTtl: 86400 * 120, // Keep for 120 days
-  });
-}
-
-/**
- * Read score history for a repo from KV.
- */
-export async function getScoreHistory(
-  kv: KVNamespace,
-  owner: string,
-  repo: string,
-): Promise<ScoreSnapshot[]> {
-  const key = `isitalive:history:${owner.toLowerCase()}/${repo.toLowerCase()}`;
-  try {
-    const data = await kv.get(key, 'json') as ScoreSnapshot[] | null;
-    return data ?? [];
-  } catch {
-    return [];
-  }
+  // Process them through the shared processor
+  return processRepos(env, allRepos);
 }
