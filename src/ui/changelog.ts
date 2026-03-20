@@ -5,7 +5,7 @@
 // via fetch('/api/changelog?page=1&limit=5') with infinite scroll loading.
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml } from './components';
+import { navbarHtml, footerHtml, componentCss } from './components';
 
 export function changelogPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -21,6 +21,8 @@ export function changelogPage(analyticsToken?: string): string {
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    ${componentCss}
 
     :root {
       --bg-primary: #0a0a0f;
@@ -201,13 +203,6 @@ export function changelogPage(analyticsToken?: string): string {
       color: var(--text-primary);
     }
 
-    footer {
-      text-align: center;
-      padding: 60px 0 40px;
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
-    footer a { color: var(--accent); text-decoration: none; }
 
     @media (max-width: 640px) {
       h1 { font-size: 1.5rem; }

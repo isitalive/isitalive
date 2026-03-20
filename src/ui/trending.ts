@@ -5,7 +5,7 @@
 // Fresh trending data is fetched client-side from /api/trending.
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml } from './components';
+import { navbarHtml, footerHtml, componentCss } from './components';
 
 export function trendingPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -27,6 +27,8 @@ export function trendingPage(analyticsToken?: string): string {
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    ${componentCss}
 
     body {
       background: var(--bg);

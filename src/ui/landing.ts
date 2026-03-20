@@ -2,7 +2,7 @@
 // Landing page HTML — dark, modern, glassmorphism design
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml } from './components';
+import { navbarHtml, footerHtml, componentCss } from './components';
 
 export function landingPage(siteKey?: string, analyticsToken?: string): string {
   const hasTurnstile = !!siteKey;
@@ -20,6 +20,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"></noscript>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    ${componentCss}
 
     :root {
       --bg-primary: #0a0a0f;
@@ -369,21 +371,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .code-block .string { color: var(--green); }
     .code-block .number { color: var(--yellow); }
 
-    /* ── Footer ─────────────────────────────── */
-    footer {
-      text-align: center;
-      padding: 80px 0 40px;
-      color: var(--text-muted);
-      font-size: 0.78rem;
-    }
-
-    footer a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    footer a:hover { color: var(--accent); }
 
     /* ── Responsive ─────────────────────────── */
     @media (max-width: 640px) {

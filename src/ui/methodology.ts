@@ -2,7 +2,7 @@
 // Methodology page — explains how the health score is calculated
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml } from './components';
+import { navbarHtml, footerHtml, componentCss } from './components';
 
 export function methodologyPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -18,6 +18,8 @@ export function methodologyPage(analyticsToken?: string): string {
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    ${componentCss}
 
     :root {
       --bg-primary: #0a0a0f;

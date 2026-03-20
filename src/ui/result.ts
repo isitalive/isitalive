@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
-import { navbarHtml, footerHtml } from './components';
+import { navbarHtml, footerHtml, componentCss } from './components';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
@@ -140,6 +140,8 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    ${componentCss}
 
     :root {
       --bg-primary: #0a0a0f;
@@ -381,14 +383,6 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
     }
 
     .embed-code:hover .copy-hint { opacity: 1; }
-
-    /* ── Footer ─────────────────────────── */
-    footer {
-      text-align: center;
-      padding: 40px 0;
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
 
     /* ── Metadata Card ──────────────────── */
     .meta-card {
