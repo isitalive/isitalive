@@ -128,20 +128,13 @@ export interface Provider {
 // Worker environment bindings
 // ---------------------------------------------------------------------------
 
-// Pipeline binding type (available in @cloudflare/workers-types/experimental,
-// declared here because the project uses standard types)
-interface Pipeline<T = Record<string, unknown>> {
-  send(records: T[]): Promise<void>;
-}
-
 export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
   RATE_LIMITER_FREE: RateLimit;
   RATE_LIMITER_PRO: RateLimit;
   RATE_LIMITER_ENTERPRISE: RateLimit;
-  RAW_DATA: R2Bucket;            // Raw GitHub response archive (R2)
-  ISITALIVE_CHECKS_STREAM: Pipeline;  // Pipelines → R2 Iceberg table (default/checks)
+  RAW_DATA: R2Bucket;            // Raw GitHub response + analytics archive (R2)
   GITHUB_TOKEN?: string;
 
   // Cloudflare Turnstile — set via CF dashboard secrets
@@ -150,10 +143,6 @@ export interface Env {
 
   // Cloudflare Web Analytics — set via CF dashboard
   CF_ANALYTICS_TOKEN?: string;   // public, embedded in HTML beacon
-
-  // R2 SQL API (for Cron trending queries) — read-only scoped token
-  CF_ACCOUNT_ID?: string;
-  CF_R2_SQL_TOKEN?: string;
 
   // Workflows — durable ingest + refresh pipelines
   INGEST_WORKFLOW: Workflow;

@@ -10,7 +10,7 @@
 import type { Env } from '../scoring/types';
 import type { QueueMessage, RecentQueryMessage, CheckEventMessage, FirstSeenMessage, ArchiveRawMessage, PageViewMessage } from './types';
 import { getRecentQueries } from '../cache/recentQueries';
-import { sendCheckEvent, archiveRawData } from '../analytics/events';
+import { buildAnalyticsEvent, writeAnalyticsBatch, archiveRawData } from '../analytics/events';
 import { getTrackedIndex, putTrackedIndex, upsertTracked } from './tracked';
 
 const RECENT_KV_KEY = 'isitalive:recent';
@@ -103,7 +103,7 @@ async function processRecentQueries(
 }
 
 /**
- * Forward all check events to the Pipeline.
+ * Batch analytics events and write to R2.
  */
 async function processCheckEvents(
   env: Env,
@@ -111,9 +111,8 @@ async function processCheckEvents(
 ): Promise<void> {
   if (messages.length === 0) return;
 
-  await Promise.allSettled(
-    messages.map(msg => sendCheckEvent(env, msg.data.result, msg.data.ctx)),
-  );
+  const events = messages.map(msg => buildAnalyticsEvent(msg.data.result, msg.data.ctx));
+  await writeAnalyticsBatch(env, events);
 }
 
 /**

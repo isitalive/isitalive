@@ -1,7 +1,7 @@
 import type { Env } from '../scoring/types';
 import { GitHubProvider } from '../providers/github';
 import { scoreProject } from '../scoring/engine';
-import { sendCheckEvent, archiveRawData } from '../analytics/events';
+import { buildAnalyticsEvent, writeAnalyticsBatch, archiveRawData } from '../analytics/events';
 import { putCache } from '../cache/index';
 
 export interface ScoreSnapshot {
@@ -14,7 +14,7 @@ const SCORE_HISTORY_MAX = 90;   // Keep ~90 days of history per repo
 const github = new GitHubProvider();
 
 /**
- * Process a list of repos in batches: fetch, score, cache, archive, and pipeline.
+ * Process a list of repos in batches: fetch, score, cache, archive, and analytics.
  * Returns the number of successfully processed repos.
  */
 export async function processRepos(env: Env, repos: string[]): Promise<number> {
@@ -60,13 +60,13 @@ export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean>
     await Promise.all([
       putCache(env, 'github', owner, repo, result),
       archiveRawData(env, 'github', owner, repo, rawData._rawResponse),
-      sendCheckEvent(env, result, {
+      writeAnalyticsBatch(env, [buildAnalyticsEvent(result, {
         source: 'cron-daily',
         apiKey: 'system',
         cacheStatus: 'miss',
         responseTimeMs: 0,
         userAgent: 'isitalive-cron/1.0',
-      }),
+      })]),
       appendScoreHistory(env.CACHE_KV, repoSlug, {
         date: today,
         score: result.score,

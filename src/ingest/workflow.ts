@@ -15,9 +15,9 @@ import {
 import type { WorkflowEvent } from 'cloudflare:workers';
 
 import type { Env } from '../scoring/types';
-import { r2SqlSource } from './sources/r2-sql';
 import { gitHubTrendingSource } from './sources/github';
 import { snapshotRepo } from './processor';
+import { getTrackedIndex } from '../queue/tracked';
 
 type IngestParams = {
   trigger: 'daily' | 'hourly';
@@ -25,16 +25,18 @@ type IngestParams = {
 
 export class IngestWorkflow extends WorkflowEntrypoint<Env, IngestParams> {
   async run(event: WorkflowEvent<IngestParams>, step: WorkflowStep) {
-    // Step 1: Gather repos from all configured ingest sources
+    // Step 1: Gather repos from tracked index + GitHub trending
     const repos = await step.do('gather-sources', async () => {
-      const [r2Repos, ghRepos] = await Promise.all([
-        r2SqlSource.getRepos(this.env),
+      const [trackedIndex, ghRepos] = await Promise.all([
+        getTrackedIndex(this.env.CACHE_KV),
         gitHubTrendingSource.getRepos(this.env),
       ]);
 
+      const trackedRepos = Object.keys(trackedIndex);
+
       // Deduplicate
-      const all = [...new Set([...r2Repos, ...ghRepos])];
-      console.log(`Workflow: gathered ${r2Repos.length} R2 + ${ghRepos.length} GitHub = ${all.length} unique repos`);
+      const all = [...new Set([...trackedRepos, ...ghRepos])];
+      console.log(`Workflow: gathered ${trackedRepos.length} tracked + ${ghRepos.length} GitHub trending = ${all.length} unique repos`);
       return all;
     });
 
