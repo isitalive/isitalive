@@ -50,8 +50,19 @@ export interface ArchiveRawMessage {
   };
 }
 
+/** Page view — lightweight tracking for Edge Cache hits */
+export interface PageViewMessage {
+  type: 'page-view';
+  data: {
+    provider: string;
+    owner: string;
+    repo: string;
+  };
+}
+
 export type QueueMessage =
   | RecentQueryMessage
   | CheckEventMessage
   | FirstSeenMessage
-  | ArchiveRawMessage;
+  | ArchiveRawMessage
+  | PageViewMessage;

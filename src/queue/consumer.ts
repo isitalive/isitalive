@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../scoring/types';
-import type { QueueMessage, RecentQueryMessage, CheckEventMessage, FirstSeenMessage, ArchiveRawMessage } from './types';
+import type { QueueMessage, RecentQueryMessage, CheckEventMessage, FirstSeenMessage, ArchiveRawMessage, PageViewMessage } from './types';
 import { getRecentQueries } from '../cache/recentQueries';
 import { sendCheckEvent, archiveRawData } from '../analytics/events';
 
@@ -42,6 +42,7 @@ export async function handleQueueBatch(
   const checkEvents: CheckEventMessage[] = [];
   const firstSeenEvents: FirstSeenMessage[] = [];
   const archiveEvents: ArchiveRawMessage[] = [];
+  const pageViews: PageViewMessage[] = [];
 
   for (const msg of batch.messages) {
     switch (msg.body.type) {
@@ -57,6 +58,9 @@ export async function handleQueueBatch(
       case 'archive-raw':
         archiveEvents.push(msg.body);
         break;
+      case 'page-view':
+        pageViews.push(msg.body);
+        break;
     }
   }
 
@@ -66,7 +70,7 @@ export async function handleQueueBatch(
     processCheckEvents(env, checkEvents),
     processFirstSeen(env, firstSeenEvents),
     processArchives(env, archiveEvents),
-    updateTrendingCounters(env, checkEvents),
+    updateTrendingCounters(env, checkEvents, pageViews),
   ]);
 }
 
@@ -153,15 +157,16 @@ async function processArchives(
 }
 
 /**
- * Update real-time trending counters from check events.
+ * Update real-time trending counters from check events and page views.
  * Maintains a rolling 24h window of per-repo check counts and scores.
  * Also writes the sorted trending list directly to KV for the UI.
  */
 async function updateTrendingCounters(
   env: Env,
-  messages: CheckEventMessage[],
+  checkMessages: CheckEventMessage[],
+  pageViewMessages: PageViewMessage[],
 ): Promise<void> {
-  if (messages.length === 0) return;
+  if (checkMessages.length === 0 && pageViewMessages.length === 0) return;
 
   try {
     // Read existing counters
@@ -181,8 +186,8 @@ async function updateTrendingCounters(
       }
     }
 
-    // Increment counters from new check events
-    for (const msg of messages) {
+    // Increment counters from check events (have full scoring data)
+    for (const msg of checkMessages) {
       const repo = msg.data.result.project.replace(/^[^/]+\//, ''); // strip provider prefix
       const existing = counters[repo];
 
@@ -196,6 +201,29 @@ async function updateTrendingCounters(
           count: 1,
           totalScore: msg.data.result.score,
           lastVerdict: msg.data.result.verdict,
+          lastSeen: now,
+        };
+      }
+    }
+
+    // Increment counters from page views (no score data — just bump the count)
+    for (const msg of pageViewMessages) {
+      const repo = `${msg.data.owner}/${msg.data.repo}`.toLowerCase();
+      const existing = counters[repo];
+
+      if (existing) {
+        // Bump count + carry forward the average score
+        const avgScore = existing.totalScore / existing.count;
+        existing.count++;
+        existing.totalScore += avgScore; // maintain same average
+        existing.lastSeen = now;
+      } else {
+        // First time seeing this repo via page view — count it with score 0
+        // (will be corrected on the next full check event)
+        counters[repo] = {
+          count: 1,
+          totalScore: 0,
+          lastVerdict: 'unknown',
           lastSeen: now,
         };
       }

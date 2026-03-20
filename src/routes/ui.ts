@@ -126,6 +126,10 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   const cachedResponse = await cache.match(cacheKey);
   if (cachedResponse) {
     console.log(`⚡ Cache HIT for: ${c.req.url}`);
+    // Track the page view for trending + analytics (fire-and-forget)
+    c.executionCtx.waitUntil(
+      c.env.EVENTS_QUEUE.send({ type: 'page-view', data: { provider, owner, repo } } satisfies QueueMessage),
+    );
     return cachedResponse;
   }
 
