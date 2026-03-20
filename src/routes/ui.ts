@@ -34,6 +34,21 @@ const providers = {
   github: new GitHubProvider(),
 };
 
+const allowedViewHosts = new Set(['isitalive.dev', 'www.isitalive.dev', 'localhost', '127.0.0.1', '[::1]']);
+
+function hasAllowedViewOrigin(originHeader: string): boolean {
+  if (!originHeader) {
+    return false;
+  }
+
+  try {
+    const { hostname } = new URL(originHeader);
+    return allowedViewHosts.has(hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Sitemap — dynamic XML based on top repos
 ui.get('/sitemap.xml', async (c) => {
   const repos = await getSitemapRepos(c.env.CACHE_KV);
@@ -83,7 +98,7 @@ ui.get('/api/recent', async (c) => {
 ui.post('/_view', async (c) => {
   // Origin check — reject requests not from our domain
   const origin = c.req.header('Origin') || c.req.header('Referer') || '';
-  if (!origin.includes('isitalive.dev')) {
+  if (!hasAllowedViewOrigin(origin)) {
     return c.json({ ok: false }, 403);
   }
 
