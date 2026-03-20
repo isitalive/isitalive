@@ -78,9 +78,9 @@ async function queryTrending(env: Env): Promise<TrendingRepo[]> {
   const sql = `
     SELECT
       repo,
-      count(*),
-      avg(score),
-      max(verdict)
+      count(*) as checkCount,
+      avg(score) as avgScore,
+      max(verdict) as maxVerdict
     FROM default.checks
     WHERE __ingest_ts > '${last24h}'
     GROUP BY repo
@@ -111,9 +111,9 @@ async function queryTrending(env: Env): Promise<TrendingRepo[]> {
   const rows = json.result?.rows ?? [];
   return rows.map((row: any) => ({
     repo: row.repo,
-    checks: Number(row['count(*)']),
-    avgScore: Math.round(Number(row['avg(score)'])),
-    lastVerdict: row['max(verdict)'] ?? 'unknown',
+    checks: Number(row.checkCount),
+    avgScore: Math.round(Number(row.avgScore)),
+    lastVerdict: row.maxVerdict ?? 'unknown',
   }));
 }
 
@@ -122,7 +122,7 @@ async function queryTrending(env: Env): Promise<TrendingRepo[]> {
  */
 async function querySitemapRepos(env: Env): Promise<string[]> {
   const sql = `
-    SELECT repo, count(*)
+    SELECT repo, count(*) as checkCount
     FROM default.checks
     GROUP BY repo
     ORDER BY count(*) DESC
@@ -228,7 +228,7 @@ async function handleDailySnapshot(env: Env): Promise<number> {
  */
 async function queryTopRepos(env: Env): Promise<string[]> {
   const sql = `
-    SELECT repo, count(*)
+    SELECT repo, count(*) as checkCount
     FROM default.checks
     GROUP BY repo
     ORDER BY count(*) DESC
