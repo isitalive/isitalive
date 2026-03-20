@@ -52,6 +52,17 @@ audit.post('/', async (c) => {
   // ── Hash manifest for caching + ETag ───────────────────────────────
   const contentHash = await hashManifest(content);
 
+  // ── L1: Cloudflare Cache API (edge, ~0ms) ─────────────────────────
+  // POST can't use Cache API directly, so we use a synthetic URL keyed
+  // by the manifest hash. Same pattern as /api/check.
+  const cache = caches.default;
+  const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/audit/${contentHash}`);
+
+  const l1Hit = await cache.match(syntheticCacheUrl);
+  if (l1Hit) {
+    return l1Hit;
+  }
+
   // ETag: if client sends If-None-Match and we have a cached complete result
   const ifNoneMatch = c.req.header('If-None-Match');
   if (ifNoneMatch === `"${contentHash}"`) {
@@ -110,6 +121,11 @@ audit.post('/', async (c) => {
   );
   if (!result.complete && result.retryAfterMs) {
     response.headers.set('Retry-After', String(Math.ceil(result.retryAfterMs / 1000)));
+  }
+
+  // ── Write to L1 edge cache if complete ─────────────────────────────
+  if (result.complete) {
+    c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
   }
 
   // ── Archive raw manifest to R2 (background) ───────────────────────
