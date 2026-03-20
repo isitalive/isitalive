@@ -21,11 +21,13 @@ import { snapshotRepo } from './processor';
 import {
   getTrackedIndex,
   putTrackedIndex,
+  upsertTracked,
   pruneStale,
   classifyTier,
   TIER_STALENESS,
   type TrackedIndex,
 } from '../queue/tracked';
+import { getTrending, getSitemapRepos } from '../cron/handler';
 
 const BUDGET_PER_RUN = 2500;
 const BATCH_SIZE = 10;
@@ -36,6 +38,31 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
     const plan = await step.do('plan-refresh', async () => {
       const index = await getTrackedIndex(this.env.CACHE_KV);
 
+      // Seed from existing KV data if the index is sparse
+      // (idempotent — upsert won't overwrite richer entries)
+      const [trendingRepos, sitemapRepos] = await Promise.all([
+        getTrending(this.env.CACHE_KV),
+        getSitemapRepos(this.env.CACHE_KV),
+      ]);
+
+      let seeded = 0;
+      for (const t of trendingRepos) {
+        if (!index[t.repo]) {
+          upsertTracked(index, t.repo, 'trending', false);
+          seeded++;
+        }
+      }
+      for (const repo of sitemapRepos) {
+        if (!index[repo]) {
+          upsertTracked(index, repo, 'ingest', false);
+          seeded++;
+        }
+      }
+      if (seeded > 0) {
+        console.log(`Refresh: seeded ${seeded} repos from trending + sitemap`);
+        await putTrackedIndex(this.env.CACHE_KV, index);
+      }
+
       // Prune repos not requested in >90 days
       const pruned = pruneStale(index);
       if (pruned > 0) {
@@ -44,7 +71,7 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
       }
 
       const totalTracked = Object.keys(index).length;
-      console.log(`Refresh: ${totalTracked} tracked repos after pruning`);
+      console.log(`Refresh: ${totalTracked} tracked repos after seeding + pruning`);
 
       // Find repos that need refreshing based on their tier staleness
       const now = Date.now();
