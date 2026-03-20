@@ -454,6 +454,80 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       opacity: 0.6;
       transition: opacity 0.3s ease;
     }
+
+    /* ── Badge CTA ───────────────────────── */
+    .badge-cta {
+      text-align: center;
+      padding: 60px 0 40px;
+    }
+    .badge-cta h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .badge-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 32px;
+    }
+    .badge-preview {
+      margin-bottom: 28px;
+    }
+    .badge-img {
+      height: 20px;
+      border-radius: 3px;
+    }
+    .badge-snippets {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .snippet-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .snippet-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      min-width: 70px;
+      text-align: left;
+    }
+    .snippet-code {
+      flex: 1;
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      overflow-x: auto;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .copy-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover { background: #4f46e5; }
+    .copy-btn:active { transform: scale(0.96); }
+    .copy-btn.copied {
+      background: var(--green);
+    }
   </style>
 </head>
 <body>
@@ -543,6 +617,28 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       </div>
     </section>
 
+    <section class="badge-cta">
+      <h2>Show the world your project is alive</h2>
+      <p class="badge-subtitle">Add a live health badge to your README in seconds.</p>
+
+      <div class="badge-preview">
+        <img src="https://isitalive.dev/api/badge/github/vercel/next.js" alt="Is It Alive? badge" class="badge-img" />
+      </div>
+
+      <div class="badge-snippets">
+        <div class="snippet-block">
+          <div class="snippet-label">Markdown</div>
+          <div class="snippet-code" id="badgeMd">[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)</div>
+          <button class="copy-btn" onclick="copySnippet('badgeMd')">Copy</button>
+        </div>
+        <div class="snippet-block">
+          <div class="snippet-label">HTML</div>
+          <div class="snippet-code" id="badgeHtml">&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;&lt;/a&gt;</div>
+          <button class="copy-btn" onclick="copySnippet('badgeHtml')">Copy</button>
+        </div>
+      </div>
+    </section>
+
     ${footerHtml}
   </div>
 
@@ -575,7 +671,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       if (parts.length >= 2) {
         document.body.classList.add('navigating');
         setTimeout(function() {
-          window.location.href = '/' + parts[0] + '/' + parts[1];
+          window.location.href = '/github/' + parts[0] + '/' + parts[1];
         }, 300);
       }`}
     });
@@ -602,6 +698,21 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     });
   </script>
   <script>
+    function copySnippet(id) {
+      var el = document.getElementById(id);
+      var text = el.textContent;
+      navigator.clipboard.writeText(text).then(function() {
+        var btn = el.parentElement.querySelector('.copy-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+  </script>
+  <script>
     // Hydrate recently checked chips
     fetch('/api/recent').then(r => r.json()).then(function(queries) {
       if (!queries || !queries.length) return;
@@ -610,7 +721,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       var COLORS = { healthy:'#22c55e', maintained:'#eab308', inactive:'#f97316', dormant:'#ef4444', unmaintained:'#6b7280' };
       list.innerHTML = queries.map(function(q) {
         var c = COLORS[q.verdict] || '#6b7280';
-        return '<a href="/' + q.owner + '/' + q.repo + '" class="recent-chip">'
+        return '<a href="/github/' + q.owner + '/' + q.repo + '" class="recent-chip">'
           + '<span class="recent-dot" style="background:' + c + '"></span>'
           + q.owner + '/' + q.repo
           + '<span style="color:var(--text-muted)">' + q.score + '</span>'
