@@ -363,7 +363,7 @@ export function methodologyPage(analyticsToken?: string): string {
       </div>
       <div class="verdict-chip">
         <div class="emoji">🟠</div>
-        <div class="name" style="color: #f97316">Inactive</div>
+        <div class="name" style="color: #f97316">Stale</div>
         <div class="range">40 – 59</div>
       </div>
       <div class="verdict-chip">

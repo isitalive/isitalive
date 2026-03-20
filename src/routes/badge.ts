@@ -14,7 +14,7 @@ const badge = new Hono<{ Bindings: Env }>();
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
   maintained: '#eab308',
-  inactive: '#f97316',
+  stale: '#f97316',
   dormant: '#ef4444',
   unmaintained: '#6b7280',
 };
@@ -22,7 +22,7 @@ const VERDICT_COLORS: Record<Verdict, string> = {
 const VERDICT_LABELS: Record<Verdict, string> = {
   healthy: 'healthy',
   maintained: 'maintained',
-  inactive: 'inactive',
+  stale: 'stale',
   dormant: 'dormant',
   unmaintained: 'unmaintained',
 };

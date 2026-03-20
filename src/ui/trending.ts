@@ -200,7 +200,7 @@ export function trendingPage(analyticsToken?: string): string {
     const VERDICT_COLORS = {
       healthy: '#22c55e',
       maintained: '#eab308',
-      inactive: '#f97316',
+      stale: '#f97316',
       dormant: '#ef4444',
       unmaintained: '#6b7280',
     };
@@ -211,7 +211,7 @@ export function trendingPage(analyticsToken?: string): string {
 
     // Normalize old verdict values stored in KV before the rename
     function normalizeVerdict(v) {
-      var REMAP = { declining: 'inactive', at_risk: 'dormant', abandoned: 'unmaintained' };
+      var REMAP = { declining: 'stale', inactive: 'stale', at_risk: 'dormant', abandoned: 'unmaintained' };
       return REMAP[v] || v;
     }
 

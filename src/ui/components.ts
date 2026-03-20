@@ -44,9 +44,10 @@ export const componentCss = `
     }
     .site-nav-link:hover { color: var(--text-primary, #e8e8ed); }
 
-    @media (max-width: 480px) {
+    @media (max-width: 640px) {
       .site-nav { flex-direction: column; gap: 12px; }
-      .site-nav-links { gap: 14px; }
+      .site-nav-links { gap: 14px; flex-wrap: wrap; justify-content: center; }
+      .site-nav-link { font-size: 0.78rem; }
     }
 
     /* ── Footer ─────────────────────────────── */
@@ -78,6 +79,7 @@ export const navbarHtml = `
     <a href="/" class="site-nav-brand">Is It Alive</a>
     <div class="site-nav-links">
       <a href="/trending" class="site-nav-link">🔥 Trending</a>
+      <a href="/api" class="site-nav-link">📡 API</a>
       <a href="/methodology" class="site-nav-link">📖 Methodology</a>
       <a href="/changelog" class="site-nav-link">📋 Changelog</a>
     </div>
@@ -90,6 +92,7 @@ export const footerHtml = `
     <p>
       <a href="/">Home</a> &nbsp;·&nbsp;
       <a href="/trending">Trending</a> &nbsp;·&nbsp;
+      <a href="/api">API</a> &nbsp;·&nbsp;
       <a href="/methodology">Methodology</a> &nbsp;·&nbsp;
       <a href="/changelog">Changelog</a> &nbsp;·&nbsp;
       <a href="https://github.com/isitalive/isitalive">GitHub</a>

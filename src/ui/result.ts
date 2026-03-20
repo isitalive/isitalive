@@ -9,7 +9,7 @@ import type { Trend } from '../ingest/processor';
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
   maintained: '#eab308',
-  inactive: '#f97316',
+  stale: '#f97316',
   dormant: '#ef4444',
   unmaintained: '#6b7280',
 };
@@ -17,7 +17,7 @@ const VERDICT_COLORS: Record<Verdict, string> = {
 const VERDICT_EMOJI: Record<Verdict, string> = {
   healthy: '🟢',
   maintained: '🟡',
-  inactive: '🟠',
+  stale: '🟠',
   dormant: '🔴',
   unmaintained: '⚫',
 };
@@ -25,10 +25,21 @@ const VERDICT_EMOJI: Record<Verdict, string> = {
 const VERDICT_LABELS: Record<Verdict, string> = {
   healthy: 'Healthy',
   maintained: 'Maintained',
-  inactive: 'Inactive',
+  stale: 'Stale',
   dormant: 'Dormant',
   unmaintained: 'Unmaintained',
 };
+
+/** Normalize legacy verdict values from KV cache */
+const VERDICT_NORMALIZE: Record<string, Verdict> = {
+  declining: 'stale',
+  inactive: 'stale',
+  at_risk: 'dormant',
+  abandoned: 'unmaintained',
+};
+function normalizeVerdict(v: string): Verdict {
+  return (VERDICT_NORMALIZE[v] as Verdict) || (v as Verdict);
+}
 
 function signalBar(score: number, color: string): string {
   return `<div style="
@@ -105,9 +116,10 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
 }
 
 export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
-  const color = VERDICT_COLORS[result.verdict];
-  const emoji = VERDICT_EMOJI[result.verdict];
-  const label = VERDICT_LABELS[result.verdict];
+  const verdict = normalizeVerdict(result.verdict);
+  const color = VERDICT_COLORS[verdict];
+  const emoji = VERDICT_EMOJI[verdict];
+  const label = VERDICT_LABELS[verdict];
   const dashOffset = 283 - (283 * result.score) / 100; // for SVG circle gauge
 
   // Trend display

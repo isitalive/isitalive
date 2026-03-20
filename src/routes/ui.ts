@@ -26,6 +26,7 @@ import type { QueueMessage } from '../queue/types';
 import { parseChangelog as parseChangelogMd } from '../changelog/parser';
 import changelogMd from '../../CHANGELOG.md';
 import { getScoreHistory, computeTrend } from '../ingest/processor';
+import { apiDocsPage } from '../ui/api-docs';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -41,6 +42,7 @@ ui.get('/sitemap.xml', async (c) => {
   const staticPages = [
     '',
     '/trending',
+    '/api',
     '/methodology',
     '/changelog',
   ];
@@ -113,6 +115,12 @@ ui.post('/_view', async (c) => {
 ui.get('/methodology', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
   return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN));
+});
+
+// API docs page
+ui.get('/api', (c) => {
+  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  return c.html(apiDocsPage(c.env.CF_ANALYTICS_TOKEN));
 });
 
 // Trending page — static HTML shell (data hydrated client-side)

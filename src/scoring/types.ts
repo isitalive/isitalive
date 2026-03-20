@@ -9,7 +9,7 @@ export type ProviderName = 'github' | 'npm' | 'pypi' | 'crates' | 'kernel';
 export type Verdict =
   | 'healthy'       // 80-100
   | 'maintained'    // 60-79
-  | 'inactive'      // 40-59
+  | 'stale'         // 40-59
   | 'dormant'       // 20-39
   | 'unmaintained'; // 0-19
 

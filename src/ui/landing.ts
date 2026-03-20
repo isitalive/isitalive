@@ -564,7 +564,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         <p class="api-subtitle">One endpoint. One answer. Perfect for AI agents.</p>
         <div class="code-block">
           <span class="comment">// Check any GitHub project</span><br>
-          <span class="url">GET /api/check/github/vercel/next.js</span><br><br>
+          <span class="url">GET https://isitalive.dev/api/check/github/vercel/next.js</span><br><br>
           <span class="comment">// Response</span><br>
           {<br>
           &nbsp;&nbsp;<span class="key">"score"</span>: <span class="number">92</span>,<br>
@@ -655,7 +655,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       if (!queries || !queries.length) return;
       var section = document.getElementById('recentSection');
       var list = document.getElementById('recentList');
-      var COLORS = { healthy:'#22c55e', maintained:'#eab308', inactive:'#f97316', dormant:'#ef4444', unmaintained:'#6b7280' };
+      var COLORS = { healthy:'#22c55e', maintained:'#eab308', stale:'#f97316', dormant:'#ef4444', unmaintained:'#6b7280' };
       list.innerHTML = queries.map(function(q) {
         var c = COLORS[q.verdict] || '#6b7280';
         return '<a href="/github/' + q.owner + '/' + q.repo + '" class="recent-chip">'

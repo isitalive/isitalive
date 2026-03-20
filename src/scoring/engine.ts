@@ -9,7 +9,7 @@ import { RULES } from './rules';
 function toVerdict(score: number): Verdict {
   if (score >= 80) return 'healthy';
   if (score >= 60) return 'maintained';
-  if (score >= 40) return 'inactive';
+  if (score >= 40) return 'stale';
   if (score >= 20) return 'dormant';
   return 'unmaintained';
 }
