@@ -2,82 +2,8 @@
 // Is It Alive? — Main entry point (Cloudflare Worker + Hono)
 // ---------------------------------------------------------------------------
 
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import type { Env } from './scoring/types';
-import { cacheTest } from './middleware/edgeCache';
-import { apiKeyAuth } from './middleware/auth';
-import { rateLimit } from './middleware/rateLimit';
-import { check } from './routes/check';
-import { badge } from './routes/badge';
-import { ui } from './routes/ui';
-import { openApiSpec } from './routes/openapi';
-import { llmsTxt, llmsFullTxt } from './routes/llms';
-import { aiPluginManifest } from './routes/aiPlugin';
-
-const app = new Hono<{ Bindings: Env }>();
-
-// ── Global middleware ─────────────────────────────────────────────────
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
-  maxAge: 86400,
-}));
-
-// Auth + rate limit only for API routes
-app.use('/api/*', apiKeyAuth);
-app.use('/api/*', rateLimit);
-
-// UI routes are protected by Turnstile (on POST) or cached (on GET)
-// No global rate limit for UI repo pages to ensure good UX for visitors.
-
-// ── API routes ────────────────────────────────────────────────────────
-app.route('/api/check', check);
-app.route('/api/badge', badge);
-
-// ── Web UI routes ─────────────────────────────────────────────────────
-app.route('/', ui);
-
-// ── AI agent discovery endpoints ──────────────────────────────────
-app.get('/openapi.json', (c) => {
-  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
-  return c.json(openApiSpec);
-});
-
-app.get('/llms.txt', (c) => {
-  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
-  c.header('Content-Type', 'text/plain; charset=utf-8');
-  return c.text(llmsTxt);
-});
-
-app.get('/llms-full.txt', (c) => {
-  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
-  c.header('Content-Type', 'text/plain; charset=utf-8');
-  return c.text(llmsFullTxt);
-});
-
-app.get('/.well-known/ai-plugin.json', (c) => {
-  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
-  return c.json(aiPluginManifest);
-});
-
-// ── Cache API test ────────────────────────────────────────────────────
-app.get('/_cache_test', cacheTest);
-
-// ── Health check ──────────────────────────────────────────────────────
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.4.0' }));
-
-// ── Admin: manual cron trigger ────────────────────────────────────────
-app.get('/_cron', async (c) => {
-  const trigger = c.req.query('trigger') || 'hourly';
-  const { handleScheduled } = await import('./cron/handler');
-  try {
-    const result = await handleScheduled(c.env, trigger);
-    return c.json({ success: true, trigger, result });
-  } catch (err: any) {
-    return c.json({ success: false, error: err.message }, 500);
-  }
-});
+import { app } from './app';
 // ── Export Worker ─────────────────────────────────────────────────────
 import { handleScheduled } from './cron/handler';
 import { handleQueueBatch } from './queue/consumer';

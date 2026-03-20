@@ -10,41 +10,6 @@ import type { Env } from '../scoring/types';
 
 type AppEnv = { Bindings: Env };
 
-/**
- * Minimal Cache API test — isolated from all other logic.
- * Wire up: app.get('/_cache_test', cacheTest)
- */
-export async function cacheTest(c: Context<AppEnv>) {
-  const cache = caches.default;
-  const testUrl = `https://isitalive.dev/__cache_test_key`;
-  const testKey = new Request(testUrl);
-
-  // Step 1: Try to match existing cache entry
-  const existing = await cache.match(testKey);
-  if (existing) {
-    const body = await existing.text();
-    return c.json({ cacheWorking: true, source: 'cache', body, ts: Date.now() });
-  }
-
-  // Step 2: Put a simple response into cache
-  const resp = new Response(JSON.stringify({ hello: 'cache', ts: Date.now() }), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, s-maxage=60',
-    },
-  });
-  await cache.put(testKey, resp);
-
-  // Step 3: Immediately try to match
-  const check = await cache.match(testKey);
-  return c.json({
-    cacheWorking: !!check,
-    source: 'fresh-put-then-match',
-    matchFound: !!check,
-    ts: Date.now(),
-  });
-}
-
 export async function edgeCache(c: Context<AppEnv>, next: Next) {
   // Only cache GET requests
   if (c.req.method !== 'GET') {
@@ -91,4 +56,3 @@ export async function edgeCache(c: Context<AppEnv>, next: Next) {
     c.res = cacheResponse;
   }
 }
-
