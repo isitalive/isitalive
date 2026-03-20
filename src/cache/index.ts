@@ -15,7 +15,7 @@
 
 import type { ScoringResult, Env } from '../scoring/types';
 
-const CACHE_PREFIX = 'isitalive:v1:';
+const CACHE_PREFIX = 'isitalive:v2:';
 
 // Cache API uses a synthetic URL as the key
 const CACHE_DOMAIN = 'https://cache.isitalive.dev';

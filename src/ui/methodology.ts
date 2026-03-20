@@ -332,7 +332,7 @@ export function methodologyPage(analyticsToken?: string): string {
     <div class="signal-card">
       <div class="signal-card-header">
         <span class="signal-card-title">CI/CD Activity</span>
-        <span class="signal-card-weight">5%</span>
+        <span class="signal-card-weight">10%</span>
       </div>
       <p>Multi-factor assessment of CI/CD health. Checks for workflow file presence, recency of last run, run frequency in the last 30 days, and success rate of recent runs.</p>
       <table class="scoring-table">

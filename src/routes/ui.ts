@@ -62,7 +62,7 @@ ${repos.map(repo => `  <url>
 
 // Landing page — show recent queries
 ui.get('/', async (c) => {
-  const recent = await getRecentQueries(c.env.RECENT_QUERIES);
+  const recent = await getRecentQueries(c.env.CACHE_KV);
   c.header('Cache-Control', 'public, max-age=60, s-maxage=60');
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN, recent));
 });
@@ -162,7 +162,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       // Track + analytics (non-blocking)
       const ctx = { ...analyticsCtx(), cacheStatus: status };
       c.executionCtx.waitUntil(Promise.all([
-        trackRecentQuery(c.env.RECENT_QUERIES, {
+        trackRecentQuery(c.env.CACHE_KV, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
         sendCheckEvent(c.env, cached, ctx),
@@ -182,7 +182,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
       trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-      trackRecentQuery(c.env.RECENT_QUERIES, {
+      trackRecentQuery(c.env.CACHE_KV, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
       archiveRawData(c.env, provider, owner, repo, rawData._rawResponse),

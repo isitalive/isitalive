@@ -43,39 +43,36 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
   const rateLimitKey = isAuthenticated ? `key:${keyName}` : `ip:${ip}`;
 
-  // Get or create a Durable Object for this rate-limit key
-  const id = c.env.RATE_LIMITER.idFromName(rateLimitKey);
-  const stub = c.env.RATE_LIMITER.get(id);
+  // Select the appropriate native Rate Limiter binding based on tier
+  let rateLimiter: RateLimit;
+  if (tier === 'pro') rateLimiter = c.env.RATE_LIMITER_PRO;
+  else if (tier === 'enterprise') rateLimiter = c.env.RATE_LIMITER_ENTERPRISE;
+  else rateLimiter = c.env.RATE_LIMITER_FREE;
 
-  const doRes = await stub.fetch(
-    new Request(`https://rate-limiter.internal/check?limit=${limitValue}&window=${WINDOW_MS}`),
-  );
-  const result = await doRes.json() as {
-    allowed: boolean;
-    remaining: number;
-    limit: number;
-    count: number;
-    resetMs: number;
-  };
-
+  // Call the native Rate Limiting API
+  const result = await rateLimiter.limit({ key: rateLimitKey });
+  
+  // The native Rate Limit API currently only returns { success: boolean }
+  // We use static fallbacks for headers
+  const resetSeconds = 60; // Configured window is 60s
+  
   // Set headers regardless of outcome
-  c.header('X-RateLimit-Limit', String(result.limit));
-  c.header('X-RateLimit-Remaining', String(result.remaining));
+  c.header('X-RateLimit-Limit', String(limitValue));
   c.header('X-RateLimit-Tier', tier);
 
-  if (!result.allowed) {
-    c.header('Retry-After', String(Math.ceil(result.resetMs / 1000)));
+  if (!result.success) {
+    c.header('Retry-After', String(resetSeconds));
     return c.json(
       {
         error: 'Rate limit exceeded',
-        limit: result.limit,
+        limit: limitValue,
         tier,
         authenticated: isAuthenticated,
         remaining: 0,
-        retryAfterSeconds: Math.ceil(result.resetMs / 1000),
+        retryAfterSeconds: resetSeconds,
         message: isAuthenticated
-          ? `Upgrade to a higher tier for more requests. Current: ${tier} (${result.limit}/min).`
-          : `Add an API key for higher limits. Current (unauthenticated): ${result.limit}/min.`,
+          ? `Upgrade to a higher tier for more requests. Current: ${tier} (${limitValue}/min).`
+          : `Add an API key for higher limits. Current (unauthenticated): ${limitValue}/min.`,
       },
       429,
     );

@@ -18,23 +18,28 @@ id = "660634f39fe641c5b186ac3cb7259ead"
 binding = "KEYS_KV"
 id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 
-# Durable Object — rate limiting
-[[durable_objects.bindings]]
-name = "RATE_LIMITER"
-class_name = "RateLimiterDO"
+# Native Rate Limiting (replaces Durable Objects)
+[[unsafe.bindings]]
+name = "RATE_LIMITER_FREE"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
 
-# Durable Object — recent queries list
-[[durable_objects.bindings]]
-name = "RECENT_QUERIES"
-class_name = "RecentQueriesDO"
+[[unsafe.bindings]]
+name = "RATE_LIMITER_PRO"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 120, period = 60 }
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER_ENTERPRISE"
+type = "ratelimit"
+namespace_id = "1003"
+simple = { limit = 600, period = 60 }
 
 [[migrations]]
-tag = "v1"
-new_sqlite_classes = ["RateLimiterDO"]
-
-[[migrations]]
-tag = "v2"
-new_sqlite_classes = ["RecentQueriesDO"]
+tag = "v3"
+deleted_classes = ["RateLimiterDO", "RecentQueriesDO"]
 
 # R2 — raw GitHub response archive (permanent source of truth)
 [[r2_buckets]]

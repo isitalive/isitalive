@@ -138,7 +138,9 @@ export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
   RATE_LIMITER: DurableObjectNamespace; // Rate limiting via Durable Object
-  RECENT_QUERIES: DurableObjectNamespace; // Recent queries list
+  RATE_LIMITER_FREE: RateLimit;
+  RATE_LIMITER_PRO: RateLimit;
+  RATE_LIMITER_ENTERPRISE: RateLimit;
   RAW_DATA: R2Bucket;            // Raw GitHub response archive (R2)
   ISITALIVE_CHECKS_STREAM: Pipeline;  // Pipelines → R2 Iceberg table (default/checks)
   GITHUB_TOKEN?: string;

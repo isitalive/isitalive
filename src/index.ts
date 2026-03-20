@@ -80,6 +80,4 @@ export default {
   },
 };
 
-// ── Durable Object exports ────────────────────────────────────────────
-export { RateLimiterDO } from './ratelimit/durableObject';
-export { RecentQueriesDO } from './cache/recentQueriesDO';
+

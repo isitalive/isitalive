@@ -2,39 +2,52 @@
 // Recent queries — thin helpers that talk to the RecentQueriesDO
 // ---------------------------------------------------------------------------
 
-export type { RecentQuery } from './recentQueriesDO';
+export interface RecentQuery {
+  owner: string;
+  repo: string;
+  score: number;
+  verdict: string;
+  checkedAt: string;
+}
+
+const RECENT_KV_KEY = 'isitalive:recent';
+const MAX_ENTRIES = 10;
 
 /**
- * Read the recent queries list from the Durable Object.
+ * Read the recent queries list from KV.
  */
 export async function getRecentQueries(
-  doNamespace: DurableObjectNamespace,
-): Promise<import('./recentQueriesDO').RecentQuery[]> {
+  kv: KVNamespace,
+): Promise<RecentQuery[]> {
   try {
-    const id = doNamespace.idFromName('global');
-    const stub = doNamespace.get(id);
-    const res = await stub.fetch('https://do/recent', { method: 'GET' });
-    return await res.json() as import('./recentQueriesDO').RecentQuery[];
+    const list = await kv.get(RECENT_KV_KEY, 'json') as RecentQuery[] | null;
+    return list ?? [];
   } catch {
     return [];
   }
 }
 
 /**
- * Add a query to the recent list via the Durable Object.
+ * Add a query to the recent list via KV.
  */
 export async function trackRecentQuery(
-  doNamespace: DurableObjectNamespace,
-  entry: import('./recentQueriesDO').RecentQuery,
+  kv: KVNamespace,
+  entry: RecentQuery,
 ): Promise<void> {
   try {
-    const id = doNamespace.idFromName('global');
-    const stub = doNamespace.get(id);
-    await stub.fetch('https://do/recent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    });
+    const list = await getRecentQueries(kv);
+
+    // Deduplicate by owner/repo (case-insensitive)
+    const key = `${entry.owner}/${entry.repo}`.toLowerCase();
+    const filtered = list.filter(
+      (q) => `${q.owner}/${q.repo}`.toLowerCase() !== key,
+    );
+
+    // Prepend and cap
+    const updatedList = [entry, ...filtered].slice(0, MAX_ENTRIES);
+    
+    // Write back to KV (eventually consistent, acceptable for this vanity UI list)
+    await kv.put(RECENT_KV_KEY, JSON.stringify(updatedList));
   } catch {
     // Non-critical — don't fail the request
   }
