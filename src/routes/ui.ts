@@ -53,7 +53,7 @@ ${staticPages.map(page => `  <url>
     <priority>${page === '' ? '1.0' : '0.8'}</priority>
   </url>`).join('\n')}
 ${repos.map(repo => `  <url>
-    <loc>${baseUrl}/${repo}</loc>
+    <loc>${baseUrl}/github/${repo}</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>`).join('\n')}
@@ -168,7 +168,7 @@ ui.post('/_check', verifyTurnstile, async (c) => {
 
   const parts = path.split('/');
   if (parts.length >= 2) {
-    return c.redirect(`/${parts[0]}/${parts[1]}`);
+    return c.redirect(`/github/${parts[0]}/${parts[1]}`);
   }
 
   return c.redirect('/');
@@ -280,13 +280,13 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   }
 }
 
-// Shortcut: /owner/repo → defaults to GitHub (e.g. isitalive.dev/zitadel/zitadel)
+// Shortcut: /owner/repo → redirect to canonical /github/owner/repo
 ui.get('/:owner/:repo', async (c) => {
   const { owner, repo } = c.req.param();
-  return handleCheck(c, 'github', owner, repo);
+  return c.redirect(`/github/${owner}/${repo}`, 301);
 });
 
-// Explicit provider: /github/owner/repo
+// Canonical: /github/owner/repo → renders result page
 ui.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param();
   return handleCheck(c, provider, owner, repo);
