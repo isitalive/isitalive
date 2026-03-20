@@ -98,3 +98,4 @@ export default {
 
 // ── Workflow exports ──────────────────────────────────────────────────
 export { IngestWorkflow } from './ingest/workflow';
+export { RefreshWorkflow } from './ingest/refresh-workflow';

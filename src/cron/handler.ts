@@ -41,6 +41,15 @@ export async function handleScheduled(env: Env, trigger?: string): Promise<{ tre
       });
     }
 
+    // Dispatch RefreshWorkflow to keep tracked repos fresh (2.5k budget)
+    try {
+      const refreshInstance = await env.REFRESH_WORKFLOW.create();
+      console.log(`Cron: dispatched refresh-workflow: ${refreshInstance.id}`);
+    } catch (err: any) {
+      // May fail if an instance is already running — that's OK
+      console.log(`Cron: refresh-workflow dispatch skipped: ${err.message}`);
+    }
+
     // Daily snapshot — only on the daily trigger
     let snapshots: number | undefined;
     if (trigger === 'daily') {

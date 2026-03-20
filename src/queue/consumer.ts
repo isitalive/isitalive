@@ -11,6 +11,7 @@ import type { Env } from '../scoring/types';
 import type { QueueMessage, RecentQueryMessage, CheckEventMessage, FirstSeenMessage, ArchiveRawMessage, PageViewMessage } from './types';
 import { getRecentQueries } from '../cache/recentQueries';
 import { sendCheckEvent, archiveRawData } from '../analytics/events';
+import { getTrackedIndex, putTrackedIndex, upsertTracked } from './tracked';
 
 const RECENT_KV_KEY = 'isitalive:recent';
 const MAX_RECENT = 10;
@@ -71,6 +72,7 @@ export async function handleQueueBatch(
     processFirstSeen(env, firstSeenEvents),
     processArchives(env, archiveEvents),
     updateTrendingCounters(env, checkEvents, pageViews),
+    updateTrackedIndex(env, checkEvents, pageViews),
   ]);
 }
 
@@ -247,5 +249,37 @@ async function updateTrendingCounters(
     });
   } catch (err) {
     console.error('Queue: failed to update trending counters:', err);
+  }
+}
+
+/**
+ * Maintain the tracked repos index — upsert repos from check events and page views.
+ */
+async function updateTrackedIndex(
+  env: Env,
+  checkMessages: CheckEventMessage[],
+  pageViewMessages: PageViewMessage[],
+): Promise<void> {
+  if (checkMessages.length === 0 && pageViewMessages.length === 0) return;
+
+  try {
+    const index = await getTrackedIndex(env.CACHE_KV);
+
+    // Upsert from check events (full checks — update lastChecked)
+    for (const msg of checkMessages) {
+      const repo = msg.data.result.project.replace(/^[^/]+\//, '');
+      const source = msg.data.ctx.source === 'api' ? 'api' as const : 'user' as const;
+      upsertTracked(index, repo, source, true);
+    }
+
+    // Upsert from page views (just views — don't update lastChecked)
+    for (const msg of pageViewMessages) {
+      const repo = `${msg.data.owner}/${msg.data.repo}`.toLowerCase();
+      upsertTracked(index, repo, 'user', false);
+    }
+
+    await putTrackedIndex(env.CACHE_KV, index);
+  } catch (err) {
+    console.error('Queue: failed to update tracked index:', err);
   }
 }

@@ -155,8 +155,9 @@ export interface Env {
   CF_ACCOUNT_ID?: string;
   CF_R2_SQL_TOKEN?: string;
 
-  // Workflows — durable ingest pipeline
+  // Workflows — durable ingest + refresh pipelines
   INGEST_WORKFLOW: Workflow;
+  REFRESH_WORKFLOW: Workflow;
 
   // Queues — unified event bus
   EVENTS_QUEUE: Queue;
