@@ -329,16 +329,31 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     @media (max-width: 640px) {
+      .container { padding: 0 20px; }
       header { padding: 60px 0 40px; }
-    }
-
-    @media (max-width: 480px) {
-      .search-box form { flex-direction: column; }
-      .search-box button { width: 100%; border-radius: 12px; margin-top: 8px; }
-      .search-box { padding: 8px; border-radius: 16px; }
-      .search-box input { padding: 12px 16px; }
       h1 { font-size: 1.8rem; }
       .subtitle { font-size: 0.9rem; }
+
+      .search-box {
+        flex-direction: column;
+        padding: 8px;
+        border-radius: 16px;
+      }
+      .search-box input {
+        width: 100%;
+        padding: 14px 16px;
+        font-size: 1rem;
+      }
+      .search-box button {
+        width: 100%;
+        border-radius: 12px;
+        padding: 14px 24px;
+        font-size: 0.9rem;
+      }
+
+      .badge-cta h2 { font-size: 1.3rem; }
+      .snippet-block { flex-direction: column; align-items: stretch; gap: 8px; }
+      .snippet-label { min-width: unset; }
     }
 
     /* ── Loading transition ──────────────────── */
