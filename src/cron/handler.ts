@@ -1,15 +1,12 @@
 // ---------------------------------------------------------------------------
-// Cron handler — hourly trending + daily snapshot
+// Cron handler — periodic maintenance + daily snapshot
 //
-// Hourly:  Queries R2 SQL API for top repos by check count in the last 24h,
-//          writes the result to CACHE_KV for the /trending page to read.
+// Every 10 min: Refreshes the sitemap from R2 SQL. Trending data is now
+//              computed in real-time by the Queue consumer — no polling needed.
 //
-// Daily:   Re-checks the top N most-queried repos, archives raw data to R2,
-//          sends snapshot events to Pipeline, and stores score history in KV.
-//          This builds a time-series dataset for trend analysis.
+// Daily (6AM UTC): Dispatches the IngestWorkflow to re-check top repos.
 //
 // R2 SQL = SQL engine over R2 Data Catalog (Iceberg tables).
-// Queried via REST API — no native Worker binding for reads.
 // CF_R2_SQL_TOKEN must be scoped to: R2 Data Catalog + R2 Storage + R2 SQL → Read
 // ---------------------------------------------------------------------------
 
@@ -27,28 +24,22 @@ export interface TrendingRepo {
 }
 
 /**
- * Scheduled (Cron) handler — routes to hourly or daily based on cron.
+ * Scheduled (Cron) handler — routes to periodic or daily based on cron.
  */
 export async function handleScheduled(env: Env, trigger?: string): Promise<{ trending: TrendingRepo[]; sitemap: string[]; snapshots?: number; error?: string }> {
-  if (!env.CF_ACCOUNT_ID || !env.CF_R2_SQL_TOKEN) {
-    return { trending: [], sitemap: [], error: 'CF_ACCOUNT_ID or CF_R2_SQL_TOKEN not set' };
-  }
-
   try {
-    // Always run trending (lightweight)
-    const [trending, sitemap] = await Promise.all([
-      queryTrending(env),
-      querySitemapRepos(env),
-    ]);
+    // Trending is now computed in real-time by the Queue consumer.
+    // Just read whatever is already in KV.
+    const trending = await getTrending(env.CACHE_KV);
 
-    await Promise.all([
-      env.CACHE_KV.put(TRENDING_KV_KEY, JSON.stringify(trending), {
-        expirationTtl: 7200,
-      }),
-      env.CACHE_KV.put(SITEMAP_KV_KEY, JSON.stringify(sitemap), {
+    // Sitemap still needs R2 SQL (all-time data, not just 24h)
+    let sitemap: string[] = [];
+    if (env.CF_ACCOUNT_ID && env.CF_R2_SQL_TOKEN) {
+      sitemap = await querySitemapRepos(env);
+      await env.CACHE_KV.put(SITEMAP_KV_KEY, JSON.stringify(sitemap), {
         expirationTtl: 172800,
-      }),
-    ]);
+      });
+    }
 
     // Daily snapshot — only on the daily trigger
     let snapshots: number | undefined;
@@ -61,54 +52,6 @@ export async function handleScheduled(env: Env, trigger?: string): Promise<{ tre
     console.error('Cron: aggregation failed:', err);
     return { trending: [], sitemap: [], error: err.message };
   }
-}
-
-/**
- * Query R2 SQL API for top repos by check count.
- * Queries the Iceberg table populated by the Pipeline.
- */
-async function queryTrending(env: Env): Promise<TrendingRepo[]> {
-  const last24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const sql = `
-    SELECT
-      repo,
-      count(*) as checkCount,
-      avg(score) as avgScore,
-      max(verdict) as maxVerdict
-    FROM default.checks
-    WHERE __ingest_ts > '${last24h}'
-    GROUP BY repo
-    ORDER BY count(*) DESC
-    LIMIT 50
-  `;
-
-  // R2 SQL uses a different endpoint than WAE
-  const bucketName = 'isitalive-data'; // The pipeline's R2 bucket
-  const res = await fetch(
-    `${R2_SQL_ENDPOINT}/${env.CF_ACCOUNT_ID}/r2-sql/query/${bucketName}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.CF_R2_SQL_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query: sql }),
-    },
-  );
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`R2 SQL API error ${res.status}: ${body}`);
-  }
-
-  const json = await res.json() as any;
-  const rows = json.result?.rows ?? [];
-  return rows.map((row: any) => ({
-    repo: row.repo,
-    checks: Number(row.checkCount),
-    avgScore: Math.round(Number(row.avgScore)),
-    lastVerdict: row.maxVerdict ?? 'unknown',
-  }));
 }
 
 /**
@@ -144,7 +87,7 @@ async function querySitemapRepos(env: Env): Promise<string[]> {
 }
 
 /**
- * Read trending data from KV (for the /trending page).
+ * Read trending data from KV (populated by Queue consumer in real-time).
  */
 export async function getTrending(kv: KVNamespace): Promise<TrendingRepo[]> {
   try {
@@ -167,20 +110,16 @@ export async function getSitemapRepos(kv: KVNamespace): Promise<string[]> {
   }
 }
 
-
-
 /**
- * Daily snapshot handler — re-checks top N repos from the pipeline.
- * Returns the number of repos successfully snapshotted.
+ * Daily snapshot handler — dispatches the IngestWorkflow.
  */
 async function handleDailySnapshot(env: Env): Promise<number> {
   console.log('Cron (Daily): dispatching ingest workflow');
 
-  // Fire-and-forget — the Workflow runs asynchronously with durable steps
   const instance = await env.INGEST_WORKFLOW.create({
     params: { trigger: 'daily' as const },
   });
 
   console.log(`Cron (Daily): workflow instance created: ${instance.id}`);
-  return 0; // Actual count tracked inside the Workflow
+  return 0;
 }
