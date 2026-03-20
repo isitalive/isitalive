@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../scoring/types';
-import type { QueueMessage, RecentQueryMessage, CheckEventMessage, FirstSeenMessage, ArchiveRawMessage, PageViewMessage } from './types';
+import type { QueueMessage, RecentQueryMessage, CheckEventMessage, FirstSeenMessage, ArchiveRawMessage, PageViewMessage, GitHubAppEventMessage } from './types';
 import { getRecentQueries } from '../cache/recentQueries';
 import { buildAnalyticsEvent, writeAnalyticsBatch, archiveRawData } from '../analytics/events';
 import { getTrackedIndex, putTrackedIndex, upsertTracked } from './tracked';
@@ -44,6 +44,7 @@ export async function handleQueueBatch(
   const firstSeenEvents: FirstSeenMessage[] = [];
   const archiveEvents: ArchiveRawMessage[] = [];
   const pageViews: PageViewMessage[] = [];
+  const ghAppEvents: GitHubAppEventMessage[] = [];
 
   for (const msg of batch.messages) {
     switch (msg.body.type) {
@@ -62,6 +63,9 @@ export async function handleQueueBatch(
       case 'page-view':
         pageViews.push(msg.body);
         break;
+      case 'github-app-event':
+        ghAppEvents.push(msg.body);
+        break;
     }
   }
 
@@ -73,6 +77,7 @@ export async function handleQueueBatch(
     processArchives(env, archiveEvents),
     updateTrendingCounters(env, checkEvents, pageViews),
     updateTrackedIndex(env, checkEvents, pageViews),
+    processGitHubAppEvents(env, ghAppEvents),
   ]);
 }
 
@@ -280,5 +285,32 @@ async function updateTrackedIndex(
     await putTrackedIndex(env.CACHE_KV, index);
   } catch (err) {
     console.error('Queue: failed to update tracked index:', err);
+  }
+}
+
+/**
+ * Write GitHub App analytics events to R2.
+ */
+async function processGitHubAppEvents(
+  env: Env,
+  messages: GitHubAppEventMessage[],
+): Promise<void> {
+  if (messages.length === 0) return;
+
+  const now = new Date();
+  const datePrefix = now.toISOString().slice(0, 10);
+  const ts = now.toISOString().replace(/[:.]/g, '-');
+  const key = `analytics/github-app/${datePrefix}/${ts}-${messages.length}.json`;
+
+  try {
+    const events = messages.map(m => ({
+      timestamp: now.toISOString(),
+      ...m.data,
+    }));
+    await env.RAW_DATA.put(key, JSON.stringify(events), {
+      httpMetadata: { contentType: 'application/json' },
+    });
+  } catch (err) {
+    console.error('Queue: failed to write GitHub App analytics to R2:', err);
   }
 }

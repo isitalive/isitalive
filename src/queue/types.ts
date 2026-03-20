@@ -7,6 +7,7 @@
 
 import type { CheckEventContext } from '../analytics/events';
 import type { ScoringResult } from '../scoring/types';
+import type { GitHubAppAnalytics } from '../github/types';
 
 /** Recent query tracking — replaces KV read-modify-write */
 export interface RecentQueryMessage {
@@ -62,9 +63,16 @@ export interface PageViewMessage {
   };
 }
 
+/** GitHub App analytics event — audit results from PR checks and re-scans */
+export interface GitHubAppEventMessage {
+  type: 'github-app-event';
+  data: GitHubAppAnalytics;
+}
+
 export type QueueMessage =
   | RecentQueryMessage
   | CheckEventMessage
   | FirstSeenMessage
   | ArchiveRawMessage
-  | PageViewMessage;
+  | PageViewMessage
+  | GitHubAppEventMessage;

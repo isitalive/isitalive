@@ -137,6 +137,11 @@ export interface Env {
   RAW_DATA: R2Bucket;            // Raw GitHub response + analytics archive (R2)
   GITHUB_TOKEN?: string;
 
+  // GitHub App — set via CF dashboard secrets
+  GITHUB_APP_ID?: string;          // GitHub App ID
+  GITHUB_PRIVATE_KEY?: string;     // PEM-encoded RSA private key
+  GITHUB_WEBHOOK_SECRET?: string;  // Webhook HMAC secret
+
   // Cloudflare Turnstile — set via CF dashboard secrets
   TURNSTILE_SITE_KEY?: string;   // public, embedded in HTML
   TURNSTILE_SECRET_KEY?: string; // private, used for server-side verification
