@@ -29,6 +29,34 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 - \`signals[]\`: Individual metrics (last_commit, issue_staleness, pr_responsiveness, etc.)
 - \`cache.nextRefreshSeconds\`: When to re-poll for fresh data
 
+### Audit Dependency Manifest
+\`POST /api/audit\`
+
+Upload a go.mod or package.json and get a scored health report for every dependency. Synchronous, idempotent, cache-first.
+
+**Request body (JSON):**
+- \`format\`: "go.mod" | "package.json"
+- \`content\`: Raw manifest file content
+
+**Example:**
+\`\`\`
+curl -X POST https://isitalive.dev/api/audit \\
+  -H "Content-Type: application/json" \\
+  -d '{"format":"go.mod","content":"<contents of go.mod>"}'
+\`\`\`
+
+**Response fields:**
+- \`auditHash\`: SHA-256 of manifest content (usable as ETag)
+- \`complete\`: true if all deps scored, false if more time needed
+- \`retryAfterMs\`: If incomplete, wait this long then call again
+- \`scored\` / \`total\` / \`pending\` / \`unresolved\`: Counts
+- \`summary\`: Aggregate verdict counts and average score
+- \`dependencies[]\`: Per-dep results with name, version, github, score, verdict, dev flag
+
+**Retry logic:** If \`complete\` is false, call the same endpoint again after \`retryAfterMs\`. The cache fills progressively — each call is faster.
+
+**Unresolved deps:** Dependencies that can't be mapped to GitHub get \`verdict: "unresolved"\` with a \`unresolvedReason\` field (e.g. "gitlab_not_supported_yet", "no_github_repo", "repo_not_found").
+
 ### Get SVG Badge
 \`GET /api/badge/{provider}/{owner}/{repo}\`
 
@@ -44,7 +72,7 @@ Returns an SVG badge for README embedding.
 Optional. Add \`Authorization: Bearer <key>\` for higher rate limits.
 
 | Tier | Rate Limit | Cache TTL |
-|------|-----------|-----------|
+|------|-----------|-----------| 
 | No key | 10/hr | 24h |
 | Free key | 100/hr | 24h |
 | Pro key | 1,000/hr | 1h |

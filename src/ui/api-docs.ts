@@ -348,6 +348,53 @@ export function apiDocsPage(analyticsToken?: string): string {
       <tr><td>0–19</td><td style="color: #6b7280">⚫ unmaintained</td><td>No meaningful activity detected</td></tr>
     </table>
 
+    <h3>Audit Dependency Manifest</h3>
+    <div class="endpoint">
+      <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
+      <span class="endpoint-path">/api/audit</span>
+      <p class="endpoint-desc">Upload a <span class="inline-code">go.mod</span> or <span class="inline-code">package.json</span> and get a scored health report for every dependency. Synchronous, idempotent, cache-first (~50ms cached).</p>
+    </div>
+
+    <h3>Request Body</h3>
+    <div class="field-list">
+      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"go.mod"</span> or <span class="inline-code">"package.json"</span></span></div>
+      <div class="field-item"><span class="field-name">content</span><span class="field-desc">Raw manifest file content (max 512KB)</span></div>
+    </div>
+
+    <h3>Example Request</h3>
+    <div class="code-block"><span class="comment"># Audit a go.mod file</span><br>curl -X POST https://isitalive.dev/api/audit \<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
+
+    <h3>Example Response</h3>
+    <div class="code-block">{<br>
+&nbsp;&nbsp;<span class="key">"auditHash"</span>: <span class="str">"7da0c591f32d..."</span>,<br>
+&nbsp;&nbsp;<span class="key">"complete"</span>: <span class="num">true</span>,<br>
+&nbsp;&nbsp;<span class="key">"scored"</span>: <span class="num">262</span>,<br>
+&nbsp;&nbsp;<span class="key">"total"</span>: <span class="num">262</span>,<br>
+&nbsp;&nbsp;<span class="key">"summary"</span>: { <span class="key">"healthy"</span>: <span class="num">53</span>, <span class="key">"avgScore"</span>: <span class="num">52</span>, ... },<br>
+&nbsp;&nbsp;<span class="key">"dependencies"</span>: [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"name"</span>: <span class="str">"github.com/zitadel/zitadel"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"github"</span>: <span class="str">"zitadel/zitadel"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"score"</span>: <span class="num">100</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"verdict"</span>: <span class="str">"healthy"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"dev"</span>: <span class="num">false</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;]<br>
+}</div>
+
+    <h3>Audit Response Fields</h3>
+    <div class="field-list">
+      <div class="field-item"><span class="field-name">auditHash</span><span class="field-desc">SHA-256 of manifest content — also returned as <span class="inline-code">ETag</span> header</span></div>
+      <div class="field-item"><span class="field-name">complete</span><span class="field-desc"><span class="inline-code">true</span> if all deps scored. If <span class="inline-code">false</span>, call again after <span class="inline-code">retryAfterMs</span></span></div>
+      <div class="field-item"><span class="field-name">retryAfterMs</span><span class="field-desc">Suggested wait in ms before calling again (only when incomplete)</span></div>
+      <div class="field-item"><span class="field-name">dependencies[]</span><span class="field-desc">Per-dependency results: name, version, github, score, verdict, dev, unresolvedReason</span></div>
+    </div>
+
+    <div class="note-box">
+      <strong>Retry logic:</strong> If <span class="inline-code">complete</span> is <span class="inline-code">false</span>, call the same endpoint again after <span class="inline-code">retryAfterMs</span>. The cache fills progressively — each call is faster.<br><br>
+      <strong>Unresolved deps:</strong> Dependencies not on GitHub get <span class="inline-code">verdict: "unresolved"</span> with a reason (e.g. <span class="inline-code">gitlab_not_supported_yet</span>, <span class="inline-code">no_github_repo</span>).
+    </div>
+
     <h3>Get SVG Badge</h3>
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>

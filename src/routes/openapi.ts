@@ -6,8 +6,8 @@ export const openApiSpec = {
   openapi: '3.1.0',
   info: {
     title: 'Is It Alive? API',
-    version: '0.3.0',
-    description: 'Check if an open-source project is actively maintained. Returns a health score (0-100), verdict, and signal breakdown based on real-time GitHub data.',
+    version: '0.4.0',
+    description: 'Check if an open-source project is actively maintained. Returns a health score (0-100), verdict, and signal breakdown based on real-time GitHub data. Also supports manifest auditing — upload a go.mod or package.json to get a scored health report for all dependencies.',
     license: {
       name: 'AGPL-3.0',
       url: 'https://www.gnu.org/licenses/agpl-3.0.html',
@@ -196,6 +196,103 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/audit': {
+      post: {
+        operationId: 'auditManifest',
+        summary: 'Audit dependency manifest',
+        description: 'Upload a go.mod or package.json file and receive a scored health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
+        security: [{ bearerAuth: [] }, {}],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AuditRequest' },
+              example: {
+                format: 'go.mod',
+                content: 'module example.com/myapp\n\ngo 1.21\n\nrequire (\n\tgithub.com/gorilla/mux v1.8.1\n)',
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Audit result (complete or partial)',
+            headers: {
+              ETag: {
+                description: 'SHA-256 hash of the manifest content. Send as If-None-Match on subsequent requests to get 304 if unchanged.',
+                schema: { type: 'string' },
+              },
+              'Retry-After': {
+                description: 'Seconds to wait before retrying (only present when complete is false)',
+                schema: { type: 'integer' },
+              },
+            },
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuditResult' },
+                example: {
+                  auditHash: '7da0c591f32d...',
+                  complete: true,
+                  format: 'go.mod',
+                  scored: 2,
+                  total: 2,
+                  pending: 0,
+                  unresolved: 0,
+                  summary: {
+                    healthy: 1,
+                    stable: 0,
+                    degraded: 0,
+                    critical: 0,
+                    unmaintained: 1,
+                    avgScore: 60,
+                  },
+                  dependencies: [
+                    {
+                      name: 'github.com/zitadel/zitadel',
+                      version: 'v2.45.0',
+                      dev: false,
+                      ecosystem: 'go',
+                      github: 'zitadel/zitadel',
+                      score: 100,
+                      verdict: 'healthy',
+                    },
+                    {
+                      name: 'github.com/gorilla/mux',
+                      version: 'v1.8.1',
+                      dev: false,
+                      ecosystem: 'go',
+                      github: 'gorilla/mux',
+                      score: 19,
+                      verdict: 'unmaintained',
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          '304': {
+            description: 'Not Modified — manifest unchanged since last audit (requires If-None-Match header)',
+          },
+          '400': {
+            description: 'Invalid request (bad JSON, unsupported format, content too large)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error: { type: 'string' },
+                    supported: {
+                      type: 'array',
+                      items: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -317,6 +414,88 @@ export const openApiSpec = {
             type: 'integer',
             description: 'Seconds until the data will be refreshed. Use this to schedule your next poll.',
           },
+        },
+      },
+      AuditRequest: {
+        type: 'object',
+        required: ['format', 'content'],
+        properties: {
+          format: {
+            type: 'string',
+            enum: ['go.mod', 'package.json'],
+            description: 'Manifest file format',
+          },
+          content: {
+            type: 'string',
+            description: 'Raw manifest file content (max 512KB)',
+          },
+        },
+      },
+      AuditResult: {
+        type: 'object',
+        required: ['auditHash', 'complete', 'format', 'scored', 'total', 'pending', 'unresolved', 'summary', 'dependencies'],
+        properties: {
+          auditHash: {
+            type: 'string',
+            description: 'SHA-256 hash of the manifest content — usable as ETag for CI pipelines',
+          },
+          complete: {
+            type: 'boolean',
+            description: 'Whether all resolvable dependencies were scored. If false, call again after retryAfterMs.',
+          },
+          format: {
+            type: 'string',
+            description: 'Manifest format that was parsed',
+          },
+          scored: {
+            type: 'integer',
+            description: 'Number of dependencies successfully scored',
+          },
+          total: {
+            type: 'integer',
+            description: 'Total number of dependencies in the manifest',
+          },
+          pending: {
+            type: 'integer',
+            description: 'Dependencies not yet scored (will be scored on retry)',
+          },
+          unresolved: {
+            type: 'integer',
+            description: 'Dependencies that could not be resolved to a GitHub repo',
+          },
+          retryAfterMs: {
+            type: 'integer',
+            description: 'When complete is false, suggested wait in ms before calling again',
+          },
+          summary: {
+            type: 'object',
+            properties: {
+              healthy: { type: 'integer' },
+              stable: { type: 'integer' },
+              degraded: { type: 'integer' },
+              critical: { type: 'integer' },
+              unmaintained: { type: 'integer' },
+              avgScore: { type: 'integer', description: 'Average score across scored dependencies' },
+            },
+          },
+          dependencies: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/AuditDep' },
+            description: 'Per-dependency results, sorted by score (highest first)',
+          },
+        },
+      },
+      AuditDep: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Original package name from manifest' },
+          version: { type: 'string', description: 'Version from manifest' },
+          dev: { type: 'boolean', description: 'Whether this is a dev/indirect dependency' },
+          ecosystem: { type: 'string', enum: ['go', 'npm'] },
+          github: { type: 'string', nullable: true, description: 'Resolved GitHub owner/repo (e.g. "vercel/next.js") or null' },
+          score: { type: 'integer', nullable: true, description: 'Health score 0-100, or null if unresolved' },
+          verdict: { type: 'string', enum: ['healthy', 'stable', 'degraded', 'critical', 'unmaintained', 'pending', 'unresolved'] },
+          unresolvedReason: { type: 'string', description: 'Why this dep could not be resolved (e.g. "gitlab_not_supported_yet", "no_github_repo", "repo_not_found")' },
         },
       },
     },
