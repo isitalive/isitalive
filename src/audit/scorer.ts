@@ -174,27 +174,30 @@ export async function scoreAudit(
           const result = scoreProject(rawData, 'github');
           // Cache in background
           ctx.waitUntil(putCache(env, 'github', owner, repo, result));
-          return { dep, result };
-        } catch {
-          return { dep, result: null };
+          return { dep, result, error: null as string | null };
+        } catch (err: any) {
+          const is404 = err.message?.includes('not found');
+          return { dep, result: null, error: is404 ? 'repo_not_found' : 'scoring_error' };
         }
       }),
     );
 
     for (const r of results) {
       if (r.status === 'rejected') continue;
-      const { dep, result } = r.value;
+      const { dep, result, error } = r.value;
       if (result) {
         scored.push(depToAudit(dep, result));
       } else {
-        remaining.push({
+        // Scoring failed — treat as unresolved (not pending), it's not recoverable
+        unresolvedDeps.push({
           name: dep.name,
           version: dep.version,
           dev: dep.dev,
           ecosystem: dep.ecosystem,
           github: `${dep.github!.owner}/${dep.github!.repo}`,
           score: null,
-          verdict: 'pending',
+          verdict: 'unresolved',
+          unresolvedReason: error ?? 'scoring_error',
         });
       }
     }
