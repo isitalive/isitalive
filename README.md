@@ -45,3 +45,4 @@ We check 8 signals and produce a weighted health score (0-100):
 ## License
 
 [AGPL-3.0](./LICENSE)
+
