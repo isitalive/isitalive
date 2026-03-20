@@ -119,3 +119,61 @@ export async function getScoreHistory(
     return [];
   }
 }
+
+// ---------------------------------------------------------------------------
+// Trend computation — rolling score analysis over history
+// ---------------------------------------------------------------------------
+
+export type TrendDirection = 'improving' | 'stable' | 'declining';
+
+export interface Trend {
+  /** null if insufficient data (<7 days span) */
+  direction: TrendDirection | null;
+  /** Score change (positive = improving) */
+  delta: number;
+  /** Number of data points available */
+  dataPoints: number;
+  /** Number of days spanned by the data */
+  daySpan: number;
+  /** Minimum days required before showing a trend */
+  minDaysRequired: number;
+}
+
+const MIN_TREND_DAYS = 7;
+const TREND_THRESHOLD = 5; // ±5 points = significant
+
+/**
+ * Compute a trend from score history.
+ *
+ * Requires at least 7 days of data span before producing a trend direction.
+ * Compares the average score of the first third vs last third of the history.
+ * A change of ±5 points or more is considered significant.
+ */
+export function computeTrend(history: ScoreSnapshot[]): Trend {
+  const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
+
+  if (sorted.length < 2) {
+    return { direction: null, delta: 0, dataPoints: sorted.length, daySpan: 0, minDaysRequired: MIN_TREND_DAYS };
+  }
+
+  const firstDate = new Date(sorted[0].date);
+  const lastDate = new Date(sorted[sorted.length - 1].date);
+  const daySpan = Math.round((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (daySpan < MIN_TREND_DAYS) {
+    return { direction: null, delta: 0, dataPoints: sorted.length, daySpan, minDaysRequired: MIN_TREND_DAYS };
+  }
+
+  // Compare first third vs last third average
+  const third = Math.max(1, Math.floor(sorted.length / 3));
+  const earlyAvg = sorted.slice(0, third).reduce((s, h) => s + h.score, 0) / third;
+  const lateAvg = sorted.slice(-third).reduce((s, h) => s + h.score, 0) / third;
+  const delta = Math.round(lateAvg - earlyAvg);
+
+  let direction: TrendDirection;
+  if (delta >= TREND_THRESHOLD) direction = 'improving';
+  else if (delta <= -TREND_THRESHOLD) direction = 'declining';
+  else direction = 'stable';
+
+  return { direction, delta, dataPoints: sorted.length, daySpan, minDaysRequired: MIN_TREND_DAYS };
+}

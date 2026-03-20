@@ -226,8 +226,8 @@ export const openApiSpec = {
           },
           verdict: {
             type: 'string',
-            enum: ['healthy', 'maintained', 'declining', 'at_risk', 'abandoned'],
-            description: 'Human-readable verdict based on score: healthy (80-100), maintained (60-79), declining (40-59), at_risk (20-39), abandoned (0-19)',
+            enum: ['healthy', 'maintained', 'inactive', 'dormant', 'unmaintained'],
+            description: 'Human-readable verdict based on score: healthy (80-100), maintained (60-79), inactive (40-59), dormant (20-39), unmaintained (0-19)',
           },
           checkedAt: {
             type: 'string',

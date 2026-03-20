@@ -4,29 +4,30 @@
 
 import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
 import { navbarHtml, footerHtml, componentCss } from './components';
+import type { Trend } from '../ingest/processor';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
   maintained: '#eab308',
-  declining: '#f97316',
-  at_risk: '#ef4444',
-  abandoned: '#6b7280',
+  inactive: '#f97316',
+  dormant: '#ef4444',
+  unmaintained: '#6b7280',
 };
 
 const VERDICT_EMOJI: Record<Verdict, string> = {
   healthy: '🟢',
   maintained: '🟡',
-  declining: '🟠',
-  at_risk: '🔴',
-  abandoned: '⚫',
+  inactive: '🟠',
+  dormant: '🔴',
+  unmaintained: '⚫',
 };
 
 const VERDICT_LABELS: Record<Verdict, string> = {
   healthy: 'Healthy',
   maintained: 'Maintained',
-  declining: 'Declining',
-  at_risk: 'At Risk',
-  abandoned: 'Abandoned',
+  inactive: 'Inactive',
+  dormant: 'Dormant',
+  unmaintained: 'Unmaintained',
 };
 
 function signalBar(score: number, color: string): string {
@@ -103,11 +104,29 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
     </section>`;
 }
 
-export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string, firstIndexed?: string | null): string {
+export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
   const color = VERDICT_COLORS[result.verdict];
   const emoji = VERDICT_EMOJI[result.verdict];
   const label = VERDICT_LABELS[result.verdict];
   const dashOffset = 283 - (283 * result.score) / 100; // for SVG circle gauge
+
+  // Trend display
+  const TREND_ICONS: Record<string, string> = { improving: '↗', stable: '→', declining: '↘' };
+  const TREND_COLORS: Record<string, string> = { improving: '#22c55e', stable: '#8b8b9e', declining: '#ef4444' };
+  const TREND_LABELS: Record<string, string> = { improving: 'Improving', stable: 'Stable', declining: 'Declining' };
+
+  let trendHtml = '';
+  if (trend) {
+    if (trend.direction) {
+      const tIcon = TREND_ICONS[trend.direction];
+      const tColor = TREND_COLORS[trend.direction];
+      const tLabel = TREND_LABELS[trend.direction];
+      const deltaStr = trend.delta > 0 ? `+${trend.delta}` : `${trend.delta}`;
+      trendHtml = `<span class="trend-pill" style="color: ${tColor}; border-color: ${tColor}33">${tIcon} ${tLabel} <span class="trend-delta">${deltaStr} pts over ${trend.daySpan}d</span></span>`;
+    } else {
+      trendHtml = `<span class="trend-pill trend-collecting">📊 Collecting trend data (${trend.dataPoints} point${trend.dataPoints !== 1 ? 's' : ''}, need ${trend.minDaysRequired}d span)</span>`;
+    }
+  }
 
   const signalsHtml = result.signals.map(s => `
     <div class="signal-row">
@@ -434,6 +453,27 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       flex-shrink: 0;
     }
 
+    /* ── Trend ──────────────────────────── */
+    .trend-pill {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 4px 14px;
+      border: 1px solid;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .trend-delta {
+      font-weight: 400;
+      opacity: 0.7;
+      margin-left: 4px;
+    }
+    .trend-collecting {
+      color: var(--text-muted);
+      border-color: var(--border);
+      font-weight: 400;
+    }
+
     @media (max-width: 640px) {
       .hero { padding: 24px 0 36px; }
       .signals, .embed-section, .meta-card { padding: 20px; }
@@ -466,6 +506,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
 
       <div>
         <span class="verdict-badge">${emoji} ${label}</span>
+        ${trendHtml}
       </div>
 
       ${result.overrideReason ? `<div class="override-notice">⚠️ ${result.overrideReason}</div>` : ''}

@@ -607,7 +607,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       if (!queries || !queries.length) return;
       var section = document.getElementById('recentSection');
       var list = document.getElementById('recentList');
-      var COLORS = { healthy:'#22c55e', maintained:'#eab308', declining:'#f97316', at_risk:'#ef4444' };
+      var COLORS = { healthy:'#22c55e', maintained:'#eab308', inactive:'#f97316', dormant:'#ef4444', unmaintained:'#6b7280' };
       list.innerHTML = queries.map(function(q) {
         var c = COLORS[q.verdict] || '#6b7280';
         return '<a href="/' + q.owner + '/' + q.repo + '" class="recent-chip">'

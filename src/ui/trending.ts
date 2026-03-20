@@ -200,9 +200,9 @@ export function trendingPage(analyticsToken?: string): string {
     const VERDICT_COLORS = {
       healthy: '#22c55e',
       maintained: '#eab308',
-      declining: '#f97316',
-      at_risk: '#ef4444',
-      abandoned: '#6b7280',
+      inactive: '#f97316',
+      dormant: '#ef4444',
+      unmaintained: '#6b7280',
     };
 
     function verdictLabel(v) {

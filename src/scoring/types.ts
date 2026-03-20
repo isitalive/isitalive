@@ -5,13 +5,13 @@
 /** Supported source-code hosting / registry providers */
 export type ProviderName = 'github' | 'npm' | 'pypi' | 'crates' | 'kernel';
 
-/** Human-readable health verdict */
+/** Human-readable health verdict — describes observed state, not trajectory */
 export type Verdict =
-  | 'healthy'    // 80-100
-  | 'maintained' // 60-79
-  | 'declining'  // 40-59
-  | 'at_risk'    // 20-39
-  | 'abandoned'; // 0-19
+  | 'healthy'       // 80-100
+  | 'maintained'    // 60-79
+  | 'inactive'      // 40-59
+  | 'dormant'       // 20-39
+  | 'unmaintained'; // 0-19
 
 /** Result of a single scoring signal */
 export interface SignalResult {

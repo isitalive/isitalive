@@ -10,7 +10,7 @@ export const aiPluginManifest = {
   name_for_human: 'Is It Alive?',
   name_for_model: 'is_it_alive',
   description_for_human: 'Check if an open-source project is actively maintained. Get health scores, verdicts, and activity signals for any GitHub repository.',
-  description_for_model: 'Use this plugin to check if an open-source project on GitHub is actively maintained. Call the checkProject endpoint with a provider (github), owner, and repo name to get a health score (0-100), verdict (healthy/maintained/declining/at_risk/abandoned), and detailed signal breakdown including last commit recency, release recency, issue responsiveness, contributor activity, and more. The response includes cache metadata with nextRefreshSeconds telling you when to re-poll. Use the badge endpoint to get an embeddable SVG badge.',
+  description_for_model: 'Use this plugin to check if an open-source project on GitHub is actively maintained. Call the checkProject endpoint with a provider (github), owner, and repo name to get a health score (0-100), verdict (healthy/maintained/inactive/dormant/unmaintained), and detailed signal breakdown including last commit recency, release recency, issue responsiveness, contributor activity, and more. The response includes cache metadata with nextRefreshSeconds telling you when to re-poll. Use the badge endpoint to get an embeddable SVG badge.',
   auth: {
     type: 'none',
   },

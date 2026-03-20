@@ -9,9 +9,9 @@ import { RULES } from './rules';
 function toVerdict(score: number): Verdict {
   if (score >= 80) return 'healthy';
   if (score >= 60) return 'maintained';
-  if (score >= 40) return 'declining';
-  if (score >= 20) return 'at_risk';
-  return 'abandoned';
+  if (score >= 40) return 'inactive';
+  if (score >= 20) return 'dormant';
+  return 'unmaintained';
 }
 
 /**
@@ -44,7 +44,7 @@ export function scoreProject(
       project,
       provider,
       score: 0,
-      verdict: 'abandoned',
+      verdict: 'unmaintained',
       checkedAt,
       cached: false,
       signals: [],

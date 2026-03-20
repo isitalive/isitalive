@@ -14,17 +14,17 @@ const badge = new Hono<{ Bindings: Env }>();
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
   maintained: '#eab308',
-  declining: '#f97316',
-  at_risk: '#ef4444',
-  abandoned: '#6b7280',
+  inactive: '#f97316',
+  dormant: '#ef4444',
+  unmaintained: '#6b7280',
 };
 
 const VERDICT_LABELS: Record<Verdict, string> = {
   healthy: 'healthy',
   maintained: 'maintained',
-  declining: 'declining',
-  at_risk: 'at risk',
-  abandoned: 'abandoned',
+  inactive: 'inactive',
+  dormant: 'dormant',
+  unmaintained: 'unmaintained',
 };
 
 function generateSvg(score: number, verdict: Verdict): string {
@@ -99,7 +99,7 @@ badge.get('/:provider/:owner/:repo', async (c) => {
     });
   } catch {
     // Fallback badge on error
-    const svg = generateSvg(0, 'abandoned');
+    const svg = generateSvg(0, 'unmaintained');
     return c.body(svg, 200, {
       'Content-Type': 'image/svg+xml',
       'Cache-Control': 'public, max-age=300',

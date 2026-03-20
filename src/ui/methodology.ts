@@ -348,7 +348,7 @@ export function methodologyPage(analyticsToken?: string): string {
     </div>
 
     <h2>Verdicts</h2>
-    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">The weighted score maps to one of five verdicts:</p>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">The weighted score maps to one of five verdicts — each describes the <strong>observed state</strong>, not a trajectory:</p>
 
     <div class="verdict-section">
       <div class="verdict-chip">
@@ -363,24 +363,24 @@ export function methodologyPage(analyticsToken?: string): string {
       </div>
       <div class="verdict-chip">
         <div class="emoji">🟠</div>
-        <div class="name" style="color: #f97316">Declining</div>
+        <div class="name" style="color: #f97316">Inactive</div>
         <div class="range">40 – 59</div>
       </div>
       <div class="verdict-chip">
         <div class="emoji">🔴</div>
-        <div class="name" style="color: #ef4444">At Risk</div>
+        <div class="name" style="color: #ef4444">Dormant</div>
         <div class="range">20 – 39</div>
       </div>
       <div class="verdict-chip">
         <div class="emoji">⚫</div>
-        <div class="name" style="color: #6b7280">Abandoned</div>
+        <div class="name" style="color: #6b7280">Unmaintained</div>
         <div class="range">0 – 19</div>
       </div>
     </div>
 
     <h2>Overrides</h2>
     <div class="note-box">
-      <strong>Archived repositories</strong> are automatically scored 0 with the verdict "Abandoned" regardless of other signals. If the repository owner has explicitly archived it, the project is no longer maintained.
+      <strong>Archived repositories</strong> are automatically scored 0 with the verdict "Unmaintained" regardless of other signals. If the repository owner has explicitly archived it, the project is no longer maintained.
     </div>
 
     <h2>Caching</h2>

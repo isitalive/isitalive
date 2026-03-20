@@ -25,6 +25,7 @@ import { trendingPage } from '../ui/trending';
 import type { QueueMessage } from '../queue/types';
 import { parseChangelog as parseChangelogMd } from '../changelog/parser';
 import changelogMd from '../../CHANGELOG.md';
+import { getScoreHistory, computeTrend } from '../ingest/processor';
 
 const ui = new Hono<{ Bindings: Env }>();
 
@@ -232,7 +233,9 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
         ),
       );
       const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo);
-      const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed));
+      const history = await getScoreHistory(c.env.CACHE_KV, owner, repo);
+      const trend = computeTrend(history);
+      const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend));
       c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
       return response;
     }
@@ -256,10 +259,12 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     ]));
 
     const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo);
+    const history = await getScoreHistory(c.env.CACHE_KV, owner, repo);
+    const trend = computeTrend(history);
     
     // 4. Create the Hono response
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
-    const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed));
+    const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend));
 
     // 5. Put a CLONED copy into the cache without blocking the user response
     c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
