@@ -53,7 +53,7 @@ binding = "ISITALIVE_CHECKS_STREAM"
 
 # Cron Triggers — hourly trending + daily snapshot (6 AM UTC)
 [triggers]
-crons = ["0 * * * *", "0 6 * * *"]
+crons = ["*/10 * * * *", "0 6 * * *"]
 
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
