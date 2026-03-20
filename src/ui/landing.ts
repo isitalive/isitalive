@@ -255,61 +255,32 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       flex-shrink: 0;
     }
 
-    /* ── Features ─────────────────────────────── */
-    .features {
+    /* ── Two-column Section ─────────────────── */
+    .two-col-section {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 80px;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-top: 60px;
+      align-items: start;
     }
 
-    .feature {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px 22px;
-      transition: border-color 0.3s, background 0.3s;
-    }
-
-    .feature:hover {
-      border-color: rgba(255,255,255,0.15);
-      background: var(--surface-hover);
-    }
-
-    .feature-icon {
-      font-size: 1.5rem;
-      margin-bottom: 14px;
-    }
-
-    .feature h3 {
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .feature p {
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-      line-height: 1.5;
-    }
-
-    /* ── How it works ─────────────────────────── */
-    .how-it-works {
-      margin-top: 80px;
-    }
-
-    .how-it-works h2 {
-      text-align: center;
-      font-size: 1.5rem;
+    .two-col-section h2 {
+      font-size: 1.2rem;
       font-weight: 700;
-      margin-bottom: 36px;
+      margin-bottom: 20px;
       letter-spacing: -0.02em;
     }
 
+    .col-right .api-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      margin-bottom: 16px;
+    }
+
     .signals-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .signal-item {
@@ -318,9 +289,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       gap: 12px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 18px;
-      font-size: 0.85rem;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.82rem;
     }
 
     .signal-weight {
@@ -333,34 +304,15 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       white-space: nowrap;
     }
 
-    /* ── API Preview ─────────────────────────── */
-    .api-preview {
-      margin-top: 80px;
-    }
-
-    .api-preview h2 {
-      text-align: center;
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 12px;
-      letter-spacing: -0.02em;
-    }
-
-    .api-preview .api-subtitle {
-      text-align: center;
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      margin-bottom: 28px;
-    }
-
+    /* ── Code Block ─────────────────────────── */
     .code-block {
       background: var(--bg-secondary);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
+      border-radius: 12px;
+      padding: 20px;
       overflow-x: auto;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       line-height: 1.7;
       color: var(--text-secondary);
     }
@@ -371,12 +323,13 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .code-block .string { color: var(--green); }
     .code-block .number { color: var(--yellow); }
 
-
     /* ── Responsive ─────────────────────────── */
+    @media (max-width: 768px) {
+      .two-col-section { grid-template-columns: 1fr; gap: 40px; }
+    }
+
     @media (max-width: 640px) {
       header { padding: 60px 0 40px; }
-      .features { grid-template-columns: 1fr; }
-      .signals-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 480px) {
@@ -569,54 +522,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       <div class="recent-list" id="recentList"></div>
     </div>
 
-    <section class="features">
-      <div class="feature">
-        <div class="feature-icon">⚡</div>
-        <h3>Edge-fast</h3>
-        <p>Powered by Cloudflare Workers with aggressive caching. Sub-100ms responses worldwide.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🤖</div>
-        <h3>API-first</h3>
-        <p>Clean JSON API for AI agents and CI pipelines. Add a health gate to your dependency workflow.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🏷️</div>
-        <h3>Badge it</h3>
-        <p>Embed a live health badge in your README. Show the world your project is alive.</p>
-      </div>
-    </section>
-
-    <section class="how-it-works">
-      <h2>What we check</h2>
-      <div class="signals-grid">
-        <div class="signal-item"><span class="signal-weight">25%</span> Last commit activity</div>
-        <div class="signal-item"><span class="signal-weight">15%</span> Release cadence</div>
-        <div class="signal-item"><span class="signal-weight">15%</span> PR responsiveness</div>
-        <div class="signal-item"><span class="signal-weight">10%</span> Issue staleness</div>
-        <div class="signal-item"><span class="signal-weight">10%</span> Contributor diversity</div>
-        <div class="signal-item"><span class="signal-weight">10%</span> Bus factor risk</div>
-        <div class="signal-item"><span class="signal-weight">10%</span> CI/CD presence</div>
-        <div class="signal-item"><span class="signal-weight">5%</span> Community size</div>
-      </div>
-    </section>
-
-    <section class="api-preview">
-      <h2>Built for machines, too</h2>
-      <p class="api-subtitle">One endpoint. One answer. Perfect for AI agents.</p>
-      <div class="code-block">
-        <span class="comment">// Check any GitHub project</span><br>
-        <span class="url">GET https://isitalive.dev/api/check/github/vercel/next.js</span><br><br>
-        <span class="comment">// Response</span><br>
-        {<br>
-        &nbsp;&nbsp;<span class="key">"score"</span>: <span class="number">92</span>,<br>
-        &nbsp;&nbsp;<span class="key">"verdict"</span>: <span class="string">"healthy"</span>,<br>
-        &nbsp;&nbsp;<span class="key">"project"</span>: <span class="string">"github/vercel/next.js"</span>,<br>
-        &nbsp;&nbsp;<span class="key">"signals"</span>: [ ... ]<br>
-        }
-      </div>
-    </section>
-
     <section class="badge-cta">
       <h2>Show the world your project is alive</h2>
       <p class="badge-subtitle">Add a live health badge to your README in seconds.</p>
@@ -635,6 +540,37 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           <div class="snippet-label">HTML</div>
           <div class="snippet-code" id="badgeHtml">&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;&lt;/a&gt;</div>
           <button class="copy-btn" onclick="copySnippet('badgeHtml')">Copy</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="two-col-section">
+      <div class="col-left">
+        <h2>What we check</h2>
+        <div class="signals-grid">
+          <div class="signal-item"><span class="signal-weight">25%</span> Last commit activity</div>
+          <div class="signal-item"><span class="signal-weight">15%</span> Release cadence</div>
+          <div class="signal-item"><span class="signal-weight">15%</span> PR responsiveness</div>
+          <div class="signal-item"><span class="signal-weight">10%</span> Issue staleness</div>
+          <div class="signal-item"><span class="signal-weight">10%</span> Contributor diversity</div>
+          <div class="signal-item"><span class="signal-weight">10%</span> Bus factor risk</div>
+          <div class="signal-item"><span class="signal-weight">10%</span> CI/CD presence</div>
+          <div class="signal-item"><span class="signal-weight">5%</span> Community size</div>
+        </div>
+      </div>
+      <div class="col-right">
+        <h2>Built for machines, too</h2>
+        <p class="api-subtitle">One endpoint. One answer. Perfect for AI agents.</p>
+        <div class="code-block">
+          <span class="comment">// Check any GitHub project</span><br>
+          <span class="url">GET /api/check/github/vercel/next.js</span><br><br>
+          <span class="comment">// Response</span><br>
+          {<br>
+          &nbsp;&nbsp;<span class="key">"score"</span>: <span class="number">92</span>,<br>
+          &nbsp;&nbsp;<span class="key">"verdict"</span>: <span class="string">"healthy"</span>,<br>
+          &nbsp;&nbsp;<span class="key">"project"</span>: <span class="string">"github/vercel/next.js"</span>,<br>
+          &nbsp;&nbsp;<span class="key">"signals"</span>: [ ... ]<br>
+          }
         </div>
       </div>
     </section>
