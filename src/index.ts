@@ -67,6 +67,17 @@ app.get('/_cache_test', cacheTest);
 // ── Health check ──────────────────────────────────────────────────────
 app.get('/health', (c) => c.json({ status: 'ok', version: '0.4.0' }));
 
+// ── Admin: manual cron trigger ────────────────────────────────────────
+app.get('/_cron', async (c) => {
+  const trigger = c.req.query('trigger') || 'hourly';
+  const { handleScheduled } = await import('./cron/handler');
+  try {
+    const result = await handleScheduled(c.env, trigger);
+    return c.json({ success: true, trigger, result });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
 // ── Export Worker ─────────────────────────────────────────────────────
 import { handleScheduled } from './cron/handler';
 import { handleQueueBatch } from './queue/consumer';
