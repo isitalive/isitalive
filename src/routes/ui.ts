@@ -106,12 +106,17 @@ ui.get('/methodology', (c) => {
   return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN));
 });
 
-// Trending page — reads from KV (populated by hourly Cron)
-ui.get('/trending', async (c) => {
-  const trendingRepos = await getTrending(c.env.CACHE_KV);
-  console.log(`UI (Trending): fetched ${trendingRepos.length} repos from KV`);
-  c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
-  return c.html(trendingPage(trendingRepos, c.env.CF_ANALYTICS_TOKEN));
+// Trending page — static HTML shell (data hydrated client-side)
+ui.get('/trending', (c) => {
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+  return c.html(trendingPage(c.env.CF_ANALYTICS_TOKEN));
+});
+
+// Trending API — lightweight JSON endpoint for client-side hydration
+ui.get('/api/trending', async (c) => {
+  const repos = await getTrending(c.env.CACHE_KV);
+  c.header('Cache-Control', 'public, max-age=10, s-maxage=10');
+  return c.json(repos);
 });
 
 // Changelog page — static per deploy

@@ -1,26 +1,13 @@
 // ---------------------------------------------------------------------------
-// Trending page — top repos by check volume (powered by WAE + Cron)
+// Trending page — HTML shell with client-side hydration
+//
+// The HTML shell (layout, CSS, nav) is edge-cached for a long time.
+// Fresh trending data is fetched client-side from /api/trending.
 // ---------------------------------------------------------------------------
 
-import type { TrendingRepo } from '../cron/handler';
 import { navbarHtml, footerHtml } from './components';
 
-function verdictColor(verdict: string): string {
-  switch (verdict) {
-    case 'healthy': return '#22c55e';
-    case 'maintained': return '#eab308';
-    case 'declining': return '#f97316';
-    case 'at_risk': return '#ef4444';
-    case 'archived': return '#6b7280';
-    default: return '#6b7280';
-  }
-}
-
-function verdictLabel(verdict: string): string {
-  return verdict.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): string {
+export function trendingPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -65,8 +52,6 @@ export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): st
       margin: 0 auto;
       padding: 0 20px 48px;
     }
-
-
 
     h1 {
       font-size: 1.6rem;
@@ -154,6 +139,27 @@ export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): st
       white-space: nowrap;
     }
 
+    /* Loading skeleton */
+    .skeleton-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .skeleton-bar {
+      height: 12px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 6px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
     @media (max-width: 480px) {
       .repo-meta { display: none; }
       .repo-card { padding: 12px 14px; gap: 10px; }
@@ -172,31 +178,63 @@ export function trendingPage(repos: TrendingRepo[], analyticsToken?: string): st
     <h1>🔥 Trending</h1>
     <p class="subtitle">Most checked projects in the last 24 hours</p>
 
-    ${repos.length === 0 ? `
-    <div class="empty-state">
-      <div style="font-size:2.5rem">📊</div>
-      <p>No trending data yet. Check back soon — the hourly aggregation needs a few data points first.</p>
+    <div id="trending-list" class="repo-list">
+      ${Array.from({ length: 5 }, () => `
+      <div class="skeleton-card">
+        <div class="skeleton-bar" style="width:22px;height:14px"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <div class="skeleton-bar" style="width:60%"></div>
+          <div class="skeleton-bar" style="width:30%;height:8px"></div>
+        </div>
+        <div class="skeleton-bar" style="width:50px;height:20px"></div>
+        <div class="skeleton-bar" style="width:30px;height:20px"></div>
+      </div>`).join('')}
     </div>
-    ` : `
-    <div class="repo-list">
-      ${repos.map((r, i) => {
-        const color = verdictColor(r.lastVerdict);
-        return `
-        <a href="/${r.repo}" class="repo-card" id="trending-${i + 1}">
-          <span class="repo-rank">#${i + 1}</span>
-          <div class="repo-info">
-            <div class="repo-name">${r.repo}</div>
-            <div class="repo-meta">${r.checks} check${r.checks !== 1 ? 's' : ''} today</div>
-          </div>
-          <span class="repo-verdict" style="background:${color}20;color:${color}">${verdictLabel(r.lastVerdict)}</span>
-          <span class="repo-score" style="color:${color}">${r.avgScore}</span>
-        </a>`;
-      }).join('')}
-    </div>
-    `}
+
     ${footerHtml}
   </div>
 
+  <script>
+    const VERDICT_COLORS = {
+      healthy: '#22c55e',
+      maintained: '#eab308',
+      declining: '#f97316',
+      at_risk: '#ef4444',
+      abandoned: '#6b7280',
+    };
+
+    function verdictLabel(v) {
+      return v.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+    }
+
+    function renderCard(r, i) {
+      const color = VERDICT_COLORS[r.lastVerdict] || '#6b7280';
+      return '<a href="/' + r.repo + '" class="repo-card" id="trending-' + (i+1) + '">'
+        + '<span class="repo-rank">#' + (i+1) + '</span>'
+        + '<div class="repo-info">'
+        + '<div class="repo-name">' + r.repo + '</div>'
+        + '<div class="repo-meta">' + r.checks + ' check' + (r.checks !== 1 ? 's' : '') + ' today</div>'
+        + '</div>'
+        + '<span class="repo-verdict" style="background:' + color + '20;color:' + color + '">' + verdictLabel(r.lastVerdict) + '</span>'
+        + '<span class="repo-score" style="color:' + color + '">' + r.avgScore + '</span>'
+        + '</a>';
+    }
+
+    fetch('/api/trending')
+      .then(r => r.json())
+      .then(repos => {
+        const el = document.getElementById('trending-list');
+        if (!repos || repos.length === 0) {
+          el.innerHTML = '<div class="empty-state"><div style="font-size:2.5rem">📊</div><p>No trending data yet. Check back soon.</p></div>';
+        } else {
+          el.innerHTML = repos.map(renderCard).join('');
+        }
+      })
+      .catch(() => {
+        document.getElementById('trending-list').innerHTML =
+          '<div class="empty-state"><div style="font-size:2.5rem">⚠️</div><p>Failed to load trending data.</p></div>';
+      });
+  </script>
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
 </html>`;
