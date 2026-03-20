@@ -50,13 +50,15 @@ export interface ArchiveRawMessage {
   };
 }
 
-/** Page view — lightweight tracking for Edge Cache hits */
+/** Page view — client-side beacon tracking for real browser views */
 export interface PageViewMessage {
   type: 'page-view';
   data: {
     provider: string;
     owner: string;
     repo: string;
+    score: number;
+    verdict: string;
   };
 }
 

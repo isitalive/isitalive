@@ -68,6 +68,38 @@ ui.get('/', async (c) => {
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN, recent));
 });
 
+// Page view beacon — client-side tracking (only real browser page loads)
+ui.post('/_view', async (c) => {
+  // Origin check — reject requests not from our domain
+  const origin = c.req.header('Origin') || c.req.header('Referer') || '';
+  if (!origin.includes('isitalive.dev')) {
+    return c.json({ ok: false }, 403);
+  }
+
+  try {
+    const body = await c.req.json() as { r?: string; s?: number; v?: string };
+    const repoSlug = body.r;
+    if (!repoSlug || typeof repoSlug !== 'string' || !repoSlug.includes('/')) {
+      return c.json({ ok: false }, 400);
+    }
+
+    const [owner, repo] = repoSlug.split('/');
+    const score = typeof body.s === 'number' ? body.s : 0;
+    const verdict = typeof body.v === 'string' ? body.v : 'unknown';
+
+    c.executionCtx.waitUntil(
+      c.env.EVENTS_QUEUE.send({
+        type: 'page-view',
+        data: { provider: 'github', owner, repo, score, verdict },
+      } satisfies QueueMessage),
+    );
+
+    return c.json({ ok: true }, 202);
+  } catch {
+    return c.json({ ok: false }, 400);
+  }
+});
+
 // Methodology page — static per deploy
 ui.get('/methodology', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
@@ -126,10 +158,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   const cachedResponse = await cache.match(cacheKey);
   if (cachedResponse) {
     console.log(`⚡ Cache HIT for: ${c.req.url}`);
-    // Track the page view for trending + analytics (fire-and-forget)
-    c.executionCtx.waitUntil(
-      c.env.EVENTS_QUEUE.send({ type: 'page-view', data: { provider, owner, repo } } satisfies QueueMessage),
-    );
+    // Page views are tracked client-side via sendBeacon → /_view
     return cachedResponse;
   }
 

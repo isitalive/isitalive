@@ -206,24 +206,21 @@ async function updateTrendingCounters(
       }
     }
 
-    // Increment counters from page views (no score data — just bump the count)
+    // Increment counters from page views (carry score/verdict from rendered page)
     for (const msg of pageViewMessages) {
       const repo = `${msg.data.owner}/${msg.data.repo}`.toLowerCase();
       const existing = counters[repo];
 
       if (existing) {
-        // Bump count + carry forward the average score
-        const avgScore = existing.totalScore / existing.count;
         existing.count++;
-        existing.totalScore += avgScore; // maintain same average
+        existing.totalScore += msg.data.score;
+        existing.lastVerdict = msg.data.verdict;
         existing.lastSeen = now;
       } else {
-        // First time seeing this repo via page view — count it with score 0
-        // (will be corrected on the next full check event)
         counters[repo] = {
           count: 1,
-          totalScore: 0,
-          lastVerdict: 'unknown',
+          totalScore: msg.data.score,
+          lastVerdict: msg.data.verdict,
           lastSeen: now,
         };
       }

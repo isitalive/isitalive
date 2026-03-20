@@ -545,6 +545,16 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       });
     }
   </script>
+  <script>
+    // Track real page views via sendBeacon — only fires in real browsers
+    try {
+      navigator.sendBeacon('/_view', JSON.stringify({
+        r: '${owner}/${repo}',
+        s: ${result.score},
+        v: '${result.verdict}',
+      }));
+    } catch(e) {}
+  </script>
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
 </html>`;
