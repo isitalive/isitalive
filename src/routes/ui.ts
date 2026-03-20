@@ -61,11 +61,17 @@ ${repos.map(repo => `  <url>
   return c.text(xml);
 });
 
-// Landing page — show recent queries
-ui.get('/', async (c) => {
+// Landing page — static shell, chips hydrated client-side
+ui.get('/', (c) => {
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN));
+});
+
+// Recent queries API — lightweight JSON for client-side hydration
+ui.get('/api/recent', async (c) => {
   const recent = await getRecentQueries(c.env.CACHE_KV);
-  c.header('Cache-Control', 'public, max-age=60, s-maxage=60');
-  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN, recent));
+  c.header('Cache-Control', 'public, max-age=10, s-maxage=10');
+  return c.json(recent);
 });
 
 // Page view beacon — client-side tracking (only real browser page loads)

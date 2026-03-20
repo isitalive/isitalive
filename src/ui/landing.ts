@@ -2,10 +2,9 @@
 // Landing page HTML — dark, modern, glassmorphism design
 // ---------------------------------------------------------------------------
 
-import type { RecentQuery } from '../cache/recentQueries';
 import { navbarHtml, footerHtml } from './components';
 
-export function landingPage(siteKey?: string, analyticsToken?: string, recentQueries: RecentQuery[] = []): string {
+export function landingPage(siteKey?: string, analyticsToken?: string): string {
   const hasTurnstile = !!siteKey;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -504,25 +503,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
       </div>
     </header>
 
-    ${recentQueries.length > 0 ? `
-    <div class="recent-section">
+    <div class="recent-section" id="recentSection" style="display:none">
       <div class="recent-label">Recently checked</div>
-      <div class="recent-list">
-        ${recentQueries.map(q => {
-          const dotColor = q.verdict === 'healthy' ? '#22c55e'
-            : q.verdict === 'maintained' ? '#eab308'
-            : q.verdict === 'declining' ? '#f97316'
-            : q.verdict === 'at_risk' ? '#ef4444'
-            : '#6b7280';
-          return `<a href="/${q.owner}/${q.repo}" class="recent-chip">`
-            + `<span class="recent-dot" style="background:${dotColor}"></span>`
-            + `${q.owner}/${q.repo}`
-            + `<span style="color:var(--text-muted)">${q.score}</span>`
-            + `</a>`;
-        }).join('')}
-      </div>
+      <div class="recent-list" id="recentList"></div>
     </div>
-    ` : ''}
 
     <section class="features">
       <div class="feature">
@@ -629,6 +613,24 @@ export function landingPage(siteKey?: string, analyticsToken?: string, recentQue
         document.getElementById('searchInput').readOnly = false;
       }
     });
+  </script>
+  <script>
+    // Hydrate recently checked chips
+    fetch('/api/recent').then(r => r.json()).then(function(queries) {
+      if (!queries || !queries.length) return;
+      var section = document.getElementById('recentSection');
+      var list = document.getElementById('recentList');
+      var COLORS = { healthy:'#22c55e', maintained:'#eab308', declining:'#f97316', at_risk:'#ef4444' };
+      list.innerHTML = queries.map(function(q) {
+        var c = COLORS[q.verdict] || '#6b7280';
+        return '<a href="/' + q.owner + '/' + q.repo + '" class="recent-chip">'
+          + '<span class="recent-dot" style="background:' + c + '"></span>'
+          + q.owner + '/' + q.repo
+          + '<span style="color:var(--text-muted)">' + q.score + '</span>'
+          + '</a>';
+      }).join('');
+      section.style.display = '';
+    }).catch(function() {});
   </script>
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
