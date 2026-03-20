@@ -89,7 +89,7 @@ export async function scoreAudit(
   contentHash: string,
   env: Env,
   ctx: ExecutionContext,
-  budgetMs = 24_000,
+  budgetMs = 28_000,
 ): Promise<AuditResult> {
   const start = Date.now();
 
@@ -142,7 +142,7 @@ export async function scoreAudit(
 
   // ── 4. Score uncached deps within time budget ──────────────────────
   const remaining: AuditDep[] = [];
-  const batchSize = 10;
+  const batchSize = 20;
   let timedOut = false;
 
   for (let i = 0; i < uncached.length; i += batchSize) {
@@ -201,7 +201,7 @@ export async function scoreAudit(
 
     // Brief pause between batches to avoid GitHub secondary rate limits
     if (i + batchSize < uncached.length && !timedOut) {
-      await sleep(100);
+      await sleep(50);
     }
   }
 
@@ -234,7 +234,10 @@ export async function scoreAudit(
   };
 
   if (!complete) {
-    auditResult.retryAfterMs = 2000;
+    // Scale retry hint based on how many deps remain vs how many we scored
+    // Background priming processes ~20 per 2s, so estimate accordingly
+    const estimatedSeconds = Math.ceil(remaining.length / 20) * 2;
+    auditResult.retryAfterMs = Math.max(1000, Math.min(estimatedSeconds * 1000, 10_000));
   }
 
   // ── 6. Cache the full audit result if complete ─────────────────────
@@ -295,15 +298,26 @@ async function scoreRemainingInBackground(
   remaining: AuditDep[],
   env: Env,
 ): Promise<void> {
-  for (const dep of remaining) {
-    if (!dep.github) continue;
-    const [owner, repo] = dep.github.split('/');
-    try {
-      const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
-      const result = scoreProject(rawData, 'github');
-      await putCache(env, 'github', owner, repo, result);
-    } catch {
-      // Best effort — will be scored on next call
+  // Process in parallel batches of 10 (less aggressive than foreground)
+  const bgBatchSize = 10;
+  for (let i = 0; i < remaining.length; i += bgBatchSize) {
+    const batch = remaining.slice(i, i + bgBatchSize);
+    await Promise.allSettled(
+      batch.map(async (dep) => {
+        if (!dep.github) return;
+        const [owner, repo] = dep.github.split('/');
+        try {
+          const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
+          const result = scoreProject(rawData, 'github');
+          await putCache(env, 'github', owner, repo, result);
+        } catch {
+          // Best effort
+        }
+      }),
+    );
+    // Small pause between background batches
+    if (i + bgBatchSize < remaining.length) {
+      await sleep(100);
     }
   }
 }
