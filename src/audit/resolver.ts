@@ -220,8 +220,22 @@ async function followGoImport(
 // ---------------------------------------------------------------------------
 
 async function resolveNpm(dep: ParsedDep): Promise<ResolvedDep> {
+  // @types/* → DefinitelyTyped/DefinitelyTyped (always, no registry lookup needed)
+  if (dep.name.startsWith('@types/')) {
+    return {
+      ...dep,
+      github: { owner: 'DefinitelyTyped', repo: 'DefinitelyTyped' },
+      resolvedFrom: 'direct',
+    };
+  }
+
   try {
-    const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(dep.name)}`, {
+    // Scoped packages: @scope/pkg → @scope%2Fpkg in npm registry URL
+    const registryName = dep.name.startsWith('@')
+      ? dep.name.replace('/', '%2F')
+      : encodeURIComponent(dep.name);
+
+    const res = await fetch(`https://registry.npmjs.org/${registryName}`, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(3000),
     });
@@ -264,7 +278,11 @@ function extractGitHub(url: string): { owner: string; repo: string } | null {
   //   git+https://github.com/owner/repo.git
   //   git://github.com/owner/repo.git
   //   github:owner/repo
-  const match = url.match(/github\.com[/:]([^/]+)\/([^/.#]+)/);
+  //   https://github.com/owner/repo.js (repo name contains .js)
+  //
+  // Strip .git suffix only, preserve everything else (.js, etc.)
+  const cleaned = url.replace(/\.git$/, '');
+  const match = cleaned.match(/github\.com[/:]([^/]+)\/([^/#]+)/);
   if (match) {
     return { owner: match[1], repo: match[2] };
   }
