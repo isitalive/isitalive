@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { app } from './app';
+import { version } from '../package.json';
 
 const env = {} as any;
 const executionCtx = {
   waitUntil: () => {},
   passThroughOnException: () => {},
-} as ExecutionContext;
+} as unknown as ExecutionContext;
 
 describe('HTTP surface area hardening', () => {
   it('does not expose the manual cron trigger endpoint', async () => {
@@ -38,7 +39,7 @@ describe('HTTP surface area hardening', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       status: 'ok',
-      version: '0.7.2',
+      version,
     });
   });
 

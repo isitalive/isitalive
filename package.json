@@ -1,6 +1,6 @@
 {
   "name": "isitalive",
-  "version": "0.1.0",
+  "version": "0.7.2",
   "license": "AGPL-3.0-only",
   "description": "Lightning-fast dependency health checker — is this open-source project safe to depend on?",
   "type": "module",

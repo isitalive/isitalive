@@ -7,6 +7,8 @@
 // Ref: https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
 // ---------------------------------------------------------------------------
 
+import { timingSafeEqual, bufferToHex } from '../utils/crypto'
+
 /**
  * Verify a GitHub webhook signature.
  *
@@ -43,26 +45,4 @@ export async function verifyWebhookSignature(
   return timingSafeEqual(computedHex, expectedHex);
 }
 
-/** Convert an ArrayBuffer to a lowercase hex string */
-function bufferToHex(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let hex = '';
-  for (let i = 0; i < bytes.length; i++) {
-    hex += bytes[i].toString(16).padStart(2, '0');
-  }
-  return hex;
-}
-
-/**
- * Constant-time string comparison.
- * Prevents timing side-channel attacks by always comparing every byte.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
+// timingSafeEqual and bufferToHex are imported from ../utils/crypto

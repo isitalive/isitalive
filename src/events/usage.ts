@@ -8,6 +8,7 @@
 
 import type { Event } from './envelope'
 import { createEvent } from './envelope'
+import { bufferToHex } from '../utils/crypto'
 
 /** Payload for a usage event */
 export interface UsageEventData {
@@ -53,7 +54,7 @@ function classifyUserAgent(ua: string | null): string {
 async function hashIp(ip: string | null): Promise<string> {
   if (!ip) return 'unknown'
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
+  return bufferToHex(buf).slice(0, 16)
 }
 
 /** Context passed from route handlers when building usage events */

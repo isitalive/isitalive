@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { Env } from './scoring/types';
+import type { Env } from './types/env';
+import { version } from '../package.json';
 import { apiKeyAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
 import { check } from './routes/check';
@@ -22,6 +23,21 @@ app.use('*', async (c, next) => {
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  c.header(
+    'Content-Security-Policy',
+    [
+      "default-src 'none'",
+      "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: https://img.shields.io",
+      "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com",
+      "frame-src https://challenges.cloudflare.com",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; '),
+  );
 });
 
 // CORS — scoped to API routes only (admin excluded)
@@ -63,4 +79,4 @@ app.get('/.well-known/ai-plugin.json', (c) => {
   return c.json(aiPluginManifest);
 });
 
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.7.2' }));
+app.get('/health', (c) => c.json({ status: 'ok', version }));

@@ -6,7 +6,8 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono'
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
+import { timingSafeEqual } from '../utils/crypto'
 import { adminAuth, createSession, sessionCookieHeader, clearSessionCookieHeader } from '../middleware/admin-auth'
 import { getAdminOverview, KVKeyStore } from '../admin/data'
 import { queryR2SQL } from '../admin/r2sql'
@@ -21,20 +22,6 @@ import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap } from '../aggregate/sitemap'
 import type { ApiKeyEntry } from '../scoring/types'
 
-/**
- * Constant-time string comparison to prevent timing attacks.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  const encoder = new TextEncoder()
-  const aBuf = encoder.encode(a)
-  const bBuf = encoder.encode(b)
-  let result = 0
-  for (let i = 0; i < aBuf.length; i++) {
-    result |= aBuf[i] ^ bBuf[i]
-  }
-  return result === 0
-}
 
 const admin = new Hono<{ Bindings: Env }>()
 

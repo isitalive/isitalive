@@ -12,6 +12,7 @@ import type { Env, ScoringResult } from '../scoring/types';
 import { getCached, putCache, type Tier } from '../cache/index';
 import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
+import { bufferToHex } from '../utils/crypto';
 
 const github = providers.github;
 
@@ -327,11 +328,9 @@ async function scoreRemainingInBackground(
 
 /** Hash manifest content using SHA-256 */
 export async function hashManifest(content: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(content);
+  const data = new TextEncoder().encode(content);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return bufferToHex(hashBuffer);
 }
 
 function sleep(ms: number): Promise<void> {
