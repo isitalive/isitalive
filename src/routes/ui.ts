@@ -16,6 +16,7 @@ import { landingPage } from '../ui/landing'
 import { resultPage } from '../ui/result'
 import { errorPage } from '../ui/error'
 import { methodologyPage } from '../ui/methodology'
+import { termsPage } from '../ui/terms'
 import { changelogPage } from '../ui/changelog'
 import { verifyTurnstile } from '../middleware/turnstile'
 import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries'
@@ -60,6 +61,7 @@ ui.get('/sitemap.xml', async (c) => {
     '/api',
     '/methodology',
     '/changelog',
+    '/terms',
   ]
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -134,6 +136,12 @@ ui.get('/methodology', (c) => {
 ui.get('/api', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
   return c.html(apiDocsPage(c.env.CF_ANALYTICS_TOKEN))
+})
+
+// Terms of Service page — static per deploy
+ui.get('/terms', (c) => {
+  c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  return c.html(termsPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Trending page — static HTML shell (data hydrated client-side)

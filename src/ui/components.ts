@@ -107,6 +107,7 @@ export const footerHtml = `
         <a href="/api">API</a> &nbsp;·&nbsp;
         <a href="/methodology">Methodology</a> &nbsp;·&nbsp;
         <a href="/changelog">Changelog</a> &nbsp;·&nbsp;
+        <a href="/terms">Terms</a> &nbsp;·&nbsp;
         <a href="https://github.com/isitalive/isitalive">GitHub</a>
       </p>
       <p class="site-footer-credits">Built with Cloudflare Workers &amp; Hono</p>
