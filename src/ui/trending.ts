@@ -278,12 +278,15 @@ export function trendingPage(analyticsToken?: string): string {
           currentOffset += data.repos.length;
           totalRepos = data.total;
           document.getElementById('total-count').textContent = currentOffset + ' of ' + totalRepos + ' repos';
-          if (data.hasMore) {
-            btn.disabled = false;
-            btn.textContent = 'Load more';
-          } else {
+          if (!data.hasMore) {
             document.getElementById('load-more').style.display = 'none';
           }
+        })
+        .catch(function() {
+          btn.textContent = 'Failed \u2014 tap to retry';
+        })
+        .finally(function() {
+          btn.disabled = false;
         });
     }
 
