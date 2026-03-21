@@ -9,6 +9,9 @@
 
 /** Shared CSS for nav + footer — include inside each page's <style> tag */
 export const componentCss = `
+    /* ── Prevent horizontal scroll from decorative orbs ── */
+    html, body { overflow-x: hidden; }
+
     /* ── Nav / Footer Wrapper ──────────────── */
     .site-chrome-wrapper {
       max-width: 1000px;

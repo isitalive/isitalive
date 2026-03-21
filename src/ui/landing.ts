@@ -52,7 +52,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
-      overflow-x: hidden;
     }
 
     /* Background gradient orbs — use radial-gradient instead of blur() for iOS perf */
