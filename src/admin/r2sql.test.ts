@@ -200,13 +200,12 @@ describe('r2sql', () => {
       expect(typeof result === 'string' || result === null).toBe(true)
     })
 
-    test.prop([fc.string()])('always rejects strings not starting with SELECT or WITH', (body) => {
-      // Prefix with something that is not SELECT or WITH
-      const prefixes = ['INSERT', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'EXEC', 'GRANT']
-      for (const prefix of prefixes) {
-        const result = validateReadOnly(`${prefix} ${body}`)
-        expect(result).not.toBeNull()
-      }
+    test.prop([
+      fc.constantFrom('INSERT', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'EXEC', 'GRANT'),
+      fc.string(),
+    ])('always rejects strings not starting with SELECT or WITH', (prefix, body) => {
+      const result = validateReadOnly(`${prefix} ${body}`)
+      expect(result).not.toBeNull()
     })
 
     test.prop([

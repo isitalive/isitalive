@@ -7,8 +7,8 @@
 
 import fc from 'fast-check'
 
-const numRuns = process.env.FC_NUM_RUNS ? parseInt(process.env.FC_NUM_RUNS, 10) : undefined
+const numRuns = process.env.FC_NUM_RUNS ? Number(process.env.FC_NUM_RUNS) : undefined
 
-if (numRuns && numRuns > 0) {
+if (numRuns && Number.isFinite(numRuns) && numRuns > 0) {
   fc.configureGlobal({ numRuns })
 }
