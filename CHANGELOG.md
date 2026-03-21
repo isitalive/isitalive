@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-03-21
+
+### Added
+- Admin dashboard at `/admin` with session-based authentication
+- Overview dashboard showing tracked repo metrics (hot/warm/cold breakdown), trending count, and rate limit configuration
+- API key management UI — create, list, and revoke keys with pluggable `KeyStore` interface (KV-backed, Stripe-ready)
+- R2 SQL Query Console with integrated chart visualization (line, bar, horizontal bar, donut charts)
+- 8 preset analytics queries (daily volume, verdict distribution, top repos, hourly traffic, API consumers, geo distribution, cache hit ratio, client types)
+- uPlot (CDN) for time-series charts, vanilla canvas for bar/donut — zero npm dependencies
+- Dimension, metric, and chart type pickers for interactive data exploration
+- Comprehensive auth tests with fuzz-style inputs (malicious payloads, unicode, injection attempts)
+- SQL validation tests with adversarial inputs and injection pattern detection
+- Data helper tests for `KVKeyStore` CRUD operations
+
+### Security
+- Admin session cookies are HMAC-SHA256 signed with `ADMIN_SECRET`
+- R2 SQL proxy validates read-only queries (blocks INSERT/UPDATE/DELETE/DROP) with string-literal-aware parsing
+- API tokens never exposed to the browser — all R2 SQL queries proxied through the Worker
+
 ## [0.5.1] - 2026-03-20
 
 ### Added

@@ -7,6 +7,7 @@ import { check } from './routes/check';
 import { badge } from './routes/badge';
 import { audit } from './routes/audit';
 import { githubWebhook } from './github/webhook';
+import { admin } from './routes/admin';
 import { ui } from './routes/ui';
 import { openApiSpec } from './routes/openapi';
 import { llmsTxt, llmsFullTxt } from './routes/llms';
@@ -27,6 +28,7 @@ app.route('/api/check', check);
 app.route('/api/badge', badge);
 app.route('/api/audit', audit);
 app.route('/github', githubWebhook);
+app.route('/admin', admin);
 app.route('/', ui);
 
 app.get('/openapi.json', (c) => {
