@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
+import { ogTags } from './og';
 
 export function changelogPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -15,6 +16,11 @@ export function changelogPage(analyticsToken?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Changelog — Is It Alive?</title>
   <meta name="description" content="What's new in Is It Alive? See the latest features, fixes, and improvements.">
+  ${ogTags({
+    title: 'Changelog — Is It Alive?',
+    description: 'What\'s new in Is It Alive? See the latest features, fixes, and improvements.',
+    url: 'https://isitalive.dev/changelog',
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">

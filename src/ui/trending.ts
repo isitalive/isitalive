@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
+import { ogTags } from './og';
 
 export function trendingPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -15,6 +16,11 @@ export function trendingPage(analyticsToken?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trending — Is It Alive?</title>
   <meta name="description" content="Most checked open-source projects in the last 24 hours. See what's trending on Is It Alive.">
+  ${ogTags({
+    title: 'Trending — Is It Alive?',
+    description: 'Most checked open-source projects in the last 24 hours. See what\'s trending on Is It Alive.',
+    url: 'https://isitalive.dev/trending',
+  })}
   <style>
     :root {
       --bg: #0a0a0f;

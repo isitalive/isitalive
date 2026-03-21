@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
+import { ogTags } from './og';
 
 export function methodologyPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -12,6 +13,11 @@ export function methodologyPage(analyticsToken?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>How We Score — Is It Alive?</title>
   <meta name="description" content="Understand how Is It Alive? calculates open-source project health scores. 8 weighted signals, transparent methodology.">
+  ${ogTags({
+    title: 'How We Score — Is It Alive?',
+    description: 'Understand how Is It Alive? calculates open-source project health scores. 8 weighted signals, transparent methodology.',
+    url: 'https://isitalive.dev/methodology',
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
