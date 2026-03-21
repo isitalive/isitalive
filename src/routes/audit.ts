@@ -113,7 +113,7 @@ audit.post('/', async (c) => {
   );
 
   // ── Response ───────────────────────────────────────────────────────
-  const response = c.json(result, result.complete ? 200 : 200);
+  const response = c.json(result);
   response.headers.set('ETag', `"${contentHash}"`);
   response.headers.set('Cache-Control', result.complete
     ? 'public, max-age=3600'

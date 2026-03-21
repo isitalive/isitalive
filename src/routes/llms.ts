@@ -101,7 +101,9 @@ Machine-readable spec: https://isitalive.dev/openapi.json
 
 ## License
 
-AGPL-3.0 — https://github.com/isitaltive/isitalive
+AGPL-3.0 — https://github.com/isitalive/isitalive
 `;
 
+// TODO: llms-full.txt should include expanded signal descriptions, scoring
+// thresholds, and example responses. For now it mirrors llms.txt.
 export const llmsFullTxt = llmsTxt;

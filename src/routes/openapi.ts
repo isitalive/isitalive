@@ -61,13 +61,11 @@ export const openApiSpec = {
                 schema: { type: 'string', enum: ['L1-HIT', 'HIT', 'STALE', 'MISS'] },
               },
               'X-RateLimit-Limit': {
-                description: 'Maximum requests allowed per hour for your tier',
+                description: 'Maximum requests allowed per minute for your tier',
                 schema: { type: 'integer' },
               },
-              'X-RateLimit-Remaining': {
-                description: 'Requests remaining in current window',
-                schema: { type: 'integer' },
-              },
+              // Note: X-RateLimit-Remaining is intentionally omitted —
+              // native Cloudflare Rate Limiting doesn't expose a remaining count.
               'X-RateLimit-Tier': {
                 description: 'Your current rate limit tier',
                 schema: { type: 'string', enum: ['free', 'pro', 'enterprise'] },

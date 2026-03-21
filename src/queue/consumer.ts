@@ -15,7 +15,7 @@ import { getTrackedIndex, putTrackedIndex, upsertTracked } from './tracked';
 
 const RECENT_KV_KEY = 'isitalive:recent';
 const MAX_RECENT = 10;
-const FIRST_SEEN_PREFIX = 'isitalive:first_seen:';
+const FIRST_SEEN_PREFIX = 'isitalive:first-seen:';
 const TRENDING_COUNTERS_KEY = 'isitalive:trending:counters';
 const TRENDING_KV_KEY = 'isitalive:trending';
 const MAX_TRENDING = 50;

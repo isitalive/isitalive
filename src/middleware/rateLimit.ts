@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Rate limiting middleware — Durable Object backed
+// Rate limiting middleware — native Cloudflare Rate Limiting
 //
 // Tier limits (per minute):
 //   - Unauthenticated (no key): 60 req/min
@@ -31,7 +31,7 @@ const UNAUTHENTICATED_LIMIT = 60;
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } };
 
 /**
- * Rate limiter using Durable Objects for atomic, strongly consistent counters.
+ * Rate limiter using native Cloudflare Rate Limiting bindings.
  */
 export async function rateLimit(c: Context<AppEnv>, next: Next) {
   const keyName = c.get('keyName');

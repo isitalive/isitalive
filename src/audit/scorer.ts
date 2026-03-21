@@ -10,10 +10,10 @@
 import type { ResolvedDep } from './resolver';
 import type { Env, ScoringResult } from '../scoring/types';
 import { getCached, putCache, type Tier } from '../cache/index';
-import { GitHubProvider } from '../providers/github';
+import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 
-const github = new GitHubProvider();
+const github = providers.github;
 
 // ---------------------------------------------------------------------------
 // Types
