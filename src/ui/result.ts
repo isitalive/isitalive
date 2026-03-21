@@ -257,6 +257,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       margin: 24px 0 20px;
     }
 
+    .gauge-container svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
     .gauge-bg { stroke: rgba(255,255,255,0.06); }
     .gauge-fill {
       stroke: ${color};
@@ -529,7 +535,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       </div>
 
       <div class="gauge-container">
-        <svg viewBox="0 0 100 100" width="180" height="180">
+        <svg viewBox="0 0 100 100">
           <circle class="gauge-bg" cx="50" cy="50" r="45" fill="none" stroke-width="8"/>
           <circle class="gauge-fill" cx="50" cy="50" r="45" fill="none" stroke-width="8" stroke-linecap="round"/>
         </svg>

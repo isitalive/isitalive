@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.6] - 2026-03-21
+
+### Fixed
+- iOS safe area: content now flows around notch and home indicator on all pages (`viewport-fit=cover` + `env(safe-area-inset-*)` padding)
+- Landing page badge snippets overflowing on mobile — text now truncates with ellipsis
+- Trending page hiding check count on mobile — now visible at smaller font size
+- Score gauge number not centered on mobile — SVG now scales responsively within its container
+- Trending `loadMore()` leaving the page stuck on fetch errors — added `.catch()` / `.finally()` recovery
+
+### Added
+- Infinite scroll on trending page — auto-loads more entries when near page bottom (matching changelog pattern)
+
 ## [0.7.5] - 2026-03-21
 
 ### Added
