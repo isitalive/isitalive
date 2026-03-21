@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.1] - 2026-03-20
+
+### Added
+- Comprehensive unit tests for scoring engine and all 8 scoring rules
+- Unit tests for manifest parsers (`go.mod`, `package.json`), resolver helpers, and audit scorer
+- Fuzz testing for `parseGoMod()`, `parsePackageJson()`, and `parseChangelog()` with seeded PRNGs
+- Unit tests for changelog parser and cache tier configuration
+- Exported pure helper functions (`extractGitHub`, `resolveGopkgIn`, `resolveGoogleGolang`, `buildSummary`) for testability
+
 ## [0.5.0] - 2026-03-20
 
 ### Added
