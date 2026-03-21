@@ -408,15 +408,15 @@ export function apiDocsPage(analyticsToken?: string): string {
     <p>Rate limits are applied per IP address (unauthenticated) or per API key (authenticated).</p>
     <table class="tier-table">
       <tr><th>Tier</th><th>Rate Limit</th><th>Cache TTL</th></tr>
-      <tr><td>No key</td><td>10 req/hr</td><td>24 hours</td></tr>
-      <tr><td>Free key</td><td>100 req/hr</td><td>24 hours</td></tr>
-      <tr><td>Pro key</td><td>1,000 req/hr</td><td>1 hour</td></tr>
-      <tr><td>Enterprise</td><td>10,000 req/hr</td><td>15 min</td></tr>
+      <tr><td>No key</td><td>60 req/min</td><td>24 hours</td></tr>
+      <tr><td>Free key</td><td>60 req/min</td><td>24 hours</td></tr>
+      <tr><td>Pro key</td><td>120 req/min</td><td>1 hour</td></tr>
+      <tr><td>Enterprise</td><td>600 req/min</td><td>15 min</td></tr>
     </table>
 
     <div class="note-box">
       Rate limit headers are included with every response:<br>
-      <span class="inline-code">X-RateLimit-Limit</span>, <span class="inline-code">X-RateLimit-Remaining</span>, <span class="inline-code">X-RateLimit-Tier</span>
+      <span class="inline-code">X-RateLimit-Limit</span>, <span class="inline-code">X-RateLimit-Tier</span>
     </div>
 
     <h2>Error Responses</h2>

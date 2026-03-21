@@ -57,7 +57,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`);
 
   // Validate provider
-  if (!(provider in providers)) {
+  if (!Object.hasOwn(providers, provider)) {
     return c.json(
       { error: `Unsupported provider: ${provider}. Supported: ${Object.keys(providers).join(', ')}` },
       400,

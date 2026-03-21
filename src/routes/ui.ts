@@ -213,7 +213,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`);
 
-  if (!(provider in providers)) {
+  if (!Object.hasOwn(providers, provider)) {
     return c.html(errorPage(`Unsupported provider: ${provider}`), 400);
   }
 

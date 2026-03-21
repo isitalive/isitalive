@@ -5,7 +5,6 @@
 // separate GitHubProvider objects across routes, audit scorer, and cron.
 // ---------------------------------------------------------------------------
 
-import type { ProviderName } from '../scoring/types';
 import type { Env } from '../scoring/types';
 import { GitHubProvider } from './github';
 import { scoreProject } from '../scoring/engine';
@@ -22,7 +21,7 @@ export type SupportedProvider = keyof typeof providers;
  * Get a provider by name, throwing if unsupported.
  */
 export function getProvider(name: string): (typeof providers)[SupportedProvider] {
-  if (!(name in providers)) {
+  if (!Object.hasOwn(providers, name)) {
     throw new Error(`Unsupported provider: ${name}. Supported: ${Object.keys(providers).join(', ')}`);
   }
   return providers[name as SupportedProvider];

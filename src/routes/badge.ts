@@ -55,7 +55,7 @@ function generateSvg(score: number, verdict: Verdict): string {
 badge.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param();
 
-  if (!(provider in providers)) {
+  if (!Object.hasOwn(providers, provider)) {
     return c.text('Unsupported provider', 400);
   }
 
