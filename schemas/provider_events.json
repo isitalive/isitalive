@@ -1,0 +1,12 @@
+{
+  "fields": [
+    { "name": "domain", "type": "string", "required": true },
+    { "name": "type", "type": "string", "required": true },
+    { "name": "id", "type": "string", "required": true },
+    { "name": "timestamp", "type": "string", "required": true },
+    { "name": "provider", "type": "string", "required": true },
+    { "name": "owner", "type": "string", "required": true },
+    { "name": "repo", "type": "string", "required": true },
+    { "name": "raw_json", "type": "string", "required": true }
+  ]
+}

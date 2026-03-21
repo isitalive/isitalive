@@ -1,8 +1,10 @@
-import type { Env } from '../scoring/types';
-import { providers } from '../providers/index';
-import { scoreProject } from '../scoring/engine';
-import { buildAnalyticsEvent, writeAnalyticsBatch, archiveRawData } from '../analytics/events';
-import { putCache } from '../cache/index';
+import type { Env } from '../scoring/types'
+import { providers } from '../providers/index'
+import { scoreProject } from '../scoring/engine'
+import { putCache } from '../cache/index'
+import { buildResultEvent } from '../events/result'
+import { buildProviderEvent } from '../events/provider'
+import { emitAll } from '../pipeline/emit'
 
 const github = providers.github;
 
@@ -60,20 +62,17 @@ export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean>
 
     await Promise.all([
       putCache(env, 'github', owner, repo, result),
-      archiveRawData(env, 'github', owner, repo, rawData._rawResponse),
-      writeAnalyticsBatch(env, [buildAnalyticsEvent(result, {
-        source: 'cron-daily',
-        apiKey: 'system',
-        cacheStatus: 'miss',
-        responseTimeMs: 0,
-        userAgent: 'isitalive-cron/1.0',
-      })]),
       appendScoreHistory(env.CACHE_KV, repoSlug, {
         date: today,
         score: result.score,
         verdict: result.verdict,
       }),
-    ]);
+      // Pipeline: result + provider events
+      emitAll(env, {
+        result: [buildResultEvent(result, 'cron-daily')],
+        provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+      }),
+    ])
 
     return true;
   } catch (err) {

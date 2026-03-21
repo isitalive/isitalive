@@ -1,0 +1,19 @@
+{
+  "fields": [
+    { "name": "domain", "type": "string", "required": true },
+    { "name": "type", "type": "string", "required": true },
+    { "name": "id", "type": "string", "required": true },
+    { "name": "timestamp", "type": "string", "required": true },
+    { "name": "repo", "type": "string", "required": true },
+    { "name": "provider", "type": "string", "required": true },
+    { "name": "score", "type": "int32", "required": true },
+    { "name": "verdict", "type": "string", "required": true },
+    { "name": "source", "type": "string", "required": true },
+    { "name": "api_key", "type": "string", "required": false },
+    { "name": "cache_status", "type": "string", "required": false },
+    { "name": "response_time_ms", "type": "int32", "required": false },
+    { "name": "country", "type": "string", "required": false },
+    { "name": "user_agent", "type": "string", "required": false },
+    { "name": "ip_hash", "type": "string", "required": false }
+  ]
+}
