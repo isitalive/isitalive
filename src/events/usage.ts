@@ -22,21 +22,17 @@ export interface UsageEventData {
   /** Source: 'api' | 'browser' | 'badge' | 'page-view' | 'github-app' */
   source: string
   /** API key name hash, or 'anon' */
-  api_key_hash: string
+  api_key: string
   /** Cache status: 'l1-hit' | 'hit' | 'stale' | 'miss' */
   cache_status: string
   /** ISO country code */
   country: string
-  /** Continent code */
-  continent: string
-  /** Cloudflare colo */
-  colo: string
-  /** Classified client type */
-  client_type: string
+  /** Classified user agent */
+  user_agent: string
   /** Response time in ms */
   response_time_ms: number
   /** SHA-256 hashed IP for privacy-safe analytics */
-  hashed_ip: string
+  ip_hash: string
 }
 
 export type UsageEvent = Event<'usage', UsageEventData>
@@ -66,7 +62,7 @@ export interface UsageContext {
   apiKey: string
   cacheStatus: string
   responseTimeMs: number
-  cf?: { country?: string; continent?: string; colo?: string }
+  cf?: { country?: string }
   userAgent: string | null
   ip: string | null
 }
@@ -85,14 +81,12 @@ export async function buildUsageEvent(
     score,
     verdict,
     source: ctx.source,
-    api_key_hash: ctx.apiKey,
+    api_key: ctx.apiKey,
     cache_status: ctx.cacheStatus,
     country: ctx.cf?.country ?? 'XX',
-    continent: ctx.cf?.continent ?? 'XX',
-    colo: ctx.cf?.colo ?? 'XX',
-    client_type: classifyUserAgent(ctx.userAgent),
+    user_agent: classifyUserAgent(ctx.userAgent),
     response_time_ms: ctx.responseTimeMs,
-    hashed_ip: await hashIp(ctx.ip),
+    ip_hash: await hashIp(ctx.ip),
   })
 }
 
@@ -110,13 +104,11 @@ export function buildPageViewUsageEvent(
     score,
     verdict,
     source: 'page-view',
-    api_key_hash: 'anon',
+    api_key: 'anon',
     cache_status: 'n/a',
     country: 'XX',
-    continent: 'XX',
-    colo: 'XX',
-    client_type: 'browser',
+    user_agent: 'browser',
     response_time_ms: 0,
-    hashed_ip: 'unknown',
+    ip_hash: 'unknown',
   })
 }

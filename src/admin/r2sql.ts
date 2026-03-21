@@ -185,7 +185,7 @@ export const PRESET_QUERIES: PresetQuery[] = [
   },
   {
     label: 'Top API Consumers',
-    sql: `SELECT api_key_hash, COUNT(*) as requests\nFROM usage_events\nWHERE api_key_hash != 'anon'\nGROUP BY api_key_hash\nORDER BY requests DESC\nLIMIT 10`,
+    sql: `SELECT api_key, COUNT(*) as requests\nFROM usage_events\nWHERE api_key != 'anon'\nGROUP BY api_key\nORDER BY requests DESC\nLIMIT 10`,
     chart: 'bar',
   },
   {
@@ -199,8 +199,8 @@ export const PRESET_QUERIES: PresetQuery[] = [
     chart: 'donut',
   },
   {
-    label: 'Client Types',
-    sql: `SELECT client_type, COUNT(*) as count\nFROM usage_events\nGROUP BY client_type`,
+    label: 'User Agents',
+    sql: `SELECT user_agent, COUNT(*) as count\nFROM usage_events\nGROUP BY user_agent`,
     chart: 'donut',
   },
   {

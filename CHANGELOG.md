@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - Cron handler now queries Iceberg via aggregate modules instead of reading queue-maintained state
 - Admin query console presets updated to use `usage_events` and `result_events` Iceberg tables
+- Pipeline events now flattened before send — envelope + data merged into flat Iceberg rows
+- Usage event field names aligned with Iceberg schema (`api_key`, `user_agent`, `ip_hash`)
 - Refresh workflow reads Iceberg-cached tracked index instead of manually maintaining it
 - `revalidateInBackground` archives raw data via Pipeline instead of queue
 - All route handlers (`check`, `ui`, `audit`) emit to Pipelines instead of legacy queue

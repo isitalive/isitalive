@@ -3,13 +3,27 @@
 //
 // Each function sends to the corresponding Pipeline binding.
 // All sends are fire-and-forget (use with waitUntil).
+//
+// Events are flattened before sending: envelope fields (domain, timestamp, id)
+// are merged with data fields into a single flat object to match the Iceberg
+// schema defined in schemas/*.json.
 // ---------------------------------------------------------------------------
 
 import type { ProviderEvent } from '../events/provider'
 import type { ResultEvent } from '../events/result'
 import type { UsageEvent } from '../events/usage'
 import type { ManifestEvent } from '../events/manifest'
+import type { Event, EventDomain } from '../events/envelope'
 import type { PipelineBindings } from './types'
+
+/**
+ * Flatten an event envelope into a single-level object for Iceberg.
+ * Merges { domain, timestamp, id, data: { ... } } → { domain, type, timestamp, id, ... }
+ */
+function flatten(event: { domain: string; timestamp: string; id: string; data: Record<string, any> }): Record<string, unknown> {
+  const { data, domain, ...envelope } = event
+  return { ...envelope, domain, type: domain, ...data }
+}
 
 /**
  * Emit a provider event to the provider pipeline.
@@ -20,7 +34,7 @@ export async function emitProviderEvent(
   event: ProviderEvent,
 ): Promise<void> {
   try {
-    await env.PROVIDER_PIPELINE.send(event)
+    await env.PROVIDER_PIPELINE.send(flatten(event))
   } catch (err) {
     console.error('Pipeline: failed to emit provider event:', err)
   }
@@ -34,7 +48,7 @@ export async function emitResultEvent(
   event: ResultEvent,
 ): Promise<void> {
   try {
-    await env.RESULT_PIPELINE.send(event)
+    await env.RESULT_PIPELINE.send(flatten(event))
   } catch (err) {
     console.error('Pipeline: failed to emit result event:', err)
   }
@@ -48,7 +62,7 @@ export async function emitUsageEvent(
   event: UsageEvent,
 ): Promise<void> {
   try {
-    await env.USAGE_PIPELINE.send(event)
+    await env.USAGE_PIPELINE.send(flatten(event))
   } catch (err) {
     console.error('Pipeline: failed to emit usage event:', err)
   }
@@ -62,7 +76,7 @@ export async function emitManifestEvent(
   event: ManifestEvent,
 ): Promise<void> {
   try {
-    await env.MANIFEST_PIPELINE.send(event)
+    await env.MANIFEST_PIPELINE.send(flatten(event))
   } catch (err) {
     console.error('Pipeline: failed to emit manifest event:', err)
   }
@@ -90,3 +104,4 @@ export async function emitAll(
 
   await Promise.allSettled(promises)
 }
+
