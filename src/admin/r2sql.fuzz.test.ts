@@ -2,17 +2,9 @@
 // Fuzz tests for R2 SQL validation — security-focused property invariants
 // ---------------------------------------------------------------------------
 
-import { describe, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
 import { validateReadOnly } from './r2sql'
-
-// SQL keyword arbitraries for generating realistic-looking queries
-const sqlKeyword = fc.constantFrom(
-  'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT',
-  'HAVING', 'UNION', 'JOIN', 'LEFT JOIN', 'INNER JOIN', 'ON',
-  'AS', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS NULL',
-  'COUNT', 'SUM', 'AVG', 'MAX', 'MIN', 'DISTINCT', 'WITH',
-)
 
 const dangerousKeyword = fc.constantFrom(
   'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE',
@@ -53,9 +45,8 @@ describe('validateReadOnly fuzz', () => {
     expect(result).toBeNull()
   })
 
-  test.prop([
-    fc.string({ maxLength: 100 }),
-  ])('rejects empty or whitespace-only input', (_unused) => {
+  // Static assertions — regular unit test, not property-based
+  it('rejects empty or whitespace-only input', () => {
     expect(validateReadOnly('')).toBe('Query cannot be empty')
     expect(validateReadOnly('   ')).toBe('Query cannot be empty')
     expect(validateReadOnly('\n\t')).toBe('Query cannot be empty')

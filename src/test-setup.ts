@@ -7,6 +7,8 @@
 
 import fc from 'fast-check'
 
+declare const process: { env: Record<string, string | undefined> }
+
 const numRuns = process.env.FC_NUM_RUNS ? Number(process.env.FC_NUM_RUNS) : undefined
 
 if (numRuns && Number.isFinite(numRuns) && numRuns > 0) {

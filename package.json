@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:fuzz": "FC_NUM_RUNS=10000 vitest run fuzz"
+    "test:fuzz": "FC_NUM_RUNS=10000 vitest run"
   },
   "dependencies": {
     "hono": "^4.7.0"

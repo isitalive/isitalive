@@ -14,7 +14,7 @@ describe('verifyWebhookSignature fuzz', () => {
   ])('never throws on arbitrary inputs', async (secret, body, signature) => {
     await expect(
       verifyWebhookSignature(secret, body, signature),
-    ).resolves.not.toThrow()
+    ).resolves.toBeTypeOf('boolean')
   })
 
   test.prop([
@@ -38,13 +38,26 @@ describe('verifyWebhookSignature fuzz', () => {
 
   test.prop([
     fc.string({ minLength: 1, maxLength: 100 }),
-    fc.string({ maxLength: 500 }),
-    fc.stringMatching(/^[0-9a-f]{64}$/),
-  ])('rejects random hex with sha256= prefix (wrong HMAC)', async (secret, body, randomHex) => {
-    // The random hex is extremely unlikely to match the actual HMAC
-    const result = await verifyWebhookSignature(secret, body, `sha256=${randomHex}`)
-    // We can't guarantee false (theoretically could match), but in practice it won't
-    expect(typeof result).toBe('boolean')
+    fc.string({ minLength: 1, maxLength: 500 }),
+    fc.string({ minLength: 1, maxLength: 100 }),
+  ])('rejects signature computed with a different secret', async (secret, body, otherSecret) => {
+    // Use a deterministically-wrong secret to guarantee mismatch
+    const wrongSecret = secret === otherSecret ? `${otherSecret}_wrong` : otherSecret
+
+    // Compute a valid HMAC with the wrong secret
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(wrongSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    )
+    const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(body))
+    const hex = Array.from(new Uint8Array(mac), b => b.toString(16).padStart(2, '0')).join('')
+
+    const result = await verifyWebhookSignature(secret, body, `sha256=${hex}`)
+    expect(result).toBe(false)
   })
 
   test.prop([
