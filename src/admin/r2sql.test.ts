@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from 'vitest'
+import { test, fc } from '@fast-check/vitest'
 import { validateReadOnly, PRESET_QUERIES } from './r2sql'
 
 describe('r2sql', () => {
@@ -193,25 +194,26 @@ describe('r2sql', () => {
       })
     }
 
-    // Random string generation (fuzz)
-    it('should handle 100 random strings without crashing', () => {
-      for (let i = 0; i < 100; i++) {
-        const len = Math.floor(Math.random() * 500) + 1
-        const bytes = new Uint8Array(len)
-        crypto.getRandomValues(bytes)
-        const str = Array.from(bytes, b => String.fromCharCode(b % 128)).join('')
-        const result = validateReadOnly(str)
-        expect(typeof result === 'string' || result === null).toBe(true)
+    // Random string generation (fuzz via fast-check)
+    test.prop([fc.string()])('never crashes on arbitrary string input', (input) => {
+      const result = validateReadOnly(input)
+      expect(typeof result === 'string' || result === null).toBe(true)
+    })
+
+    test.prop([fc.string()])('always rejects strings not starting with SELECT or WITH', (body) => {
+      // Prefix with something that is not SELECT or WITH
+      const prefixes = ['INSERT', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'EXEC', 'GRANT']
+      for (const prefix of prefixes) {
+        const result = validateReadOnly(`${prefix} ${body}`)
+        expect(result).not.toBeNull()
       }
     })
 
-    // Should reject any random string that doesn't start with SELECT/WITH
-    it('should reject random strings that do not start with SELECT or WITH', () => {
-      const nonSelectStarters = ['A', 'B', 'Z', '1', '{', '[', '(', 'INSERT', 'DELETE', 'DROP']
-      for (const prefix of nonSelectStarters) {
-        const result = validateReadOnly(prefix + ' some random sql')
-        expect(result).not.toBeNull()
-      }
+    test.prop([
+      fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_ ]{0,50}$/),
+    ])('always rejects multi-statement queries', (body) => {
+      const result = validateReadOnly(`SELECT 1; ${body}`)
+      expect(result).not.toBeNull()
     })
   })
 

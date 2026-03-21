@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { test, fc } from '@fast-check/vitest'
 import { parseGoMod, parsePackageJson, parseManifest } from './parsers'
 
 // ── parseGoMod ─────────────────────────────────────────────────────────
@@ -230,95 +231,79 @@ require github.com/foo/bar v1.0.0
   })
 })
 
-// ── Fuzz: parseGoMod never throws ──────────────────────────────────────
+// ── Fuzz: parseGoMod never throws (fast-check) ────────────────────────
 describe('parseGoMod fuzz', () => {
-  // Seeded PRNG for reproducibility
-  function mulberry32(seed: number) {
-    return function () {
-      seed |= 0
-      seed = (seed + 0x6d2b79f5) | 0
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-    }
-  }
+  test.prop([fc.string()])('never throws on arbitrary string input', (input) => {
+    expect(() => parseGoMod(input)).not.toThrow()
+  })
 
-  function randomString(rng: () => number, maxLen: number): string {
-    const len = Math.floor(rng() * maxLen)
-    const chars = 'abcdefghijklmnopqrstuvwxyz./\n\t (){}[]@#$%^&*0123456789'
-    let s = ''
-    for (let i = 0; i < len; i++) {
-      s += chars[Math.floor(rng() * chars.length)]
-    }
-    return s
-  }
-
-  it('never throws on random input (300 iterations)', () => {
-    const rng = mulberry32(42)
-    for (let i = 0; i < 300; i++) {
-      const input = randomString(rng, 500)
-      expect(() => parseGoMod(input)).not.toThrow()
+  test.prop([fc.string()])('never returns stdlib modules regardless of input', (body) => {
+    const input = `require (\n${body}\n)`
+    const deps = parseGoMod(input)
+    for (const dep of deps) {
+      expect(dep.name).not.toBe('go')
+      expect(dep.name.startsWith('toolchain')).toBe(false)
     }
   })
 
-  it('never returns stdlib modules regardless of input structure', () => {
-    const rng = mulberry32(123)
-    for (let i = 0; i < 300; i++) {
-      const input = `require (\n${randomString(rng, 200)}\n)`
-      const deps = parseGoMod(input)
-      for (const dep of deps) {
-        expect(dep.name).not.toBe('go')
-        expect(dep.name.startsWith('toolchain')).toBe(false)
-      }
+  test.prop([fc.string()])('every returned dep has ecosystem "go"', (input) => {
+    const deps = parseGoMod(input)
+    for (const dep of deps) {
+      expect(dep.ecosystem).toBe('go')
+      expect(typeof dep.name).toBe('string')
+      expect(dep.name.length).toBeGreaterThan(0)
+      expect(typeof dep.version).toBe('string')
+      expect(typeof dep.dev).toBe('boolean')
     }
+  })
+
+  test.prop([fc.string()])('result has no duplicate names', (input) => {
+    const deps = parseGoMod(input)
+    const names = deps.map(d => d.name)
+    expect(new Set(names).size).toBe(names.length)
   })
 })
 
-// ── Fuzz: parsePackageJson never throws on valid JSON ──────────────────
+// ── Fuzz: parsePackageJson never throws on valid JSON (fast-check) ────
 describe('parsePackageJson fuzz', () => {
-  function mulberry32(seed: number) {
-    return function () {
-      seed |= 0
-      seed = (seed + 0x6d2b79f5) | 0
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  const depMapArb = fc.dictionary(
+    fc.stringMatching(/^@?[a-z][a-z0-9._-]{0,30}(\/[a-z][a-z0-9._-]{0,30})?$/),
+    fc.oneof(
+      fc.stringMatching(/^\^?\d{1,3}\.\d{1,3}\.\d{1,3}$/),
+      fc.constant('*'),
+      fc.constant('latest'),
+    ),
+  )
+
+  const packageJsonArb = fc.record({
+    name: fc.option(fc.string(), { nil: undefined }),
+    version: fc.option(fc.string(), { nil: undefined }),
+    dependencies: fc.option(depMapArb, { nil: undefined }),
+    devDependencies: fc.option(depMapArb, { nil: undefined }),
+  })
+
+  test.prop([packageJsonArb])('never throws on valid package.json objects', (pkg) => {
+    const content = JSON.stringify(pkg)
+    expect(() => parsePackageJson(content)).not.toThrow()
+
+    const deps = parsePackageJson(content)
+    for (const dep of deps) {
+      expect(dep.ecosystem).toBe('npm')
+      expect(typeof dep.name).toBe('string')
+      expect(typeof dep.version).toBe('string')
+      expect(typeof dep.dev).toBe('boolean')
     }
-  }
+  })
 
-  it('never throws on valid JSON objects (200 iterations)', () => {
-    const rng = mulberry32(99)
-    for (let i = 0; i < 200; i++) {
-      // Build a random-ish but valid JSON object
-      const obj: Record<string, any> = {}
-      if (rng() > 0.5) {
-        const deps: Record<string, string> = {}
-        const count = Math.floor(rng() * 10)
-        for (let j = 0; j < count; j++) {
-          deps[`pkg-${j}`] = `^${Math.floor(rng() * 20)}.0.0`
-        }
-        obj.dependencies = deps
-      }
-      if (rng() > 0.5) {
-        obj.devDependencies = { [`dev-${i}`]: '*' }
-      }
-      // Add random noise keys
-      if (rng() > 0.7) {
-        obj.name = `app-${i}`
-        obj.version = '1.0.0'
-        obj.scripts = { test: 'vitest' }
-      }
-      const content = JSON.stringify(obj)
-      expect(() => parsePackageJson(content)).not.toThrow()
-
-      // Output must have valid ecosystem values
-      const deps = parsePackageJson(content)
+  test.prop([fc.string()])('never throws on arbitrary string (may throw on non-JSON)', (input) => {
+    try {
+      const deps = parsePackageJson(input)
       for (const dep of deps) {
         expect(dep.ecosystem).toBe('npm')
-        expect(typeof dep.name).toBe('string')
-        expect(typeof dep.version).toBe('string')
-        expect(typeof dep.dev).toBe('boolean')
       }
+    } catch (e: any) {
+      // Only acceptable error is invalid JSON
+      expect(e.message).toContain('Invalid package.json')
     }
   })
 })

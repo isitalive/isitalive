@@ -8,13 +8,16 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:fuzz": "FC_NUM_RUNS=10000 vitest run fuzz"
   },
   "dependencies": {
     "hono": "^4.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250313.0",
+    "@fast-check/vitest": "^0.3.0",
+    "fast-check": "^4.6.0",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0",
     "wrangler": "^4.5.0"
