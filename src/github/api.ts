@@ -215,16 +215,17 @@ interface IssueComment {
 }
 
 /**
- * List all comments on a PR (uses the issues endpoint).
- * Paginates automatically in case there are many comments.
+ * Find the first PR comment that contains the given marker AND was
+ * posted by a Bot user (our GitHub App). Paginates with early exit.
+ * Returns null if no matching comment is found.
  */
-export async function listPRComments(
+export async function findPRComment(
   token: string,
   owner: string,
   repo: string,
   prNumber: number,
-): Promise<IssueComment[]> {
-  const comments: IssueComment[] = [];
+  marker: string,
+): Promise<IssueComment | null> {
   let page = 1;
   const perPage = 100;
 
@@ -233,12 +234,18 @@ export async function listPRComments(
       `/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=${perPage}&page=${page}`,
       { token },
     );
-    comments.push(...batch);
+
+    for (const comment of batch) {
+      if (comment.user?.type === 'Bot' && comment.body.includes(marker)) {
+        return comment;
+      }
+    }
+
     if (batch.length < perPage) break;
     page++;
   }
 
-  return comments;
+  return null;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCheckRunOutput, getConclusion } from '../github/report';
+import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from '../github/report';
 import type { AuditResult } from '../audit/scorer';
 import { DEFAULT_CONFIG } from '../github/types';
 
@@ -109,5 +109,70 @@ describe('buildCheckRunOutput', () => {
     });
     const output = buildCheckRunOutput(result, 'package.json', DEFAULT_CONFIG);
     expect(output.annotations).toBeUndefined();
+  });
+});
+
+describe('buildPRCommentBody', () => {
+  it('includes the hidden marker for find-or-update', () => {
+    const result = makeAuditResult();
+    const body = buildPRCommentBody(result, 'package.json', DEFAULT_CONFIG, false);
+    expect(body).toContain(COMMENT_MARKER);
+  });
+
+  it('includes (baseline) tag when isBaseline is true', () => {
+    const result = makeAuditResult();
+    const body = buildPRCommentBody(result, 'package.json', DEFAULT_CONFIG, true);
+    expect(body).toContain('(baseline)');
+  });
+
+  it('omits (baseline) tag when isBaseline is false', () => {
+    const result = makeAuditResult();
+    const body = buildPRCommentBody(result, 'package.json', DEFAULT_CONFIG, false);
+    expect(body).not.toContain('(baseline)');
+  });
+
+  it('only emits non-zero verdict rows', () => {
+    const result = makeAuditResult({
+      summary: { healthy: 2, stable: 0, degraded: 0, critical: 0, unmaintained: 0, avgScore: 90 },
+    });
+    const body = buildPRCommentBody(result, 'package.json', DEFAULT_CONFIG, false);
+    expect(body).toContain('Healthy');
+    expect(body).not.toContain('Stable');
+    expect(body).not.toContain('Degraded');
+    expect(body).not.toContain('Critical');
+    expect(body).not.toContain('Unmaintained');
+  });
+
+  it('shows flagged deps in a details block', () => {
+    const result = makeAuditResult({
+      dependencies: [
+        { name: 'bad-pkg', version: '1.0.0', dev: false, ecosystem: 'npm' as const, github: 'owner/bad-pkg', score: 15, verdict: 'unmaintained' },
+      ],
+    });
+    const body = buildPRCommentBody(result, 'package.json', DEFAULT_CONFIG, false);
+    expect(body).toContain('<details>');
+    expect(body).toContain('bad-pkg');
+    expect(body).toContain('need attention');
+  });
+
+  it('escapes markdown-sensitive characters in dep names', () => {
+    const result = makeAuditResult({
+      dependencies: [
+        { name: '@scope/my|pkg', version: '1.0.0', dev: false, ecosystem: 'npm' as const, github: null, score: 10, verdict: 'unmaintained' },
+      ],
+    });
+    const body = buildPRCommentBody(result, 'package.json', DEFAULT_CONFIG, false);
+    // Pipe should be escaped, @ should be wrapped in backticks
+    expect(body).toContain('\\|');
+    expect(body).toContain('`@`');
+    expect(body).not.toContain('| @scope');
+  });
+
+  it('uses ✅ for passing audits and ❌ for failing', () => {
+    const passing = makeAuditResult({ summary: { ...makeAuditResult().summary, avgScore: 80 } });
+    const failing = makeAuditResult({ summary: { ...makeAuditResult().summary, avgScore: 20 } });
+
+    expect(buildPRCommentBody(passing, 'package.json', DEFAULT_CONFIG, false)).toContain('✅');
+    expect(buildPRCommentBody(failing, 'package.json', DEFAULT_CONFIG, false)).toContain('❌');
   });
 });

@@ -139,6 +139,15 @@ function buildAnnotations(
 export const COMMENT_MARKER = '<!-- isitalive-audit -->';
 
 /**
+ * Escape markdown-sensitive characters in user-supplied strings.
+ * Prevents table breakage from pipes, mention spam from @, and
+ * rendering issues from newlines in package names.
+ */
+function escapeMd(s: string): string {
+  return s.replace(/\|/g, '\\|').replace(/@/g, '`@`').replace(/\n/g, ' ');
+}
+
+/**
  * Build a markdown comment body for a PR.
  * Includes a hidden marker so we can find and update it on subsequent pushes.
  */
@@ -195,7 +204,7 @@ export function buildPRCommentBody(
       const link = dep.github
         ? `[View](https://isitalive.dev/github/${dep.github})`
         : '—';
-      parts.push(`| ${dep.name} | ${scoreStr} | ${emoji} ${dep.verdict} | ${link} |`);
+      parts.push(`| ${escapeMd(dep.name)} | ${scoreStr} | ${emoji} ${dep.verdict} | ${link} |`);
     }
     parts.push('');
     parts.push('</details>');
