@@ -15,9 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Schema files for all 4 event pipelines (`schemas/`)
 - Architecture Decision Record (`docs/adr/001-event-driven-architecture.md`)
 - Smart placement for optimal latency
+- Admin query console presets: Score Distribution, Event Sources
 
 ### Changed
 - Cron handler now queries Iceberg via aggregate modules instead of reading queue-maintained state
+- Admin query console presets updated to use `usage_events` and `result_events` Iceberg tables
 - Refresh workflow reads Iceberg-cached tracked index instead of manually maintaining it
 - `revalidateInBackground` archives raw data via Pipeline instead of queue
 - All route handlers (`check`, `ui`, `audit`) emit to Pipelines instead of legacy queue

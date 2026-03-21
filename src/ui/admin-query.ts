@@ -166,7 +166,7 @@ export function adminQueryPage(): string {
       <textarea
         class="form-textarea"
         id="queryInput"
-        placeholder="SELECT * FROM analytics LIMIT 10"
+        placeholder="SELECT * FROM usage_events LIMIT 10"
         rows="5"
       ></textarea>
     </div>

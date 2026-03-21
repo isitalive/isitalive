@@ -165,42 +165,52 @@ export interface PresetQuery {
 export const PRESET_QUERIES: PresetQuery[] = [
   {
     label: 'Daily Volume (30d)',
-    sql: `SELECT DATE(timestamp) as day, COUNT(*) as checks\nFROM analytics\nGROUP BY day\nORDER BY day\nLIMIT 30`,
+    sql: `SELECT DATE(timestamp) as day, COUNT(*) as checks\nFROM usage_events\nWHERE timestamp > NOW() - INTERVAL '30 days'\nGROUP BY day\nORDER BY day`,
     chart: 'line',
   },
   {
     label: 'Verdict Distribution',
-    sql: `SELECT verdict, COUNT(*) as count\nFROM analytics\nGROUP BY verdict\nORDER BY count DESC`,
+    sql: `SELECT verdict, COUNT(*) as count\nFROM usage_events\nWHERE verdict != ''\nGROUP BY verdict\nORDER BY count DESC`,
     chart: 'donut',
   },
   {
     label: 'Top 20 Repos',
-    sql: `SELECT repo, COUNT(*) as checks\nFROM analytics\nGROUP BY repo\nORDER BY checks DESC\nLIMIT 20`,
+    sql: `SELECT repo, COUNT(*) as checks\nFROM usage_events\nWHERE repo != ''\nGROUP BY repo\nORDER BY checks DESC\nLIMIT 20`,
     chart: 'hbar',
   },
   {
     label: 'Hourly Traffic',
-    sql: `SELECT HOUR(timestamp) as hour, COUNT(*) as requests\nFROM analytics\nGROUP BY hour\nORDER BY hour`,
+    sql: `SELECT HOUR(timestamp) as hour, COUNT(*) as requests\nFROM usage_events\nGROUP BY hour\nORDER BY hour`,
     chart: 'line',
   },
   {
     label: 'Top API Consumers',
-    sql: `SELECT api_key, COUNT(*) as requests\nFROM analytics\nWHERE api_key != 'anon'\nGROUP BY api_key\nORDER BY requests DESC\nLIMIT 10`,
+    sql: `SELECT api_key_hash, COUNT(*) as requests\nFROM usage_events\nWHERE api_key_hash != 'anon'\nGROUP BY api_key_hash\nORDER BY requests DESC\nLIMIT 10`,
     chart: 'bar',
   },
   {
     label: 'Geo Distribution',
-    sql: `SELECT country, COUNT(*) as requests\nFROM analytics\nGROUP BY country\nORDER BY requests DESC\nLIMIT 20`,
+    sql: `SELECT country, COUNT(*) as requests\nFROM usage_events\nWHERE country != 'XX'\nGROUP BY country\nORDER BY requests DESC\nLIMIT 20`,
     chart: 'bar',
   },
   {
     label: 'Cache Hit Ratio',
-    sql: `SELECT cache_status, COUNT(*) as count\nFROM analytics\nGROUP BY cache_status`,
+    sql: `SELECT cache_status, COUNT(*) as count\nFROM usage_events\nGROUP BY cache_status`,
     chart: 'donut',
   },
   {
     label: 'Client Types',
-    sql: `SELECT client_type, COUNT(*) as count\nFROM analytics\nGROUP BY client_type`,
+    sql: `SELECT client_type, COUNT(*) as count\nFROM usage_events\nGROUP BY client_type`,
+    chart: 'donut',
+  },
+  {
+    label: 'Score Distribution',
+    sql: `SELECT\n  CASE\n    WHEN score >= 80 THEN 'healthy (80-100)'\n    WHEN score >= 60 THEN 'stable (60-79)'\n    WHEN score >= 40 THEN 'degraded (40-59)'\n    WHEN score >= 20 THEN 'critical (20-39)'\n    ELSE 'unmaintained (0-19)'\n  END as bucket,\n  COUNT(*) as count\nFROM result_events\nGROUP BY bucket\nORDER BY count DESC`,
+    chart: 'donut',
+  },
+  {
+    label: 'Event Sources',
+    sql: `SELECT source, COUNT(*) as count\nFROM usage_events\nGROUP BY source\nORDER BY count DESC`,
     chart: 'donut',
   },
 ]
