@@ -52,7 +52,7 @@ export function methodologyPage(analyticsToken?: string): string {
     .container {
       position: relative;
       z-index: 1;
-      max-width: 740px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -70,7 +70,7 @@ export function methodologyPage(analyticsToken?: string): string {
       color: var(--text-secondary);
       font-size: 0.95rem;
       margin-bottom: 40px;
-      max-width: 600px;
+      max-width: 100%;
     }
 
     h2 {
@@ -203,9 +203,9 @@ export function methodologyPage(analyticsToken?: string): string {
   <div class="bg-orb bg-orb-1"></div>
   <div class="bg-orb bg-orb-2"></div>
 
-  <div class="container">
-    ${navbarHtml}
+  ${navbarHtml}
 
+  <div class="container">
     <h1>How We Score</h1>
     <p class="intro">Every project is evaluated across 8 weighted signals pulled from the GitHub GraphQL API. The signals are combined into a single score from 0 to 100, then mapped to a human-readable verdict.</p>
 
@@ -395,8 +395,9 @@ export function methodologyPage(analyticsToken?: string): string {
 
     <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">During the <strong>stale</strong> window, you'll receive the cached result immediately while a background refresh runs. After the stale window, a fresh fetch is triggered synchronously.</p>
 
-    ${footerHtml}
   </div>
+
+  ${footerHtml}
   ${analyticsToken ? '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"' + analyticsToken + '"}\'></script>' : ''}
 </body>
 </html>`;

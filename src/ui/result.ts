@@ -207,7 +207,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
     .container {
       position: relative;
       z-index: 1;
-      max-width: 680px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -499,9 +499,9 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
   <div class="bg-orb bg-orb-1"></div>
   <div class="bg-orb bg-orb-2"></div>
 
-  <div class="container">
-    ${navbarHtml}
+  ${navbarHtml}
 
+  <div class="container">
 
     <section class="hero">
       <div class="project-name">
@@ -565,8 +565,9 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
       </div>
     </section>
 
-    ${footerHtml}
   </div>
+
+  ${footerHtml}
 
   <script>
     function copyText(el) {

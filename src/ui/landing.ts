@@ -65,7 +65,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       z-index: 1;
       max-width: 1000px;
       margin: 0 auto;
-      padding: 0 40px;
+      padding: 0 24px;
     }
 
     /* ── Header ─────────────────────────────── */
@@ -507,9 +507,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <div class="bg-orb bg-orb-2"></div>
   <div class="bg-orb bg-orb-3"></div>
 
-  <div class="container">
-    ${navbarHtml}
-    <header>
+  ${navbarHtml}
+
+  <div class="container">    <header>
 
       <h1>Is this project safe to depend on?</h1>
       <p class="subtitle">Instantly check the health of any open-source project. One query, one score, one answer.</p>
@@ -594,8 +594,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       </div>
     </section>
 
-    ${footerHtml}
   </div>
+
+  ${footerHtml}
 
   <div class="loading-bar" id="loadingBar"></div>
 

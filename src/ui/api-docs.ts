@@ -50,7 +50,7 @@ export function apiDocsPage(analyticsToken?: string): string {
       position: relative; z-index: 1;
       max-width: 900px;
       margin: 0 auto;
-      padding: 0 40px;
+      padding: 0 24px;
     }
 
     h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
@@ -257,9 +257,9 @@ export function apiDocsPage(analyticsToken?: string): string {
   <div class="bg-orb bg-orb-1"></div>
   <div class="bg-orb bg-orb-2"></div>
 
-  <div class="container">
-    ${navbarHtml}
+  ${navbarHtml}
 
+  <div class="container">
     <h1>📡 API Reference</h1>
     <p class="page-subtitle">One endpoint, one answer. Check if any open-source project is actively maintained.</p>
 
@@ -434,8 +434,9 @@ export function apiDocsPage(analyticsToken?: string): string {
       <div class="field-item"><span class="field-name"><a href="/.well-known/ai-plugin.json" style="color: var(--accent)">ai-plugin.json</a></span><span class="field-desc">AI agent plugin manifest</span></div>
     </div>
 
-    ${footerHtml}
   </div>
+
+  ${footerHtml}
 
   ${analyticsToken ? '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"' + analyticsToken + '"}\' ></script>' : ''}
 </body>

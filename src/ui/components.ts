@@ -9,6 +9,15 @@
 
 /** Shared CSS for nav + footer — include inside each page's <style> tag */
 export const componentCss = `
+    /* ── Nav / Footer Wrapper ──────────────── */
+    .site-chrome-wrapper {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 10;
+    }
+
     /* ── Navbar ─────────────────────────────── */
     .site-nav {
       display: flex;
@@ -73,30 +82,34 @@ export const componentCss = `
     }
 `;
 
-/** Navbar HTML — uses .site-nav classes defined in componentCss */
+/** Navbar HTML — self-contained with consistent width wrapper */
 export const navbarHtml = `
-  <nav class="site-nav">
-    <a href="/" class="site-nav-brand">Is It Alive</a>
-    <div class="site-nav-links">
-      <a href="/trending" class="site-nav-link">🔥 Trending</a>
-      <a href="/api" class="site-nav-link">📡 API</a>
-      <a href="/methodology" class="site-nav-link">📖 Methodology</a>
-      <a href="/changelog" class="site-nav-link">📋 Changelog</a>
-    </div>
-  </nav>
+  <div class="site-chrome-wrapper">
+    <nav class="site-nav">
+      <a href="/" class="site-nav-brand">Is It Alive</a>
+      <div class="site-nav-links">
+        <a href="/trending" class="site-nav-link">🔥 Trending</a>
+        <a href="/api" class="site-nav-link">📡 API</a>
+        <a href="/methodology" class="site-nav-link">📖 Methodology</a>
+        <a href="/changelog" class="site-nav-link">📋 Changelog</a>
+      </div>
+    </nav>
+  </div>
 `;
 
-/** Footer HTML — uses .site-footer classes defined in componentCss */
+/** Footer HTML — self-contained with consistent width wrapper */
 export const footerHtml = `
-  <footer class="site-footer">
-    <p>
-      <a href="/">Home</a> &nbsp;·&nbsp;
-      <a href="/trending">Trending</a> &nbsp;·&nbsp;
-      <a href="/api">API</a> &nbsp;·&nbsp;
-      <a href="/methodology">Methodology</a> &nbsp;·&nbsp;
-      <a href="/changelog">Changelog</a> &nbsp;·&nbsp;
-      <a href="https://github.com/isitalive/isitalive">GitHub</a>
-    </p>
-    <p class="site-footer-credits">Built with Cloudflare Workers &amp; Hono</p>
-  </footer>
+  <div class="site-chrome-wrapper">
+    <footer class="site-footer">
+      <p>
+        <a href="/">Home</a> &nbsp;·&nbsp;
+        <a href="/trending">Trending</a> &nbsp;·&nbsp;
+        <a href="/api">API</a> &nbsp;·&nbsp;
+        <a href="/methodology">Methodology</a> &nbsp;·&nbsp;
+        <a href="/changelog">Changelog</a> &nbsp;·&nbsp;
+        <a href="https://github.com/isitalive/isitalive">GitHub</a>
+      </p>
+      <p class="site-footer-credits">Built with Cloudflare Workers &amp; Hono</p>
+    </footer>
+  </div>
 `;

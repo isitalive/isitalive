@@ -55,7 +55,7 @@ export function changelogPage(analyticsToken?: string): string {
     .container {
       position: relative;
       z-index: 1;
-      max-width: 740px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -71,7 +71,7 @@ export function changelogPage(analyticsToken?: string): string {
       color: var(--text-secondary);
       font-size: 0.95rem;
       margin-bottom: 40px;
-      max-width: 600px;
+      max-width: 100%;
     }
 
     /* ── Version cards ── */
@@ -214,9 +214,9 @@ export function changelogPage(analyticsToken?: string): string {
   <div class="bg-orb bg-orb-1"></div>
   <div class="bg-orb bg-orb-2"></div>
 
-  <div class="container">
-    ${navbarHtml}
+  ${navbarHtml}
 
+  <div class="container">
     <h1>Changelog</h1>
     <p class="intro">What's new, improved, and fixed in Is It Alive?</p>
 
@@ -240,8 +240,9 @@ export function changelogPage(analyticsToken?: string): string {
 
     <div id="endMsg" style="display:none" class="load-more">That's everything so far.</div>
 
-    ${footerHtml}
   </div>
+
+  ${footerHtml}
 
   <script>
     var TYPE_CONFIG = {
