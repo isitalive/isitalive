@@ -10,7 +10,7 @@
 /** Shared CSS for nav + footer — include inside each page's <style> tag */
 export const componentCss = `
     /* ── Prevent horizontal scroll from decorative orbs ── */
-    html, body { overflow-x: hidden; }
+    /* Removed html/body overflow-x: hidden because it breaks iOS Safari viewport-fit=cover */
 
     /* ── iOS safe-area: dark bg extends behind browser chrome ── */
     html {
