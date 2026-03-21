@@ -12,6 +12,7 @@ import { parseManifest, type ManifestFormat } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
 import { scoreAudit, hashManifest } from '../audit/scorer';
 import { buildManifestEvent } from '../events/manifest';
+import { buildUsageEvent } from '../events/usage';
 import { emitAll } from '../pipeline/emit';
 
 const audit = new Hono<{ Bindings: Env }>();
@@ -143,9 +144,32 @@ audit.post('/', async (c) => {
     c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
   }
 
-  // ── Emit manifest event to Pipeline (background) ───────────────────
-  c.executionCtx.waitUntil(
-    emitAll(c.env, {
+  // ── Emit events to Pipeline (background) ────────────────────────────
+  // Usage events for each scored dep → powers trending + tracked indexes
+  // Manifest event → audit analytics
+  c.executionCtx.waitUntil((async () => {
+    const usageEvents = await Promise.all(
+      result.dependencies
+        .filter(d => d.score !== null && d.github)
+        .map(d => buildUsageEvent(
+          d.github!,
+          'github',
+          d.score!,
+          d.verdict,
+          {
+            source: 'audit',
+            apiKey: c.req.header('Authorization')?.replace('Bearer ', '') ?? 'anon',
+            cacheStatus: 'n/a',
+            responseTimeMs: 0,
+            cf: { country: (c.req.raw as any).cf?.country },
+            userAgent: c.req.header('User-Agent') ?? null,
+            ip: c.req.header('CF-Connecting-IP') ?? null,
+          },
+        )),
+    )
+
+    await emitAll(c.env, {
+      usage: usageEvents,
       manifest: [buildManifestEvent({
         manifestHash: contentHash,
         format,
@@ -154,8 +178,8 @@ audit.post('/', async (c) => {
         conclusion: result.complete ? 'success' : 'partial',
         trigger: 'api',
       })],
-    }),
-  )
+    })
+  })())
 
   return response;
 });

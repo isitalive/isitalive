@@ -25,9 +25,27 @@ export function adminJobsPage(): string {
 
       <div class="job-grid">
         <div class="card">
-          <div class="card-label">🔥 Refresh All</div>
-          <div class="card-sub" style="margin-bottom:12px">Trending + Tracked + Sitemap from Iceberg</div>
-          <button class="btn btn-primary" id="btn-cron" onclick="triggerJob('cron')">▶ Run Now</button>
+          <div class="card-label">🔥 Trending</div>
+          <div class="card-sub" style="margin-bottom:12px">Top repos from usage_events (24h)</div>
+          <button class="btn btn-primary" id="btn-trending" onclick="triggerJob('trending')">▶ Refresh</button>
+          <div class="job-result" id="result-trending"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">📋 Tracked</div>
+          <div class="card-sub" style="margin-bottom:12px">All repos seen in last 90 days + tiers</div>
+          <button class="btn btn-primary" id="btn-tracked" onclick="triggerJob('tracked')">▶ Refresh</button>
+          <div class="job-result" id="result-tracked"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">🗺 Sitemap</div>
+          <div class="card-sub" style="margin-bottom:12px">Top repos for sitemap.xml</div>
+          <button class="btn btn-primary" id="btn-sitemap" onclick="triggerJob('sitemap')">▶ Refresh</button>
+          <div class="job-result" id="result-sitemap"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">⚡ Run All</div>
+          <div class="card-sub" style="margin-bottom:12px">Trending + Tracked + Sitemap + Refresh Workflow</div>
+          <button class="btn btn-ghost" id="btn-cron" onclick="triggerJob('cron')">▶ Run All</button>
           <div class="job-result" id="result-cron"></div>
         </div>
       </div>

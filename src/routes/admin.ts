@@ -16,6 +16,9 @@ import { adminKeysPage } from '../ui/admin-keys'
 import { adminQueryPage } from '../ui/admin-query'
 import { adminJobsPage } from '../ui/admin-jobs'
 import { handleScheduled } from '../cron/handler'
+import { refreshTrending } from '../aggregate/trending'
+import { refreshTracked } from '../aggregate/tracked'
+import { refreshSitemap } from '../aggregate/sitemap'
 import type { ApiKeyEntry } from '../scoring/types'
 
 /**
@@ -85,10 +88,27 @@ admin.get('/', async (c) => {
   return c.html(adminOverviewPage(overview))
 })
 
-// Manual cron trigger — force refresh trending/tracked/sitemap from Iceberg
+// Manual cron trigger — force refresh all from Iceberg
 admin.post('/api/cron', async (c) => {
   const result = await handleScheduled(c.env)
   return c.json(result)
+})
+
+// Individual aggregate refreshes
+admin.post('/api/trending', async (c) => {
+  const trending = await refreshTrending(c.env)
+  return c.json({ ok: true, count: trending.length, trending })
+})
+
+admin.post('/api/tracked', async (c) => {
+  const tracked = await refreshTracked(c.env)
+  const count = Object.keys(tracked).length
+  return c.json({ ok: true, count })
+})
+
+admin.post('/api/sitemap', async (c) => {
+  const sitemap = await refreshSitemap(c.env)
+  return c.json({ ok: true, count: sitemap.length })
 })
 
 // Dispatch ingest workflow
