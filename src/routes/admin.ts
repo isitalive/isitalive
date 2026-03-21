@@ -14,6 +14,7 @@ import { adminLoginPage } from '../ui/admin-login'
 import { adminOverviewPage } from '../ui/admin-overview'
 import { adminKeysPage } from '../ui/admin-keys'
 import { adminQueryPage } from '../ui/admin-query'
+import { adminJobsPage } from '../ui/admin-jobs'
 import { handleScheduled } from '../cron/handler'
 import type { ApiKeyEntry } from '../scoring/types'
 
@@ -88,6 +89,31 @@ admin.get('/', async (c) => {
 admin.post('/api/cron', async (c) => {
   const result = await handleScheduled(c.env)
   return c.json(result)
+})
+
+// Dispatch ingest workflow
+admin.post('/api/ingest', async (c) => {
+  try {
+    const instance = await c.env.INGEST_WORKFLOW.create({ params: { trigger: 'daily' as const } })
+    return c.json({ ok: true, instanceId: instance.id })
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500)
+  }
+})
+
+// Dispatch refresh workflow
+admin.post('/api/refresh', async (c) => {
+  try {
+    const instance = await c.env.REFRESH_WORKFLOW.create()
+    return c.json({ ok: true, instanceId: instance.id })
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500)
+  }
+})
+
+// Jobs page
+admin.get('/jobs', (c) => {
+  return c.html(adminJobsPage())
 })
 
 // API Keys page

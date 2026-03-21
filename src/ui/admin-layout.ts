@@ -7,7 +7,7 @@
 
 export interface AdminLayoutOpts {
   title: string
-  activePage: 'overview' | 'keys' | 'query'
+  activePage: 'overview' | 'keys' | 'query' | 'jobs'
   content: string
   /** Extra <script> tags to append before </body> */
   scripts?: string
@@ -22,6 +22,7 @@ export function adminLayout(opts: AdminLayoutOpts): string {
     { id: 'overview', label: '📊 Overview', href: '/admin' },
     { id: 'keys', label: '🔑 API Keys', href: '/admin/keys' },
     { id: 'query', label: '🔍 Query Console', href: '/admin/query' },
+    { id: 'jobs', label: '⚡ Jobs', href: '/admin/jobs' },
   ]
 
   return `<!DOCTYPE html>
