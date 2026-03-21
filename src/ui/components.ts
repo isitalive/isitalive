@@ -18,8 +18,8 @@ export const componentCss = `
     }
     
     html {
-      background-color: #0a0a0f;
-      background: var(--bg-primary, #0a0a0f);
+      background-color: #000000;
+      background: #000000;
     }
 
     /* ── iOS safe-area insets (notch, home indicator) ── */
