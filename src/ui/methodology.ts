@@ -10,7 +10,7 @@ export function methodologyPage(analyticsToken?: string): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>How We Score — Is It Alive?</title>
   <meta name="description" content="Understand how Is It Alive? calculates open-source project health scores. 8 weighted signals, transparent methodology.">
   ${ogTags({

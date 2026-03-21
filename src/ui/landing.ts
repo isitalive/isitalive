@@ -11,7 +11,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Is It Alive? — Open Source Health Checker</title>
   <meta name="description" content="Instantly check if an open-source project is actively maintained or abandoned. Fast, cached, API-ready.">
   ${ogTags({
@@ -468,6 +468,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
+      overflow: hidden;
     }
     .snippet-label {
       font-size: 0.72rem;

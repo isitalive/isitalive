@@ -173,7 +173,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>${owner}/${repo} — Is It Alive?</title>
   <meta name="description" content="${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
   ${ogTags({
