@@ -57,12 +57,33 @@ name = "refresh-workflow"
 binding = "REFRESH_WORKFLOW"
 class_name = "RefreshWorkflow"
 
-# R2 — raw GitHub response archive + analytics events
+# R2 — data lake (Iceberg tables + raw archives)
 [[r2_buckets]]
 binding = "RAW_DATA"
 bucket_name = "isitalive-raw"
 
-# Queues — unified event bus (recent queries, analytics, first-seen, archives)
+[[r2_buckets]]
+binding = "DATA_BUCKET"
+bucket_name = "isitalive-raw"
+
+# Pipelines — event streams → Iceberg tables (R2 Data Catalog)
+[[pipelines]]
+binding = "PROVIDER_PIPELINE"
+pipeline = "d29d70a2629a476a8bfbf0251b914612"
+
+[[pipelines]]
+binding = "RESULT_PIPELINE"
+pipeline = "2d6ee2810cdb4079a6d78468e6fccf65"
+
+[[pipelines]]
+binding = "USAGE_PIPELINE"
+pipeline = "c0c9974a46f1409383bbe28e82fab329"
+
+[[pipelines]]
+binding = "MANIFEST_PIPELINE"
+pipeline = "aceb9a448fc6426ca418d233579a5bc9"
+
+# Queues — legacy event bus (to be removed after full Pipeline migration)
 [[queues.producers]]
 binding = "EVENTS_QUEUE"
 queue = "isitalive-events"

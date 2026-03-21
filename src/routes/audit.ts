@@ -11,6 +11,8 @@ import type { Env } from '../scoring/types';
 import { parseManifest, type ManifestFormat } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
 import { scoreAudit, hashManifest } from '../audit/scorer';
+import { buildManifestEvent } from '../events/manifest';
+import { emitAll } from '../pipeline/emit';
 
 const audit = new Hono<{ Bindings: Env }>();
 
@@ -128,18 +130,19 @@ audit.post('/', async (c) => {
     c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
   }
 
-  // ── Archive raw manifest to R2 (background) ───────────────────────
-  const ext = format === 'go.mod' ? 'gomod' : 'json';
-  const r2Key = `audits/${contentHash}/${new Date().toISOString()}.${ext}`;
+  // ── Emit manifest event to Pipeline (background) ───────────────────
   c.executionCtx.waitUntil(
-    c.env.RAW_DATA.put(r2Key, content, {
-      customMetadata: {
+    emitAll(c.env, {
+      manifest: [buildManifestEvent({
+        manifestHash: contentHash,
         format,
-        depCount: String(deps.length),
-        hash: contentHash,
-      },
-    }).catch(() => {}), // best effort
-  );
+        depCount: deps.length,
+        avgScore: result.summary?.avgScore ?? 0,
+        conclusion: result.complete ? 'success' : 'partial',
+        trigger: 'api',
+      })],
+    }),
+  )
 
   return response;
 });

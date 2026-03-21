@@ -1,0 +1,17 @@
+{
+  "fields": [
+    { "name": "domain", "type": "string", "required": true },
+    { "name": "type", "type": "string", "required": true },
+    { "name": "id", "type": "string", "required": true },
+    { "name": "timestamp", "type": "string", "required": true },
+    { "name": "manifest_hash", "type": "string", "required": true },
+    { "name": "format", "type": "string", "required": true },
+    { "name": "dep_count", "type": "int32", "required": true },
+    { "name": "avg_score", "type": "int32", "required": true },
+    { "name": "conclusion", "type": "string", "required": true },
+    { "name": "trigger", "type": "string", "required": true },
+    { "name": "installation_id", "type": "int32", "required": false },
+    { "name": "repo", "type": "string", "required": false },
+    { "name": "pr_number", "type": "int32", "required": false }
+  ]
+}

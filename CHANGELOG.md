@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] - 2026-03-21
+
+### Added
+- Event-driven architecture with 4 typed domain events: `provider`, `result`, `usage`, `manifest`
+- Cloudflare Pipelines integration — events stream to Iceberg tables via R2 Data Catalog
+- Iceberg-backed cron aggregations for trending repos, tracked repos, sitemap, and score history
+- Pipeline emit layer (`src/pipeline/emit.ts`) with fire-and-forget sends and graceful error handling
+- KV key convention (`ita:{domain}:{key}`) for materialized view caching
+- Schema files for all 4 event pipelines (`schemas/`)
+- Architecture Decision Record (`docs/adr/001-event-driven-architecture.md`)
+
+### Changed
+- Cron handler now queries Iceberg via aggregate modules instead of reading queue-maintained state
+- Queue consumer simplified from 317 → 66 lines — only handles `recent-query` messages
+- Refresh workflow reads Iceberg-cached tracked index instead of manually maintaining it
+- `revalidateInBackground` archives raw data via Pipeline instead of queue
+- All route handlers (`check`, `ui`, `audit`) emit to Pipelines instead of legacy queue
+
+### Removed
+- Legacy queue sends for `check-event`, `archive-raw`, `first-seen`, `page-view`, `github-app-event`
+- Analytics R2 batch writes from processor and audit routes
+- Queue-based trending counter maintenance and tracked index writes
+
 ## [0.6.0] - 2026-03-21
 
 ### Added

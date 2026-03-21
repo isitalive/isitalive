@@ -27,12 +27,13 @@ import {
   createPRComment,
   updatePRComment,
 } from './api';
-import { detectManifests } from './detector';
-import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from './report';
-import { parseManifest } from '../audit/parsers';
-import { resolveAll } from '../audit/resolver';
-import { scoreAudit, hashManifest } from '../audit/scorer';
-import type { QueueMessage } from '../queue/types';
+import { detectManifests } from './detector'
+import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from './report'
+import { parseManifest } from '../audit/parsers'
+import { resolveAll } from '../audit/resolver'
+import { scoreAudit, hashManifest } from '../audit/scorer'
+import { buildManifestEvent } from '../events/manifest'
+import { emitAll } from '../pipeline/emit'
 
 const CHECK_NAME = 'IsItAlive Dependency Audit';
 
@@ -201,12 +202,22 @@ export async function handlePullRequest(
       processingTimeMs: Date.now() - startTime,
     };
 
+    // Pipeline: manifest event
     ctx.waitUntil(
-      env.EVENTS_QUEUE.send({
-        type: 'github-app-event',
-        data: analyticsData,
-      } satisfies QueueMessage),
-    );
+      emitAll(env, {
+        manifest: [buildManifestEvent({
+          manifestHash: contentHash,
+          format: manifest.format,
+          depCount: deps.length,
+          avgScore: auditResult.summary.avgScore,
+          conclusion,
+          trigger: 'pull_request',
+          installationId: installation.id,
+          repo: repository.full_name,
+          prNumber: pr.number,
+        })],
+      }),
+    )
   } catch (err: any) {
     console.error('GitHub App: PR handler error:', err);
 
@@ -265,23 +276,21 @@ export async function handlePush(
       const auditResult = await scoreAudit(resolved, format, contentHash, env, ctx);
 
       // Emit analytics
+      // Pipeline: manifest event
       ctx.waitUntil(
-        env.EVENTS_QUEUE.send({
-          type: 'github-app-event',
-          data: {
-            installationId: installation.id,
-            action: 'audit',
-            trigger: 'push',
-            repoFullName: repository.full_name,
-            manifestFormat: format,
+        emitAll(env, {
+          manifest: [buildManifestEvent({
+            manifestHash: contentHash,
+            format,
             depCount: deps.length,
             avgScore: auditResult.summary.avgScore,
             conclusion: getConclusion(auditResult, config.scoreThreshold),
-            threshold: config.scoreThreshold,
-            processingTimeMs: Date.now() - startTime,
-          } satisfies GitHubAppAnalytics,
-        } satisfies QueueMessage),
-      );
+            trigger: 'push',
+            installationId: installation.id,
+            repo: repository.full_name,
+          })],
+        }),
+      )
 
       break; // Only audit the first manifest found
     } catch {
