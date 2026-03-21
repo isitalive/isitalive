@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
+import { ogTags } from './og';
 
 export function landingPage(siteKey?: string, analyticsToken?: string): string {
   const hasTurnstile = !!siteKey;
@@ -13,6 +14,11 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Is It Alive? — Open Source Health Checker</title>
   <meta name="description" content="Instantly check if an open-source project is actively maintained or abandoned. Fast, cached, API-ready.">
+  ${ogTags({
+    title: 'Is It Alive? — Open Source Health Checker',
+    description: 'Instantly check if an open-source project is actively maintained or abandoned. Fast, cached, API-ready.',
+    url: 'https://isitalive.dev/',
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">

@@ -5,6 +5,7 @@
 import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
 import { navbarHtml, footerHtml, componentCss } from './components';
 import { escapeHtml } from './error';
+import { ogTags } from './og';
 import type { Trend } from '../ingest/processor';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
@@ -173,6 +174,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${owner}/${repo} — Is It Alive?</title>
   <meta name="description" content="${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
+  ${ogTags({
+    title: `${owner}/${repo} — Is It Alive?`,
+    description: `${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
+    url: `https://isitalive.dev/github/${owner}/${repo}`,
+    image: badgeUrl,
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">

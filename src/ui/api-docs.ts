@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
+import { ogTags } from './og';
 
 export function apiDocsPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -12,6 +13,11 @@ export function apiDocsPage(analyticsToken?: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>API Reference — Is It Alive?</title>
   <meta name="description" content="API documentation for Is It Alive? — check open-source project health with a single HTTP request.">
+  ${ogTags({
+    title: 'API Reference — Is It Alive?',
+    description: 'API documentation for Is It Alive? — check open-source project health with a single HTTP request.',
+    url: 'https://isitalive.dev/api',
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
