@@ -149,6 +149,11 @@ export interface Env {
   // Cloudflare Web Analytics — set via CF dashboard
   CF_ANALYTICS_TOKEN?: string;   // public, embedded in HTML beacon
 
+  // Admin dashboard — set via CF dashboard secrets
+  ADMIN_SECRET?: string;         // shared secret for admin session auth
+  CF_ACCOUNT_ID?: string;        // Cloudflare account ID (for R2 SQL API)
+  CF_R2_SQL_TOKEN?: string;      // read-only scoped token for R2 SQL queries
+
   // Workflows — durable ingest + refresh pipelines
   INGEST_WORKFLOW: Workflow;
   REFRESH_WORKFLOW: Workflow;
