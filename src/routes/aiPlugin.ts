@@ -19,6 +19,6 @@ export const aiPluginManifest = {
     url: 'https://isitalive.dev/openapi.json',
   },
   logo_url: 'https://isitalive.dev/logo.png',
-  contact_email: '',
-  legal_info_url: 'https://github.com/isitalive/isitalive/blob/main/LICENSE',
+  contact_email: 'hi@isitalive.dev',
+  legal_info_url: 'https://github.com/isitalive/isitalive/blob/main/TERMS.md',
 };
