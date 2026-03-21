@@ -30,9 +30,9 @@ export function validateReadOnly(sql: string): string | null {
     return 'Query cannot be empty'
   }
 
-  // Must start with SELECT or WITH (CTEs)
-  if (!/^\s*(SELECT|WITH)\b/i.test(trimmed)) {
-    return 'Only SELECT queries are allowed'
+  // Must start with SELECT, WITH (CTEs), SHOW, or DESCRIBE
+  if (!/^\s*(SELECT|WITH|SHOW|DESCRIBE)\b/i.test(trimmed)) {
+    return 'Only SELECT, SHOW, and DESCRIBE queries are allowed'
   }
 
   // Strip string literals before checking for blocked patterns —

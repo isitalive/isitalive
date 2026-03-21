@@ -56,37 +56,37 @@ describe('r2sql', () => {
 
     it('should reject INSERT', () => {
       const err = validateReadOnly('INSERT INTO analytics (repo) VALUES ("test")')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
 
     it('should reject UPDATE', () => {
       const err = validateReadOnly('UPDATE analytics SET score = 100')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
 
     it('should reject DELETE', () => {
       const err = validateReadOnly('DELETE FROM analytics WHERE repo = "test"')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
 
     it('should reject DROP TABLE', () => {
       const err = validateReadOnly('DROP TABLE analytics')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
 
     it('should reject ALTER TABLE', () => {
       const err = validateReadOnly('ALTER TABLE analytics ADD COLUMN foo TEXT')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
 
     it('should reject CREATE TABLE', () => {
       const err = validateReadOnly('CREATE TABLE evil (id INT)')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
 
     it('should reject TRUNCATE', () => {
       const err = validateReadOnly('TRUNCATE analytics')
-      expect(err).toContain('Only SELECT queries are allowed')
+      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
     })
   })
 
