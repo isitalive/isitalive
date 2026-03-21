@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Recent queries — thin helpers that talk to the RecentQueriesDO
+// Recent queries — KV-backed helpers for the recent queries list
 // ---------------------------------------------------------------------------
 
 export interface RecentQuery {

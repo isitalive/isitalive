@@ -9,7 +9,7 @@
 
 import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
-import { GitHubProvider } from '../providers/github';
+import { providers, revalidateInBackground } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { getCached, putCache, getFirstSeen } from '../cache/index';
 import { landingPage } from '../ui/landing';
@@ -30,9 +30,7 @@ import { apiDocsPage } from '../ui/api-docs';
 
 const ui = new Hono<{ Bindings: Env }>();
 
-const providers = {
-  github: new GitHubProvider(),
-};
+
 
 const allowedViewHosts = new Set(['isitalive.dev', 'www.isitalive.dev', 'localhost', '127.0.0.1', '[::1]']);
 
@@ -215,7 +213,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`);
 
-  if (!(provider in providers)) {
+  if (!Object.hasOwn(providers, provider)) {
     return c.html(errorPage(`Unsupported provider: ${provider}`), 400);
   }
 
@@ -233,18 +231,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
     if (cached && (status === 'l1-hit' || status === 'hit' || status === 'stale')) {
       if (status === 'stale') {
-        c.executionCtx.waitUntil((async () => {
-          try {
-            const prov = providers[provider as keyof typeof providers];
-            const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
-            const fresh = scoreProject(rawData, prov.name);
-            await putCache(c.env, provider, owner, repo, fresh);
-            // Archive raw data from background revalidation via queue
-            await c.env.EVENTS_QUEUE.send({ type: 'archive-raw', data: {
-              provider, owner, repo, rawResponse: rawData._rawResponse,
-            }} satisfies QueueMessage);
-          } catch {}
-        })());
+        c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo, c.env.EVENTS_QUEUE));
       }
       // Track + analytics via Queue (fire-and-forget)
       const ctx: CheckEventContext = { ...analyticsCtx(), cacheStatus: status };

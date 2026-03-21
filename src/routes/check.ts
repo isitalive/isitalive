@@ -4,40 +4,16 @@
 
 import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
-import { GitHubProvider } from '../providers/github';
+import { providers, revalidateInBackground } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { getCached, putCache, cacheControlHeader, TIERS, type Tier } from '../cache/index';
 import type { CheckEventContext } from '../analytics/events';
 import type { QueueMessage } from '../queue/types';
 
-const check = new Hono<{ Bindings: Env }>();
+type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } };
+const check = new Hono<AppEnv>();
 
-const providers = {
-  github: new GitHubProvider(),
-};
 
-/** Background revalidation — fetches fresh data and updates KV */
-async function revalidate(
-  env: Env,
-  provider: string,
-  owner: string,
-  repo: string,
-): Promise<void> {
-  try {
-    const prov = providers[provider as keyof typeof providers];
-    if (!prov) return;
-    const rawData = await prov.fetchProject(owner, repo, env.GITHUB_TOKEN);
-    const result = scoreProject(rawData, prov.name);
-    await putCache(env, provider, owner, repo, result);
-    // Archive raw data via queue
-    await env.EVENTS_QUEUE.send({
-      type: 'archive-raw',
-      data: { provider, owner, repo, rawResponse: rawData._rawResponse },
-    } satisfies QueueMessage);
-  } catch {
-    // Silently fail — stale data is still being served
-  }
-}
 
 /** Build cache metadata for the API response */
 function cacheMeta(
@@ -81,20 +57,19 @@ check.get('/:provider/:owner/:repo', async (c) => {
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`);
 
   // Validate provider
-  if (!(provider in providers)) {
+  if (!Object.hasOwn(providers, provider)) {
     return c.json(
       { error: `Unsupported provider: ${provider}. Supported: ${Object.keys(providers).join(', ')}` },
       400,
     );
   }
 
-  const vars = c as any;
-  const tier: Tier = vars.get('tier') ?? 'free';
+  const tier: Tier = c.get('tier') ?? 'free';
 
   // Build analytics context
   const analyticsCtx = (): CheckEventContext => ({
     source: 'api',
-    apiKey: vars.get('keyName') ?? 'anon',
+    apiKey: c.get('keyName') ?? 'anon',
     cacheStatus: 'miss',
     responseTimeMs: Date.now() - startTime,
     cf: (c.req.raw as any).cf,
@@ -125,7 +100,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
   if (cached.status === 'stale' && cached.result) {
     const ctx: CheckEventContext = { ...analyticsCtx(), cacheStatus: 'stale' };
     c.executionCtx.waitUntil(Promise.all([
-      revalidate(c.env, provider, owner, repo),
+      revalidateInBackground(c.env, provider, owner, repo, c.env.EVENTS_QUEUE),
       c.env.EVENTS_QUEUE.send({ type: 'check-event', data: { result: cached.result, ctx } } satisfies QueueMessage),
     ]));
 

@@ -20,5 +20,5 @@ export const aiPluginManifest = {
   },
   logo_url: 'https://isitalive.dev/logo.png',
   contact_email: '',
-  legal_info_url: 'https://github.com/isitaltive/isitalive/blob/main/LICENSE',
+  legal_info_url: 'https://github.com/isitalive/isitalive/blob/main/LICENSE',
 };

@@ -76,27 +76,46 @@ export async function handlePullRequest(
     // Detect manifest files
     const manifests = detectManifests(files);
 
-    if (manifests.length === 0) {
-      // No manifest changes — pass with a neutral note
+    // If no manifests were changed in the PR, fall back to auditing
+    // the repo's existing manifest files from the PR head SHA.
+    // This ensures every PR gets a dependency health check.
+    let manifest = manifests[0] ?? null;
+    let isBaseline = false;
+
+    if (!manifest) {
+      const fallbackPaths = ['package.json', 'go.mod'] as const;
+      for (const path of fallbackPaths) {
+        try {
+          const content = await getFileContent(token, owner, repo, path, headSha);
+          if (content) {
+            manifest = { path, format: path };
+            isBaseline = true;
+            break;
+          }
+        } catch {
+          // File doesn't exist — try next
+        }
+      }
+    }
+
+    if (!manifest) {
+      // No manifest files exist in the repo at all
       await updateCheckRun(token, owner, repo, checkRun.id, {
         status: 'completed',
         conclusion: 'neutral',
         output: {
-          title: 'No manifest changes detected',
-          summary: 'No `package.json` or `go.mod` files were modified in this PR.',
+          title: 'No manifest files found',
+          summary: 'No `package.json` or `go.mod` files found in this repository.',
         },
       });
       await createCommitStatus(token, owner, repo, headSha, {
         state: 'success',
-        description: 'No manifest changes',
+        description: 'No manifest files found',
         context: 'isitalive',
       });
       return;
     }
 
-    // Audit the first manifest found (most impactful)
-    // TODO: support multiple manifests in a single PR
-    const manifest = manifests[0];
 
     // Fetch manifest content from the PR head
     const content = await getFileContent(token, owner, repo, manifest.path, headSha);
@@ -128,6 +147,11 @@ export async function handlePullRequest(
     // Build check run output
     const output = buildCheckRunOutput(auditResult, manifest.path, config);
     const conclusion = getConclusion(auditResult, config.scoreThreshold);
+
+    // Annotate title for baseline audits (no manifest changes in the PR)
+    if (isBaseline) {
+      output.title += ' (baseline)';
+    }
 
     // Update the check run with results
     await updateCheckRun(token, owner, repo, checkRun.id, {

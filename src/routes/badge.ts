@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
 import type { Verdict } from '../scoring/types';
-import { GitHubProvider } from '../providers/github';
+import { providers, revalidateInBackground } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { getCached, putCache } from '../cache/index';
 
@@ -19,18 +19,12 @@ const VERDICT_COLORS: Record<Verdict, string> = {
   unmaintained: '#6b7280',
 };
 
-const VERDICT_LABELS: Record<Verdict, string> = {
-  healthy: 'healthy',
-  stable: 'stable',
-  degraded: 'degraded',
-  critical: 'critical',
-  unmaintained: 'unmaintained',
-};
+
 
 function generateSvg(score: number, verdict: Verdict): string {
   const color = VERDICT_COLORS[verdict];
   const label = 'is it alive?';
-  const value = `${score} · ${VERDICT_LABELS[verdict]}`;
+  const value = `${score} · ${verdict}`;
   const labelWidth = 80;
   const valueWidth = 110;
   const totalWidth = labelWidth + valueWidth;
@@ -56,14 +50,12 @@ function generateSvg(score: number, verdict: Verdict): string {
 </svg>`;
 }
 
-const providers = {
-  github: new GitHubProvider(),
-};
+
 
 badge.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param();
 
-  if (!(provider in providers)) {
+  if (!Object.hasOwn(providers, provider)) {
     return c.text('Unsupported provider', 400);
   }
 
@@ -74,14 +66,7 @@ badge.get('/:provider/:owner/:repo', async (c) => {
 
     if (status === 'stale' && cached) {
       // Serve stale, revalidate in background
-      c.executionCtx.waitUntil((async () => {
-        try {
-          const prov = providers[provider as keyof typeof providers];
-          const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
-          const fresh = scoreProject(rawData, prov.name);
-          await putCache(c.env, provider, owner, repo, fresh);
-        } catch {}
-      })());
+      c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo));
     }
 
     if (!result) {

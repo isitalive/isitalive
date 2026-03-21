@@ -1,8 +1,10 @@
 import type { Env } from '../scoring/types';
-import { GitHubProvider } from '../providers/github';
+import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { buildAnalyticsEvent, writeAnalyticsBatch, archiveRawData } from '../analytics/events';
 import { putCache } from '../cache/index';
+
+const github = providers.github;
 
 export interface ScoreSnapshot {
   date: string;     // YYYY-MM-DD
@@ -11,7 +13,6 @@ export interface ScoreSnapshot {
 }
 
 const SCORE_HISTORY_MAX = 90;   // Keep ~90 days of history per repo
-const github = new GitHubProvider();
 
 /**
  * Process a list of repos in batches: fetch, score, cache, archive, and analytics.
