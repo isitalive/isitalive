@@ -44,6 +44,20 @@ We check 8 signals and produce a weighted health score (0-100):
 
 **Archived repos** are instantly scored 0 (Abandoned).
 
+## GitHub App
+
+Install the [IsItAlive GitHub App](https://github.com/apps/isitalive) to get automatic dependency audits on every pull request.
+
+**What it does:**
+- Audits your `package.json` / `go.mod` dependencies on every PR
+- Posts a Check Run with pass/fail and inline annotations
+- Posts (and updates) a PR comment with the audit summary
+- Falls back to baseline audit when no manifest files are changed
+
+## For AI Agents
+
+See [AGENTS.md](./AGENTS.md) for instructions on using isitalive programmatically.
+
 ## License
 
 [AGPL-3.0](./LICENSE)

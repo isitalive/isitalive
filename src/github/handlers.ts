@@ -23,9 +23,12 @@ import {
   createCheckRun,
   updateCheckRun,
   createCommitStatus,
+  findPRComment,
+  createPRComment,
+  updatePRComment,
 } from './api';
 import { detectManifests } from './detector';
-import { buildCheckRunOutput, getConclusion } from './report';
+import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from './report';
 import { parseManifest } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
 import { scoreAudit, hashManifest } from '../audit/scorer';
@@ -167,6 +170,21 @@ export async function handlePullRequest(
       context: 'isitalive',
       targetUrl: checkRun.html_url,
     });
+
+    // Post or update PR comment with audit results (best-effort)
+    const commentBody = buildPRCommentBody(auditResult, manifest.path, config, isBaseline);
+    try {
+      const existing = await findPRComment(token, owner, repo, pr.number, COMMENT_MARKER);
+
+      if (existing) {
+        await updatePRComment(token, owner, repo, existing.id, commentBody);
+      } else {
+        await createPRComment(token, owner, repo, pr.number, commentBody);
+      }
+    } catch (commentErr) {
+      // Best-effort: PR comment failures should not affect audit outcome
+      console.warn('Failed to post/update PR comment:', commentErr);
+    }
 
     // Emit analytics event
     const analyticsData: GitHubAppAnalytics = {

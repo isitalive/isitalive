@@ -130,3 +130,91 @@ function buildAnnotations(
       : `${dep.name} is ${dep.verdict}. Could not resolve to a GitHub repository.`,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// PR Comment — markdown body for issue comments
+// ---------------------------------------------------------------------------
+
+/** Hidden HTML marker used to identify our comment for updates */
+export const COMMENT_MARKER = '<!-- isitalive-audit -->';
+
+/**
+ * Escape markdown-sensitive characters in user-supplied strings.
+ * Prevents table breakage from pipes, mention spam from @, and
+ * rendering issues from newlines in package names.
+ */
+function escapeMd(s: string): string {
+  return s.replace(/\|/g, '\\|').replace(/@/g, '`@`').replace(/\n/g, ' ');
+}
+
+/**
+ * Build a markdown comment body for a PR.
+ * Includes a hidden marker so we can find and update it on subsequent pushes.
+ */
+export function buildPRCommentBody(
+  result: AuditResult,
+  manifestPath: string,
+  config: GitHubAppConfig,
+  isBaseline: boolean,
+): string {
+  const conclusion = getConclusion(result, config.scoreThreshold);
+  const icon = conclusion === 'success' ? '✅' : '❌';
+  const baselineTag = isBaseline ? ' (baseline)' : '';
+
+  const parts: string[] = [];
+
+  parts.push(COMMENT_MARKER);
+  parts.push('');
+  parts.push(
+    `## ${icon} IsItAlive Dependency Audit${baselineTag}`,
+  );
+  parts.push('');
+  parts.push(
+    `**Average score: ${result.summary.avgScore}/100** · ` +
+    `Threshold: ${config.scoreThreshold} · ` +
+    `Manifest: \`${manifestPath}\``,
+  );
+  parts.push('');
+
+  // Summary table
+  parts.push('| Verdict | Count |');
+  parts.push('|---------|-------|');
+  if (result.summary.healthy > 0)       parts.push(`| 🟢 Healthy | ${result.summary.healthy} |`);
+  if (result.summary.stable > 0)        parts.push(`| 🟡 Stable | ${result.summary.stable} |`);
+  if (result.summary.degraded > 0)      parts.push(`| 🟠 Degraded | ${result.summary.degraded} |`);
+  if (result.summary.critical > 0)      parts.push(`| 🔴 Critical | ${result.summary.critical} |`);
+  if (result.summary.unmaintained > 0)  parts.push(`| ⚫ Unmaintained | ${result.summary.unmaintained} |`);
+  if (result.unresolved > 0)            parts.push(`| ❓ Unresolved | ${result.unresolved} |`);
+  parts.push('');
+
+  // Flagged dependencies (only show problems)
+  const flagged = result.dependencies.filter(
+    d => d.verdict === 'critical' || d.verdict === 'unmaintained' || d.verdict === 'degraded',
+  );
+
+  if (flagged.length > 0) {
+    parts.push('<details>');
+    parts.push(`<summary>⚠️ ${flagged.length} dependencies need attention</summary>`);
+    parts.push('');
+    parts.push('| Package | Score | Verdict | Details |');
+    parts.push('|---------|-------|---------|---------|');
+    for (const dep of flagged) {
+      const emoji = VERDICT_EMOJI[dep.verdict] ?? '❓';
+      const scoreStr = dep.score !== null ? String(dep.score) : '—';
+      const link = dep.github
+        ? `[View](https://isitalive.dev/github/${dep.github})`
+        : '—';
+      parts.push(`| ${escapeMd(dep.name)} | ${scoreStr} | ${emoji} ${dep.verdict} | ${link} |`);
+    }
+    parts.push('');
+    parts.push('</details>');
+    parts.push('');
+  }
+
+  parts.push(
+    `<sub>📊 ${result.scored}/${result.total} dependencies scored · ` +
+    `Powered by [IsItAlive](https://isitalive.dev)</sub>`,
+  );
+
+  return parts.join('\n');
+}

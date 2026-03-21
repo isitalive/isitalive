@@ -203,3 +203,79 @@ export async function createCommitStatus(
     },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Issue / PR Comments
+// ---------------------------------------------------------------------------
+
+interface IssueComment {
+  id: number;
+  body: string;
+  user: { login: string; type: string } | null;
+}
+
+/**
+ * Find the first PR comment that contains the given marker AND was
+ * posted by a Bot user (our GitHub App). Paginates with early exit.
+ * Returns null if no matching comment is found.
+ */
+export async function findPRComment(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  marker: string,
+): Promise<IssueComment | null> {
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const batch = await ghFetch<IssueComment[]>(
+      `/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=${perPage}&page=${page}`,
+      { token },
+    );
+
+    for (const comment of batch) {
+      if (comment.user?.type === 'Bot' && comment.body.includes(marker)) {
+        return comment;
+      }
+    }
+
+    if (batch.length < perPage) break;
+    page++;
+  }
+
+  return null;
+}
+
+/**
+ * Create a new comment on a PR.
+ */
+export async function createPRComment(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<IssueComment> {
+  return ghFetch<IssueComment>(
+    `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
+    { token, method: 'POST', body: { body } },
+  );
+}
+
+/**
+ * Update an existing PR comment by its comment ID.
+ */
+export async function updatePRComment(
+  token: string,
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+): Promise<void> {
+  await ghFetch(
+    `/repos/${owner}/${repo}/issues/comments/${commentId}`,
+    { token, method: 'PATCH', body: { body } },
+  );
+}

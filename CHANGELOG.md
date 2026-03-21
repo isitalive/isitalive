@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-03-20
+
+### Added
+- GitHub App posts a PR comment with dependency audit summary
+- Subsequent pushes update the same comment instead of creating duplicates
+- `AGENTS.md` file for AI agent integration instructions
+- IsItAlive health badge on README
+
+### Fixed
+- Navbar and footer width jumping between pages (now self-contained at 1000px)
+- Content container widths inconsistent across pages (standardized to 900px)
+
 ## [0.4.0] - 2026-03-20
 
 ### Added
