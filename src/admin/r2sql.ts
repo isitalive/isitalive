@@ -67,20 +67,21 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
 
   const accountId = env.CF_ACCOUNT_ID
   const token = env.CF_R2_SQL_TOKEN
+  const warehouse = env.CF_R2_WAREHOUSE
 
-  if (!accountId || !token) {
+  if (!accountId || !token || !warehouse) {
     return {
       columns: [],
       rows: [],
       rowCount: 0,
       timing: Date.now() - start,
-      error: 'R2 SQL is not configured. Set CF_ACCOUNT_ID and CF_R2_SQL_TOKEN in Worker secrets.',
+      error: 'R2 SQL is not configured. Set CF_ACCOUNT_ID, CF_R2_SQL_TOKEN, and CF_R2_WAREHOUSE in Worker secrets.',
     }
   }
 
   try {
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/sql`,
+      `https://api.sql.cloudflarestorage.com/api/v1/accounts/${accountId}/r2-sql/query/${warehouse}`,
       {
         method: 'POST',
         headers: {

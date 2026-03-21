@@ -153,6 +153,7 @@ export interface Env {
   ADMIN_SECRET?: string;         // shared secret for admin session auth
   CF_ACCOUNT_ID?: string;        // Cloudflare account ID (for R2 SQL API)
   CF_R2_SQL_TOKEN?: string;      // read-only scoped token for R2 SQL queries
+  CF_R2_WAREHOUSE?: string;      // R2 Data Catalog warehouse name for SQL queries
 
   // Workflows — durable ingest + refresh pipelines
   INGEST_WORKFLOW: Workflow;
