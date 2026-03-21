@@ -4,6 +4,8 @@ import { scoreProject } from '../scoring/engine'
 import { putCache } from '../cache/index'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
+import { createEvent } from '../events/envelope'
+import type { UsageEvent } from '../events/usage'
 import { emitAll } from '../pipeline/emit'
 
 const github = providers.github;
@@ -67,10 +69,23 @@ export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean>
         score: result.score,
         verdict: result.verdict,
       }),
-      // Pipeline: result + provider events
+      // Pipeline: result + provider + usage events
       emitAll(env, {
         result: [buildResultEvent(result, 'cron-daily')],
         provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+        usage: [createEvent('usage', {
+          repo: repoSlug.toLowerCase(),
+          provider: 'github',
+          score: result.score,
+          verdict: result.verdict,
+          source: 'cron',
+          api_key: 'system',
+          cache_status: 'miss',
+          country: 'XX',
+          user_agent: 'cron',
+          response_time_ms: 0,
+          ip_hash: 'system',
+        }) as UsageEvent],
       }),
     ])
 

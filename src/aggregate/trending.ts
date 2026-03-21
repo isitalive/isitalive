@@ -21,7 +21,7 @@ const TRENDING_SQL = `
 SELECT
   repo,
   COUNT(*) as checks,
-  CAST(AVG(score) AS INTEGER) as avg_score,
+  AVG(score) as avg_score,
   MAX(verdict) as last_verdict
 FROM usage_events
 WHERE timestamp > NOW() - INTERVAL '24 hours'
@@ -47,7 +47,7 @@ export async function refreshTrending(env: Env): Promise<TrendingRepo[]> {
   const trending: TrendingRepo[] = result.rows.map(row => ({
     repo: String(row[0]),
     checks: Number(row[1]),
-    avgScore: Number(row[2]),
+    avgScore: Math.round(Number(row[2])),
     lastVerdict: String(row[3]),
   }))
 
