@@ -120,9 +120,9 @@ export async function adminAuth(c: Context<AdminEnv>, next: Next) {
     return next()
   }
 
-  // Not authenticated — redirect to login
-  const isApiRequest = c.req.header('Accept')?.includes('application/json')
-  if (isApiRequest) {
+  // Not authenticated — return 401 for API paths, redirect for pages
+  const path = new URL(c.req.url).pathname
+  if (path.startsWith('/admin/api/')) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
@@ -131,14 +131,17 @@ export async function adminAuth(c: Context<AdminEnv>, next: Next) {
 
 /**
  * Build a Set-Cookie header for the admin session.
+ * Secure attribute is omitted when running over HTTP (local dev).
  */
-export function sessionCookieHeader(cookie: string, maxAge: number): string {
-  return `${SESSION_COOKIE}=${cookie}; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`
+export function sessionCookieHeader(cookie: string, maxAge: number, isSecure = true): string {
+  const secure = isSecure ? '; Secure' : ''
+  return `${SESSION_COOKIE}=${cookie}; Path=/admin; HttpOnly${secure}; SameSite=Strict; Max-Age=${maxAge}`
 }
 
 /**
  * Build a Set-Cookie header that clears the admin session.
  */
-export function clearSessionCookieHeader(): string {
-  return `${SESSION_COOKIE}=; Path=/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=0`
+export function clearSessionCookieHeader(isSecure = true): string {
+  const secure = isSecure ? '; Secure' : ''
+  return `${SESSION_COOKIE}=; Path=/admin; HttpOnly${secure}; SameSite=Strict; Max-Age=0`
 }
