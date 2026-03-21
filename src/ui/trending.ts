@@ -50,9 +50,9 @@ export function trendingPage(analyticsToken?: string): string {
     .container {
       position: relative;
       z-index: 1;
-      max-width: 720px;
+      max-width: 900px;
       margin: 0 auto;
-      padding: 0 20px 48px;
+      padding: 0 24px 48px;
     }
 
     h1 {
@@ -162,7 +162,7 @@ export function trendingPage(analyticsToken?: string): string {
       50% { opacity: 0.5; }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 640px) {
       .repo-meta { display: none; }
       .repo-card { padding: 12px 14px; gap: 10px; }
     }
@@ -175,9 +175,9 @@ export function trendingPage(analyticsToken?: string): string {
   <div class="bg-orb a"></div>
   <div class="bg-orb b"></div>
 
-  <div class="container">
-    ${navbarHtml}
-    <h1>🔥 Trending</h1>
+  ${navbarHtml}
+
+  <div class="container">    <h1>🔥 Trending</h1>
     <p class="subtitle">Most checked projects in the last 24 hours</p>
 
     <div id="trending-list" class="repo-list">
@@ -193,8 +193,9 @@ export function trendingPage(analyticsToken?: string): string {
       </div>`).join('')}
     </div>
 
-    ${footerHtml}
   </div>
+
+  ${footerHtml}
 
   <script>
     const VERDICT_COLORS = {

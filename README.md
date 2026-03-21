@@ -1,5 +1,7 @@
 # isitalive
 
+[![Is It Alive?](https://isitalive.dev/api/badge/github/isitalive/isitalive)](https://isitalive.dev/github/isitalive/isitalive)
+
 > Is this project safe to depend on?
 
 Lightning-fast open-source dependency health checker. One query, one score, one answer.
