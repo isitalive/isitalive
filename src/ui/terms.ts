@@ -104,6 +104,7 @@ export function termsPage(analyticsToken?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0f">
   <title>Terms of Service — Is It Alive?</title>
   <meta name="description" content="Terms of Service for isitalive.dev — open-source project health checker.">
   <link rel="preconnect" href="https://fonts.googleapis.com">

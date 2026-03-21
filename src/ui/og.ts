@@ -28,6 +28,7 @@ export function ogTags(meta: OgMeta): string {
   const u = escapeHtml(meta.url)
 
   const lines: string[] = [
+    `<meta name="theme-color" content="#0a0a0f">`,
     `<meta property="og:type" content="${type}">`,
     `<meta property="og:title" content="${t}">`,
     `<meta property="og:description" content="${d}">`,
