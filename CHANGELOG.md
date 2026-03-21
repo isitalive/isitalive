@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.4] - 2026-03-21
+
+### Fixed
+- Mobile horizontal scroll into empty area — added `overflow-x: hidden` on both `html` and `body` via shared component CSS (fixes iOS Safari which uses `html` as scroll container)
+- `wrangler dev` failing with "Cannot apply deleted_classes migration to non-existent class RateLimiterDO" — removed stale Durable Objects migration (rate limiting uses native rate limiter API)
+
 ## [0.7.3] - 2026-03-21
 
 ### Added
