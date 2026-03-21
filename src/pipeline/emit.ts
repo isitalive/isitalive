@@ -20,7 +20,7 @@ import type { PipelineBindings } from './types'
  * Flatten an event envelope into a single-level object for Iceberg.
  * Merges { domain, timestamp, id, data: { ... } } → { domain, type, timestamp, id, ... }
  */
-function flatten(event: { domain: string; timestamp: string; id: string; data: Record<string, any> }): Record<string, unknown> {
+function flatten<T extends object>(event: { domain: string; timestamp: string; id: string; data: T }): Record<string, unknown> {
   const { data, domain, ...envelope } = event
   return { ...envelope, domain, type: domain, ...data }
 }

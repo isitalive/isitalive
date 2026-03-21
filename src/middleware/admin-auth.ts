@@ -16,7 +16,8 @@
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono'
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
+import { timingSafeEqual } from '../utils/crypto'
 
 type AdminEnv = { Bindings: Env }
 
@@ -44,13 +45,7 @@ async function hmacSign(payload: string, secret: string): Promise<string> {
  */
 async function hmacVerify(payload: string, signature: string, secret: string): Promise<boolean> {
   const expected = await hmacSign(payload, secret)
-  // Constant-time comparison
-  if (expected.length !== signature.length) return false
-  let result = 0
-  for (let i = 0; i < expected.length; i++) {
-    result |= expected.charCodeAt(i) ^ signature.charCodeAt(i)
-  }
-  return result === 0
+  return timingSafeEqual(expected, signature)
 }
 
 /**

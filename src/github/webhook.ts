@@ -41,14 +41,17 @@ githubWebhook.post('/webhook', async (c) => {
     return c.json({ error: 'Missing X-GitHub-Event header' }, 400);
   }
 
-  let payload: any;
+  let payload: unknown;
   try {
     payload = JSON.parse(body);
   } catch {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
 
-  console.log(`GitHub App: received ${event}.${payload.action ?? ''} (delivery: ${deliveryId})`);
+  const action = typeof payload === 'object' && payload !== null && 'action' in payload
+    ? (payload as { action: string }).action
+    : '';
+  console.log(`GitHub App: received ${event}.${action} (delivery: ${deliveryId})`);
 
   // ── Dispatch ────────────────────────────────────────────────────────
   // Use waitUntil for the heavy work so we can respond 200 immediately.
@@ -57,7 +60,6 @@ githubWebhook.post('/webhook', async (c) => {
 
   switch (event) {
     case 'pull_request': {
-      const action = payload.action as string;
       if (['opened', 'synchronize', 'reopened'].includes(action)) {
         c.executionCtx.waitUntil(
           handlePullRequest(payload as PullRequestEvent, c.env, c.executionCtx, config),
