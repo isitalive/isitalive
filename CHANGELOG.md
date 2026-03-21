@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.3] - 2026-03-21
+
+### Added
+- Open Graph and Twitter Card meta tags on all 6 public pages — shared links now render rich previews on Slack, X/Twitter, Discord, LinkedIn, and iMessage
+- Shared `ogTags()` helper (`src/ui/og.ts`) with HTML-escaping and 8 unit tests
+- `Content-Security-Policy` header — allowlists Google Fonts, Cloudflare Insights, shields.io, and Turnstile
+- `/health` endpoint now returns package version dynamically
+
+### Fixed
+- Consolidated `timingSafeEqual`, `bufferToHex`, `sha256Hex` into `src/utils/crypto.ts` — previously duplicated across 5+ files
+- `timingSafeEqual` docstring accurately describes early-return on length mismatch and UTF-16 code unit comparison
+
 ## [0.7.2] - 2026-03-21
 
 ### Security
