@@ -34,7 +34,7 @@ export async function emitProviderEvent(
   event: ProviderEvent,
 ): Promise<void> {
   try {
-    await env.PROVIDER_PIPELINE.send(flatten(event))
+    await env.PROVIDER_PIPELINE.send([flatten(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit provider event:', err)
   }
@@ -48,7 +48,7 @@ export async function emitResultEvent(
   event: ResultEvent,
 ): Promise<void> {
   try {
-    await env.RESULT_PIPELINE.send(flatten(event))
+    await env.RESULT_PIPELINE.send([flatten(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit result event:', err)
   }
@@ -62,7 +62,7 @@ export async function emitUsageEvent(
   event: UsageEvent,
 ): Promise<void> {
   try {
-    await env.USAGE_PIPELINE.send(flatten(event))
+    await env.USAGE_PIPELINE.send([flatten(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit usage event:', err)
   }
@@ -76,7 +76,7 @@ export async function emitManifestEvent(
   event: ManifestEvent,
 ): Promise<void> {
   try {
-    await env.MANIFEST_PIPELINE.send(flatten(event))
+    await env.MANIFEST_PIPELINE.send([flatten(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit manifest event:', err)
   }
