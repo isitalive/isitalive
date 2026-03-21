@@ -150,7 +150,7 @@ describe('getAdminOverview', () => {
 
     const kv: Record<string, string> = {
       'ita:state:tracked': JSON.stringify(trackedIndex),
-      'isitalive:trending': JSON.stringify(trending),
+      'ita:state:trending': JSON.stringify(trending),
     }
 
     const mockKV = createMockKV(kv)

@@ -5,7 +5,7 @@ import { apiKeyAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
 import { check } from './routes/check';
 import { badge } from './routes/badge';
-import { audit } from './routes/audit';
+import { audit } from './routes/manifest';
 import { githubWebhook } from './github/webhook';
 import { admin } from './routes/admin';
 import { ui } from './routes/ui';

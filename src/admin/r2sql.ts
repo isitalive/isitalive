@@ -105,35 +105,24 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
 
     const data = await response.json() as any
 
-    // R2 SQL returns { success, result: { columns, data } } or similar
-    // Adapt to our QueryResult shape
+    // R2 SQL API returns { success, result: { schema, rows, metrics }, errors, messages }
     if (!data.success) {
       const errors = data.errors?.map((e: any) => e.message).join(', ') || 'Unknown error'
       return { columns: [], rows: [], rowCount: 0, timing: Date.now() - start, error: errors }
     }
 
-    // Parse the result — R2 SQL returns results as array of objects
-    const results = data.result ?? []
-    if (!Array.isArray(results) || results.length === 0) {
+    const result = data.result
+    if (!result || !Array.isArray(result.rows) || result.rows.length === 0) {
       return { columns: [], rows: [], rowCount: 0, timing: Date.now() - start }
     }
 
-    // If result is an array of arrays with a schema
-    // Handle both formats: array of objects or { columns, data }
-    let columns: string[] = []
-    let rows: any[][] = []
+    // Extract column names from schema or fall back to row keys
+    const columns: string[] = Array.isArray(result.schema)
+      ? result.schema.map((col: any) => col.name)
+      : Object.keys(result.rows[0])
 
-    if (Array.isArray(results) && results.length > 0) {
-      if (typeof results[0] === 'object' && !Array.isArray(results[0])) {
-        // Array of objects — most common
-        columns = Object.keys(results[0])
-        rows = results.map((row: any) => columns.map(col => row[col]))
-      } else {
-        // Already array of arrays — use first row as header
-        columns = results[0] as string[]
-        rows = results.slice(1) as any[][]
-      }
-    }
+    // Rows are objects — convert to arrays matching column order
+    const rows = result.rows.map((row: any) => columns.map(col => row[col]))
 
     return {
       columns,
@@ -165,7 +154,7 @@ export interface PresetQuery {
 export const PRESET_QUERIES: PresetQuery[] = [
   {
     label: 'Daily Volume (30d)',
-    sql: `SELECT DATE(timestamp) as day, COUNT(*) as checks\nFROM usage_events\nWHERE timestamp > NOW() - INTERVAL '30 days'\nGROUP BY day\nORDER BY day`,
+    sql: `SELECT substring(timestamp, 1, 10) as day, COUNT(*) as checks\nFROM usage_events\nWHERE timestamp > NOW() - INTERVAL '30 days'\nGROUP BY day\nORDER BY day`,
     chart: 'line',
   },
   {
@@ -180,7 +169,7 @@ export const PRESET_QUERIES: PresetQuery[] = [
   },
   {
     label: 'Hourly Traffic',
-    sql: `SELECT HOUR(timestamp) as hour, COUNT(*) as requests\nFROM usage_events\nGROUP BY hour\nORDER BY hour`,
+    sql: `SELECT substring(timestamp, 12, 2) as hr, COUNT(*) as requests\nFROM usage_events\nGROUP BY hr\nORDER BY hr`,
     chart: 'line',
   },
   {

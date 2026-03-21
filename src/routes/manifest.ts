@@ -53,6 +53,7 @@ audit.post('/', async (c) => {
 
   // ── Hash manifest for caching + ETag ───────────────────────────────
   const contentHash = await hashManifest(content);
+  const auditCacheKey = `audit:result:${contentHash}`;
 
   // ── L1: Cloudflare Cache API (edge, ~0ms) ─────────────────────────
   // POST can't use Cache API directly, so we use a synthetic URL keyed
@@ -65,19 +66,31 @@ audit.post('/', async (c) => {
     return l1Hit;
   }
 
-  // ETag: if client sends If-None-Match and we have a cached complete result
-  const ifNoneMatch = c.req.header('If-None-Match');
-  if (ifNoneMatch === `"${contentHash}"`) {
-    const cached = await c.env.CACHE_KV.get(`audit:result:${contentHash}`);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed.complete) {
-        return new Response(null, {
-          status: 304,
-          headers: { ETag: `"${contentHash}"` },
-        });
-      }
+  // ── L2: KV cache (global, persistent) ─────────────────────────────
+  // Check KV BEFORE parsing/resolving — skips expensive npm lookups.
+  // Only complete results are ever written to this key, so no need to
+  // parse and re-serialize — return the raw JSON string directly.
+  const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
+  if (kvCached) {
+    // ETag: 304 if client already has this version
+    const ifNoneMatch = c.req.header('If-None-Match');
+    if (ifNoneMatch === `"${contentHash}"`) {
+      return new Response(null, {
+        status: 304,
+        headers: { ETag: `"${contentHash}"` },
+      });
     }
+
+    const response = new Response(kvCached, {
+      headers: {
+        'Content-Type': 'application/json',
+        'ETag': `"${contentHash}"`,
+        'Cache-Control': 'public, max-age=3600',
+      },
+    });
+    // Re-populate L1 edge cache for same-datacenter instant hits
+    c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
+    return response;
   }
 
   // ── Parse manifest ─────────────────────────────────────────────────

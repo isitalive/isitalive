@@ -63,7 +63,7 @@ class_name = "RefreshWorkflow"
 # R2 — data lake (Iceberg tables via R2 Data Catalog)
 [[r2_buckets]]
 binding = "DATA_BUCKET"
-bucket_name = "isitalive-raw"
+bucket_name = "isitalive-data"
 
 # Pipelines — event streams → Iceberg tables (R2 Data Catalog)
 [[pipelines]]

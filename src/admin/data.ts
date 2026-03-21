@@ -7,6 +7,7 @@
 
 import type { Env, ApiKeyEntry } from '../scoring/types'
 import { getTrackedIndex, type TrackedIndex } from '../aggregate/tracked'
+import { TRENDING_KEY } from '../state/keys'
 
 // ---------------------------------------------------------------------------
 // Overview stats
@@ -22,12 +23,10 @@ export interface AdminOverview {
   tierLimits: { tier: string; limit: number; period: number }[]
 }
 
-const TRENDING_KV_KEY = 'isitalive:trending'
-
 export async function getAdminOverview(env: Env): Promise<AdminOverview> {
   const [tracked, trending] = await Promise.all([
     getTrackedIndex(env.CACHE_KV),
-    env.CACHE_KV.get(TRENDING_KV_KEY, 'json') as Promise<any[] | null>,
+    env.CACHE_KV.get(TRENDING_KEY, 'json') as Promise<any[] | null>,
   ])
 
   let hot = 0, warm = 0, cold = 0

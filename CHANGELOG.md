@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.1] - 2026-03-21
+
+### Fixed
+- R2 SQL response parsing — `data.result` is an object `{ schema, rows }`, not an array; all Iceberg queries were silently returning zero rows
+- Admin dashboard trending count reading from legacy KV key (`isitalive:trending`) instead of current key (`ita:state:trending`)
+- R2 SQL preset queries using unsupported `DATE()` and `HOUR()` functions — replaced with `substring()` on ISO-8601 timestamps
+- Audit cache checked too late — KV lookup moved before `parseManifest()` and `resolveAll()`, skipping expensive npm registry lookups on repeat calls
+- Audit cache response now returns raw KV string directly, avoiding unnecessary JSON parse + serialize round-trip for large payloads
+
+### Changed
+- Renamed `src/routes/audit.ts` → `src/routes/manifest.ts` for clarity
+
 ## [0.7.0] - 2026-03-21
 
 ### Added
