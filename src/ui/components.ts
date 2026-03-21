@@ -12,6 +12,11 @@ export const componentCss = `
     /* ── Prevent horizontal scroll from decorative orbs ── */
     html, body { overflow-x: hidden; }
 
+    /* ── iOS safe-area: dark bg extends behind browser chrome ── */
+    html {
+      background: var(--bg-primary, #0a0a0f);
+    }
+
     /* ── iOS safe-area insets (notch, home indicator) ── */
     body {
       padding-top: env(safe-area-inset-top);

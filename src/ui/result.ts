@@ -416,6 +416,8 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       font-size: 0.78rem;
       color: var(--text-secondary);
       word-break: break-all;
+      overflow-wrap: anywhere;
+      overflow: hidden;
       cursor: pointer;
       transition: border-color 0.2s;
       position: relative;

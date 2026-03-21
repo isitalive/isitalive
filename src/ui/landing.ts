@@ -357,10 +357,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       }
 
       .badge-cta h2 { font-size: 1.3rem; }
-      .badge-snippets { max-width: 100%; }
-      .snippet-block { flex-direction: column; align-items: stretch; gap: 8px; }
+      .badge-snippets { max-width: 100%; overflow: hidden; }
+      .snippet-block { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
       .snippet-label { min-width: unset; text-align: center; }
-      .snippet-code { font-size: 0.65rem; min-width: 0; }
+      .snippet-code { font-size: 0.65rem; min-width: 0; width: 100%; max-width: 100%; }
       .copy-btn { align-self: center; }
     }
 

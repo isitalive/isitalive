@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.7] - 2026-03-21
+
+### Fixed
+- iOS Safari: dark background now extends behind status bar and home indicator (set `background` on `html` element)
+- Landing page badge snippets overflowing viewport on mobile — added width constraints to snippet containers
+- Result page embed URLs hardened with `overflow-wrap: anywhere` for consistent wrapping
+
 ## [0.7.6] - 2026-03-21
 
 ### Fixed
