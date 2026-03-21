@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components'
+import { escapeHtml } from './error'
 import termsMd from '../../TERMS.md'
 
 /**
@@ -79,15 +80,24 @@ function renderMarkdown(md: string): string {
   return out.join('\n')
 }
 
-/** Inline markdown: **bold**, [text](url) */
+/** Inline markdown: **bold**, [text](url), backslash escapes, with HTML safety */
 function inline(text: string): string {
-  return text
+  return escapeHtml(text)
+    .replace(/\\(.)/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="contact-link">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
+      if (/^https?:\/\/|^mailto:/i.test(href)) {
+        return `<a href="${href}" class="contact-link">${label}</a>`
+      }
+      return label
+    })
 }
 
+// Pre-render once at module init — TERMS.md is static per deploy
+const renderedTerms = renderMarkdown(termsMd)
+
 export function termsPage(analyticsToken?: string): string {
-  const rendered = renderMarkdown(termsMd)
+  const rendered = renderedTerms
 
   return `<!DOCTYPE html>
 <html lang="en">
