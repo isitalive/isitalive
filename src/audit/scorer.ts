@@ -276,7 +276,7 @@ function depToAudit(dep: ResolvedDep, result: ScoringResult): AuditDep {
   };
 }
 
-function buildSummary(scored: AuditDep[]) {
+export function buildSummary(scored: AuditDep[]) {
   const counts = { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0 };
   let totalScore = 0;
 
