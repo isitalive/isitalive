@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.5] - 2026-03-21
+
+### Added
+- GitHub Actions CI pipeline — type-check (`tsc --noEmit`) and tests (`vitest`) run on every push to `main` and on pull requests
+- `.node-version` file pinning Node 22 for CI and local tooling (nvm, fnm, mise)
+- npm dependency caching in CI via `actions/setup-node` for faster builds
+
 ## [0.7.4] - 2026-03-21
 
 ### Fixed
