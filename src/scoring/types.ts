@@ -139,8 +139,7 @@ export interface Env {
   RATE_LIMITER_FREE: RateLimit;
   RATE_LIMITER_PRO: RateLimit;
   RATE_LIMITER_ENTERPRISE: RateLimit;
-  RAW_DATA: R2Bucket;            // Legacy alias — use DATA_BUCKET in new code
-  DATA_BUCKET: R2Bucket;         // R2 bucket for Iceberg tables + raw archives
+  DATA_BUCKET: R2Bucket;         // R2 bucket for Iceberg tables (R2 Data Catalog)
   GITHUB_TOKEN?: string;
 
   // GitHub App — set via CF dashboard secrets
@@ -170,9 +169,6 @@ export interface Env {
   RESULT_PIPELINE: Pipeline;     // Computed health scores
   USAGE_PIPELINE: Pipeline;      // Request/access tracking
   MANIFEST_PIPELINE: Pipeline;   // Dependency scanning events
-
-  // Queues — legacy, to be removed in Phase 4
-  EVENTS_QUEUE: Queue;
 }
 
 /** Shape of an API key entry in KEYS_KV */

@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Env, ApiKeyEntry } from '../scoring/types'
-import { getTrackedIndex, type TrackedIndex } from '../queue/tracked'
+import { getTrackedIndex, type TrackedIndex } from '../aggregate/tracked'
 
 // ---------------------------------------------------------------------------
 // Overview stats
@@ -30,12 +30,10 @@ export async function getAdminOverview(env: Env): Promise<AdminOverview> {
     env.CACHE_KV.get(TRENDING_KV_KEY, 'json') as Promise<any[] | null>,
   ])
 
-  const now = Date.now()
   let hot = 0, warm = 0, cold = 0
   for (const entry of Object.values(tracked)) {
-    const age = now - new Date(entry.lastRequested).getTime()
-    if (age <= 7 * 86400000) hot++
-    else if (age <= 30 * 86400000) warm++
+    if (entry.tier === 'hot') hot++
+    else if (entry.tier === 'warm') warm++
     else cold++
   }
 
@@ -125,10 +123,9 @@ export class KVKeyStore implements KeyStore {
 
 export interface TrackedRepoDisplay {
   repo: string
-  lastChecked: string
-  lastRequested: string
-  source: string
+  lastSeen: string
   requestCount: number
+  tier: string
 }
 
 export async function getTrackedRepos(env: Env): Promise<TrackedRepoDisplay[]> {
@@ -136,7 +133,9 @@ export async function getTrackedRepos(env: Env): Promise<TrackedRepoDisplay[]> {
   return Object.entries(index)
     .map(([repo, entry]) => ({
       repo,
-      ...entry,
+      lastSeen: entry.lastSeen,
+      requestCount: entry.requestCount,
+      tier: entry.tier,
     }))
     .sort((a, b) => b.requestCount - a.requestCount)
     .slice(0, 200) // Cap at 200 for display

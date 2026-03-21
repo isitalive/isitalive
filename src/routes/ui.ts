@@ -18,10 +18,9 @@ import { errorPage } from '../ui/error'
 import { methodologyPage } from '../ui/methodology'
 import { changelogPage } from '../ui/changelog'
 import { verifyTurnstile } from '../middleware/turnstile'
-import { getRecentQueries } from '../cache/recentQueries'
+import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries'
 import { getTrending, getSitemapRepos } from '../cron/handler'
 import { trendingPage } from '../ui/trending'
-import type { QueueMessage } from '../queue/types'
 import { parseChangelog as parseChangelogMd } from '../changelog/parser'
 import changelogMd from '../../CHANGELOG.md'
 import { getScoreHistory, computeTrend } from '../ingest/processor'
@@ -237,10 +236,10 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       }
       const usageCtx = buildUsageCtx(status)
       c.executionCtx.waitUntil(Promise.all([
-        // Keep recent-query for landing page
-        c.env.EVENTS_QUEUE.send({ type: 'recent-query', data: {
-            owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
-        }} satisfies QueueMessage),
+        // Direct KV write for recent queries (landing page)
+        trackRecentQuery(c.env.CACHE_KV, {
+          owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
+        }),
         // Pipeline events
         buildUsageEvent(`${owner}/${repo}`, provider, cached.score, cached.verdict, usageCtx)
           .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached, 'browser')] })),
@@ -260,10 +259,10 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const usageCtx = buildUsageCtx('miss')
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
-      // Keep recent-query for landing page
-      c.env.EVENTS_QUEUE.send({ type: 'recent-query', data: {
+      // Direct KV write for recent queries (landing page)
+      trackRecentQuery(c.env.CACHE_KV, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
-      }} satisfies QueueMessage),
+      }),
       // Pipeline events
       buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
         .then(ue => emitAll(c.env, {

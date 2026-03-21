@@ -52,11 +52,7 @@ describe('HTTP surface area hardening', () => {
         },
         body: JSON.stringify({ r: 'owner/repo', s: 75, v: 'stable' }),
       }),
-      {
-        EVENTS_QUEUE: {
-          send: vi.fn(),
-        },
-      } as any,
+      {} as any,
       executionCtx,
     );
 

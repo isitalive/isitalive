@@ -4,21 +4,15 @@
 
 import type { Env } from './scoring/types';
 import { app } from './app';
-// ── Export Worker ─────────────────────────────────────────────────────
 import { handleScheduled } from './cron/handler';
-import { handleQueueBatch } from './queue/consumer';
-import type { QueueMessage } from './queue/types';
 
 export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
-    // Detect daily cron (6 AM UTC) vs hourly
+    // Detect daily cron (6 AM UTC) vs every-10-min aggregation
     const trigger = event.cron === '0 6 * * *' ? 'daily' : 'hourly';
     console.log(`Cron: triggered (${trigger}) at ${new Date(event.scheduledTime).toISOString()}`);
     await handleScheduled(env, trigger);
-  },
-  async queue(batch: MessageBatch<QueueMessage>, env: Env) {
-    await handleQueueBatch(batch, env);
   },
 };
 

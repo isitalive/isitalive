@@ -140,16 +140,16 @@ describe('getAdminOverview', () => {
     const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000).toISOString()
 
     const trackedIndex = {
-      'hot/repo1': { lastChecked: daysAgo(1), lastRequested: daysAgo(1), source: 'user', requestCount: 100 },
-      'hot/repo2': { lastChecked: daysAgo(3), lastRequested: daysAgo(3), source: 'api', requestCount: 50 },
-      'warm/repo1': { lastChecked: daysAgo(15), lastRequested: daysAgo(15), source: 'user', requestCount: 10 },
-      'cold/repo1': { lastChecked: daysAgo(60), lastRequested: daysAgo(60), source: 'trending', requestCount: 2 },
+      'hot/repo1': { repo: 'hot/repo1', lastSeen: daysAgo(1), requestCount: 100, tier: 'hot' },
+      'hot/repo2': { repo: 'hot/repo2', lastSeen: daysAgo(3), requestCount: 50, tier: 'hot' },
+      'warm/repo1': { repo: 'warm/repo1', lastSeen: daysAgo(15), requestCount: 10, tier: 'warm' },
+      'cold/repo1': { repo: 'cold/repo1', lastSeen: daysAgo(60), requestCount: 2, tier: 'cold' },
     }
 
     const trending = [{ repo: 'hot/repo1' }, { repo: 'hot/repo2' }]
 
     const kv: Record<string, string> = {
-      'isitalive:tracked': JSON.stringify(trackedIndex),
+      'ita:state:tracked': JSON.stringify(trackedIndex),
       'isitalive:trending': JSON.stringify(trending),
     }
 

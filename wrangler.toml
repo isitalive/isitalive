@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-03-14"
 compatibility_flags = ["nodejs_compat"]
 
+[placement]
+mode = "smart"
+
 # Module rules — import .md files as text
 [[rules]]
 type = "Text"
@@ -57,11 +60,7 @@ name = "refresh-workflow"
 binding = "REFRESH_WORKFLOW"
 class_name = "RefreshWorkflow"
 
-# R2 — data lake (Iceberg tables + raw archives)
-[[r2_buckets]]
-binding = "RAW_DATA"
-bucket_name = "isitalive-raw"
-
+# R2 — data lake (Iceberg tables via R2 Data Catalog)
 [[r2_buckets]]
 binding = "DATA_BUCKET"
 bucket_name = "isitalive-raw"
@@ -83,17 +82,7 @@ pipeline = "c0c9974a46f1409383bbe28e82fab329"
 binding = "MANIFEST_PIPELINE"
 pipeline = "aceb9a448fc6426ca418d233579a5bc9"
 
-# Queues — legacy event bus (to be removed after full Pipeline migration)
-[[queues.producers]]
-binding = "EVENTS_QUEUE"
-queue = "isitalive-events"
-
-[[queues.consumers]]
-queue = "isitalive-events"
-max_batch_size = 100
-max_batch_timeout = 5
-
-# Cron Triggers — hourly trending + daily snapshot (6 AM UTC)
+# Cron Triggers — every 10 min aggregation + daily snapshot (6 AM UTC)
 [triggers]
 crons = ["*/10 * * * *", "0 6 * * *"]
 
