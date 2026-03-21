@@ -14,6 +14,7 @@ import { adminLoginPage } from '../ui/admin-login'
 import { adminOverviewPage } from '../ui/admin-overview'
 import { adminKeysPage } from '../ui/admin-keys'
 import { adminQueryPage } from '../ui/admin-query'
+import { handleScheduled } from '../cron/handler'
 import type { ApiKeyEntry } from '../scoring/types'
 
 /**
@@ -81,6 +82,12 @@ admin.use('/*', async (c, next) => {
 admin.get('/', async (c) => {
   const overview = await getAdminOverview(c.env)
   return c.html(adminOverviewPage(overview))
+})
+
+// Manual cron trigger — force refresh trending/tracked/sitemap from Iceberg
+admin.post('/api/cron', async (c) => {
+  const result = await handleScheduled(c.env)
+  return c.json(result)
 })
 
 // API Keys page
