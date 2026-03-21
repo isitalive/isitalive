@@ -43,7 +43,7 @@ export function ogTags(meta: OgMeta): string {
 
   if (meta.image) {
     const img = escapeHtml(meta.image)
-    lines.splice(7, 0, `<meta property="og:image" content="${img}">`)
+    lines.splice(6, 0, `<meta property="og:image" content="${img}">`)
     lines.push(`<meta name="twitter:image" content="${img}">`)
   }
 

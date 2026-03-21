@@ -18,6 +18,7 @@ export const componentCss = `
     }
     
     html {
+      background-color: #0a0a0f;
       background: var(--bg-primary, #0a0a0f);
     }
 
