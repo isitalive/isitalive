@@ -23,9 +23,12 @@ import {
   createCheckRun,
   updateCheckRun,
   createCommitStatus,
+  listPRComments,
+  createPRComment,
+  updatePRComment,
 } from './api';
 import { detectManifests } from './detector';
-import { buildCheckRunOutput, getConclusion } from './report';
+import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from './report';
 import { parseManifest } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
 import { scoreAudit, hashManifest } from '../audit/scorer';
@@ -167,6 +170,17 @@ export async function handlePullRequest(
       context: 'isitalive',
       targetUrl: checkRun.html_url,
     });
+
+    // Post or update PR comment with audit results
+    const commentBody = buildPRCommentBody(auditResult, manifest.path, config, isBaseline);
+    const existingComments = await listPRComments(token, owner, repo, pr.number);
+    const existing = existingComments.find(c => c.body.includes(COMMENT_MARKER));
+
+    if (existing) {
+      await updatePRComment(token, owner, repo, existing.id, commentBody);
+    } else {
+      await createPRComment(token, owner, repo, pr.number, commentBody);
+    }
 
     // Emit analytics event
     const analyticsData: GitHubAppAnalytics = {

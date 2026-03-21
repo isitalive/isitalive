@@ -203,3 +203,72 @@ export async function createCommitStatus(
     },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Issue / PR Comments
+// ---------------------------------------------------------------------------
+
+interface IssueComment {
+  id: number;
+  body: string;
+  user: { login: string; type: string } | null;
+}
+
+/**
+ * List all comments on a PR (uses the issues endpoint).
+ * Paginates automatically in case there are many comments.
+ */
+export async function listPRComments(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<IssueComment[]> {
+  const comments: IssueComment[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const batch = await ghFetch<IssueComment[]>(
+      `/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=${perPage}&page=${page}`,
+      { token },
+    );
+    comments.push(...batch);
+    if (batch.length < perPage) break;
+    page++;
+  }
+
+  return comments;
+}
+
+/**
+ * Create a new comment on a PR.
+ */
+export async function createPRComment(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<IssueComment> {
+  return ghFetch<IssueComment>(
+    `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
+    { token, method: 'POST', body: { body } },
+  );
+}
+
+/**
+ * Update an existing PR comment by its comment ID.
+ */
+export async function updatePRComment(
+  token: string,
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+): Promise<void> {
+  await ghFetch(
+    `/repos/${owner}/${repo}/issues/comments/${commentId}`,
+    { token, method: 'PATCH', body: { body } },
+  );
+}
