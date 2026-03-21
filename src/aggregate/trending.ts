@@ -28,7 +28,7 @@ WHERE timestamp > NOW() - INTERVAL '24 hours'
   AND repo != ''
 GROUP BY repo
 ORDER BY checks DESC
-LIMIT 50
+LIMIT 250
 `
 
 /**

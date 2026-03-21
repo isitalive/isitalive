@@ -162,6 +162,29 @@ export function trendingPage(analyticsToken?: string): string {
       50% { opacity: 0.5; }
     }
 
+    .load-more-container {
+      text-align: center;
+      margin-top: 16px;
+    }
+    .btn-load-more {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 24px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-load-more:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .btn-load-more:disabled { opacity: 0.5; cursor: not-allowed; }
+    .total-count { color: var(--text-muted); font-size: 0.75rem; margin-top: 8px; }
+
     @media (max-width: 640px) {
       .repo-meta { display: none; }
       .repo-card { padding: 12px 14px; gap: 10px; }
@@ -192,6 +215,10 @@ export function trendingPage(analyticsToken?: string): string {
         <div class="skeleton-bar" style="width:30px;height:20px"></div>
       </div>`).join('')}
     </div>
+    <div id="load-more" class="load-more-container" style="display:none">
+      <button class="btn-load-more" id="btn-load-more" onclick="loadMore()">Load more</button>
+      <div class="total-count" id="total-count"></div>
+    </div>
 
   </div>
 
@@ -206,11 +233,14 @@ export function trendingPage(analyticsToken?: string): string {
       unmaintained: '#6b7280',
     };
 
+    var currentOffset = 0;
+    var pageSize = 20;
+    var totalRepos = 0;
+
     function verdictLabel(v) {
       return v.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
     }
 
-    // Normalize old verdict values stored in KV
     function normalizeVerdict(v) {
       var REMAP = { declining:'degraded', inactive:'degraded', stale:'degraded', at_risk:'critical', dormant:'critical', abandoned:'unmaintained', maintained:'stable' };
       return REMAP[v] || v;
@@ -230,14 +260,43 @@ export function trendingPage(analyticsToken?: string): string {
         + '</a>';
     }
 
-    fetch('/api/trending')
+    function loadMore() {
+      var btn = document.getElementById('btn-load-more');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      fetch('/api/trending?limit=' + pageSize + '&offset=' + currentOffset)
+        .then(r => r.json())
+        .then(data => {
+          var el = document.getElementById('trending-list');
+          var html = data.repos.map(function(r, i) { return renderCard(r, currentOffset + i); }).join('');
+          el.insertAdjacentHTML('beforeend', html);
+          currentOffset += data.repos.length;
+          totalRepos = data.total;
+          document.getElementById('total-count').textContent = currentOffset + ' of ' + totalRepos + ' repos';
+          if (data.hasMore) {
+            btn.disabled = false;
+            btn.textContent = 'Load more';
+          } else {
+            document.getElementById('load-more').style.display = 'none';
+          }
+        });
+    }
+
+    // Initial load
+    fetch('/api/trending?limit=' + pageSize + '&offset=0')
       .then(r => r.json())
-      .then(repos => {
+      .then(data => {
         const el = document.getElementById('trending-list');
-        if (!repos || repos.length === 0) {
+        if (!data.repos || data.repos.length === 0) {
           el.innerHTML = '<div class="empty-state"><div style="font-size:2.5rem">📊</div><p>No trending data yet. Check back soon.</p></div>';
         } else {
-          el.innerHTML = repos.map(renderCard).join('');
+          el.innerHTML = data.repos.map(renderCard).join('');
+          currentOffset = data.repos.length;
+          totalRepos = data.total;
+          document.getElementById('total-count').textContent = currentOffset + ' of ' + totalRepos + ' repos';
+          if (data.hasMore) {
+            document.getElementById('load-more').style.display = 'block';
+          }
         }
       })
       .catch(() => {

@@ -142,11 +142,20 @@ ui.get('/trending', (c) => {
   return c.html(trendingPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
-// Trending API — lightweight JSON endpoint for client-side hydration
+// Trending API — paginated JSON endpoint for client-side hydration
 ui.get('/api/trending', async (c) => {
-  const repos = await getTrending(c.env.CACHE_KV)
+  const allRepos = await getTrending(c.env.CACHE_KV)
+  const limit = Math.max(1, parseInt(c.req.query('limit') || '20', 10))
+  const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10))
+  const page = allRepos.slice(offset, offset + limit)
   c.header('Cache-Control', 'public, max-age=10, s-maxage=10')
-  return c.json(repos)
+  return c.json({
+    repos: page,
+    total: allRepos.length,
+    offset,
+    limit,
+    hasMore: offset + limit < allRepos.length,
+  })
 })
 
 // Changelog page — static HTML shell (data hydrated client-side)
