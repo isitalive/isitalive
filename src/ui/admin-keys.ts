@@ -17,8 +17,8 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
 
     ${flash ? `
       <div class="admin-alert ${flash.type}">
-        ${flash.message}
-        ${flash.key ? `<br><code style="font-size:0.9rem; background:var(--bg-secondary); padding:4px 8px; border-radius:4px; margin-top:8px; display:inline-block; user-select:all">${flash.key}</code>
+        ${escapeHtml(flash.message)}
+        ${flash.key ? `<br><code style="font-size:0.9rem; background:var(--bg-secondary); padding:4px 8px; border-radius:4px; margin-top:8px; display:inline-block; user-select:all">${escapeHtml(flash.key)}</code>
         <br><small style="color:var(--text-muted)">⚠️ Copy this key now — it won't be shown again.</small>` : ''}
       </div>
     ` : ''}
@@ -77,7 +77,7 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
                     ${k.active !== false ? `
                       <form method="POST" action="/admin/api/keys/${k.id}/revoke" style="display:inline">
                         <button type="submit" class="btn btn-danger" style="padding:4px 10px; font-size:0.72rem"
-                          onclick="return confirm('Revoke key ${escapeHtml(k.name)}?')">
+                          onclick="return confirm('Revoke key ' + ${JSON.stringify(escapeHtml(k.name))} + '?')">
                           Revoke
                         </button>
                       </form>

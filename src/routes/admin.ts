@@ -16,6 +16,21 @@ import { adminKeysPage } from '../ui/admin-keys'
 import { adminQueryPage } from '../ui/admin-query'
 import type { ApiKeyEntry } from '../scoring/types'
 
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  const encoder = new TextEncoder()
+  const aBuf = encoder.encode(a)
+  const bBuf = encoder.encode(b)
+  let result = 0
+  for (let i = 0; i < aBuf.length; i++) {
+    result |= aBuf[i] ^ bBuf[i]
+  }
+  return result === 0
+}
+
 const admin = new Hono<{ Bindings: Env }>()
 
 // ── Auth routes (unguarded) ─────────────────────────────────────────────────
@@ -33,18 +48,21 @@ admin.post('/auth/login', async (c) => {
   const body = await c.req.parseBody()
   const input = (body['secret'] as string || '').trim()
 
-  if (!input || input !== secret) {
+  // Constant-time comparison to prevent timing attacks
+  if (!input || input.length !== secret.length || !timingSafeEqual(input, secret)) {
     return c.html(adminLoginPage('Invalid secret. Please try again.'), 401)
   }
 
   // Valid — create session
+  const isSecure = new URL(c.req.url).protocol === 'https:'
   const session = await createSession(secret)
-  c.header('Set-Cookie', sessionCookieHeader(session.cookie, session.maxAge))
+  c.header('Set-Cookie', sessionCookieHeader(session.cookie, session.maxAge, isSecure))
   return c.redirect('/admin')
 })
 
 admin.get('/auth/logout', (c) => {
-  c.header('Set-Cookie', clearSessionCookieHeader())
+  const isSecure = new URL(c.req.url).protocol === 'https:'
+  c.header('Set-Cookie', clearSessionCookieHeader(isSecure))
   return c.redirect('/admin/auth/login')
 })
 
@@ -76,7 +94,11 @@ admin.get('/keys', async (c) => {
 admin.post('/api/keys', async (c) => {
   const body = await c.req.parseBody()
   const name = (body['name'] as string || '').trim()
-  const tier = (body['tier'] as string || 'free') as ApiKeyEntry['tier']
+  const rawTier = ((body['tier'] as string) || 'free').trim()
+  const allowedTiers: ApiKeyEntry['tier'][] = ['free', 'pro', 'enterprise']
+  const tier: ApiKeyEntry['tier'] = allowedTiers.includes(rawTier as ApiKeyEntry['tier'])
+    ? (rawTier as ApiKeyEntry['tier'])
+    : 'free'
 
   if (!name) {
     const store = new KVKeyStore(c.env.KEYS_KV)
@@ -122,7 +144,7 @@ admin.post('/api/query', async (c) => {
     const sql = (body.sql || '').trim()
 
     if (!sql) {
-      return c.json({ error: 'SQL query is required', columns: [], rows: [], rowCount: 0, timing: 0 })
+      return c.json({ error: 'SQL query is required', columns: [], rows: [], rowCount: 0, timing: 0 }, 400)
     }
 
     const result = await queryR2SQL(c.env, sql)
