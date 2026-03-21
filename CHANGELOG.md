@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [0.7.7] - 2026-03-21
 
 ### Fixed
-- iOS Safari: browser chrome (status bar, toolbar) now matches dark page background via `<meta name="theme-color">` on all pages
+- iOS Safari: page background now extends behind status bar and home indicator — moved safe-area padding from `body` to navbar/footer wrappers so bg fills edge-to-edge
+- iOS Safari: browser chrome color matches page via `<meta name="theme-color">` on all pages
+- CSP `img-src` now allows `https://isitalive.dev` — badge image was blocked on preview/staging domains
 - Landing page badge snippets overflowing viewport on mobile — added width constraints to snippet containers
 - Result page embed URLs hardened with `overflow-wrap: anywhere` for consistent wrapping
 

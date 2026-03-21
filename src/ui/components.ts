@@ -18,10 +18,10 @@ export const componentCss = `
     }
 
     /* ── iOS safe-area insets (notch, home indicator) ── */
+    /* Left/right on body for landscape; top/bottom on content wrappers
+       so the background extends edge-to-edge behind browser chrome. */
     body {
-      padding-top: env(safe-area-inset-top);
       padding-right: env(safe-area-inset-right);
-      padding-bottom: env(safe-area-inset-bottom);
       padding-left: env(safe-area-inset-left);
     }
 
@@ -40,6 +40,7 @@ export const componentCss = `
       align-items: center;
       justify-content: space-between;
       padding: 24px 0;
+      padding-top: calc(24px + env(safe-area-inset-top));
       position: relative;
       z-index: 10;
     }
@@ -79,6 +80,7 @@ export const componentCss = `
     .site-footer {
       text-align: center;
       padding: 80px 0 40px;
+      padding-bottom: calc(40px + env(safe-area-inset-bottom));
       color: var(--text-muted, #55556a);
       font-size: 0.78rem;
       position: relative;
