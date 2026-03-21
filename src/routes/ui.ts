@@ -302,13 +302,27 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 // Shortcut: /owner/repo → redirect to canonical /github/owner/repo
 ui.get('/:owner/:repo', async (c) => {
   const { owner, repo } = c.req.param()
+  if (!isValidParam(owner) || !isValidParam(repo)) {
+    return c.html(errorPage('Invalid repository path.'), 400)
+  }
   return c.redirect(`/github/${owner}/${repo}`, 301)
 })
 
 // Canonical: /github/owner/repo → renders result page
 ui.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param()
+  if (!isValidParam(owner) || !isValidParam(repo)) {
+    return c.html(errorPage('Invalid repository path.'), 400)
+  }
   return handleCheck(c, provider, owner, repo)
 })
+
+/**
+ * Validate URL path params — only allow valid GitHub-style identifiers.
+ * Blocks XSS / path-traversal payloads in owner/repo params.
+ */
+function isValidParam(value: string): boolean {
+  return /^[a-zA-Z0-9._-]+$/.test(value) && value.length <= 100
+}
 
 export { ui }

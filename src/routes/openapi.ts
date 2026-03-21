@@ -6,7 +6,7 @@ export const openApiSpec = {
   openapi: '3.1.0',
   info: {
     title: 'Is It Alive? API',
-    version: '0.4.0',
+    version: '0.7.2',
     description: 'Check if an open-source project is actively maintained. Returns a health score (0-100), verdict, and signal breakdown based on real-time GitHub data. Also supports manifest auditing — upload a go.mod or package.json to get a scored health report for all dependencies.',
     license: {
       name: 'AGPL-3.0',
@@ -297,7 +297,7 @@ export const openApiSpec = {
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
-        description: 'API key for higher rate limits. Pass as `Authorization: Bearer sk_your_key`. Without auth: 10 req/hr. Free key: 100/hr. Pro: 1,000/hr. Enterprise: 10,000/hr.',
+        description: 'API key for higher rate limits. Pass as `Authorization: Bearer sk_your_key`. Without auth: 60 req/min. Free key: 60/min. Pro: 120/min. Enterprise: 600/min.',
       },
     },
     schemas: {

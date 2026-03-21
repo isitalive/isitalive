@@ -250,6 +250,11 @@ export function apiDocsPage(analyticsToken?: string): string {
     @media (max-width: 640px) {
       .container { padding: 0 20px; }
       h1 { font-size: 1.6rem; }
+      .endpoint { padding: 16px; }
+      .field-item { flex-direction: column; gap: 4px; }
+      .field-name { min-width: unset; }
+      .params-table, .verdict-table, .tier-table { display: block; overflow-x: auto; }
+      .code-block { font-size: 0.68rem; padding: 14px; }
     }
   </style>
 </head>

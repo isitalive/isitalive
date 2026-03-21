@@ -196,6 +196,8 @@ export function methodologyPage(analyticsToken?: string): string {
       h1 { font-size: 1.5rem; }
       .signal-card { padding: 18px; }
       .verdict-section { grid-template-columns: repeat(2, 1fr); }
+      .scoring-table { display: block; overflow-x: auto; }
+      .note-box { padding: 12px 16px; }
     }
   </style>
 </head>

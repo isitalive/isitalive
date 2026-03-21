@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.2] - 2026-03-21
+
+### Security
+- HTML-escape all user-supplied values (`owner`, `repo`, metadata fields, signal labels/values) interpolated into result page HTML — prevents XSS via crafted URLs
+- Input validation on UI route params — reject non-alphanumeric `owner`/`repo` with 400 before any processing
+- SQL comment injection fix — `validateReadOnly()` now strips `--` and `/* */` comments before checking for blocked keywords
+- Added security response headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`
+- Scoped CORS `origin: '*'` to `/api/*` only — admin routes no longer have permissive CORS
+
+### Fixed
+- Rate limits in OpenAPI spec and llms.txt showing old per-hour values — updated to actual per-minute (60, 120, 600)
+- CI/CD signal weight in llms.txt showing 5% — corrected to actual 10%
+- OpenAPI spec version stuck at `0.4.0` — updated to `0.7.2`
+- `AGENTS.md` audit request body field listed as `"manifest"` — corrected to `"content"`
+- `AGENTS.md` anonymous rate limit listed as 30/min — corrected to 60/min
+- `/health` endpoint reporting stale version `0.4.0` — now returns `0.7.2`
+- Result page mobile: gauge too large, embed code overflowing, meta pills not wrapping
+- API docs mobile: field items not stacking, tables overflowing on small screens
+- Methodology page mobile: scoring tables overflowing on small screens
+
 ## [0.7.1] - 2026-03-21
 
 ### Fixed
