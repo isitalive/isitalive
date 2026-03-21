@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { Env } from '../scoring/types';
 import { parseManifest, type ManifestFormat } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
@@ -91,6 +92,11 @@ audit.post('/', async (c) => {
     });
     // Re-populate L1 edge cache for same-datacenter instant hits
     c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
+
+    // Emit usage events in background — parse cached JSON AFTER response
+    // is sent so it doesn't affect latency
+    c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
+
     return response;
   }
 
@@ -183,5 +189,41 @@ audit.post('/', async (c) => {
 
   return response;
 });
+
+/**
+ * Parse a cached audit result in the background and emit usage events.
+ * Called via waitUntil so it doesn't affect response latency.
+ */
+async function emitUsageFromCached(cachedJson: string, c: Context<{ Bindings: Env }>): Promise<void> {
+  try {
+    const result = JSON.parse(cachedJson)
+    const scoredDeps = (result.dependencies || []).filter(
+      (d: any) => d.score !== null && d.github,
+    )
+    if (scoredDeps.length === 0) return
+
+    const usageEvents = await Promise.all(
+      scoredDeps.map((d: any) => buildUsageEvent(
+        d.github,
+        'github',
+        d.score,
+        d.verdict,
+        {
+          source: 'audit',
+          apiKey: c.req.header('Authorization')?.replace('Bearer ', '') ?? 'anon',
+          cacheStatus: 'kv-hit',
+          responseTimeMs: 0,
+          cf: { country: (c.req.raw as any).cf?.country },
+          userAgent: c.req.header('User-Agent') ?? null,
+          ip: c.req.header('CF-Connecting-IP') ?? null,
+        },
+      )),
+    )
+
+    await emitAll(c.env, { usage: usageEvents })
+  } catch {
+    // Best effort — don't let usage event failures affect anything
+  }
+}
 
 export { audit };
