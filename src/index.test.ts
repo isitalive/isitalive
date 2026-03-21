@@ -44,27 +44,7 @@ describe('HTTP surface area hardening', () => {
     });
   });
 
-  it('rejects analytics beacons from lookalike origins', async () => {
-    const response = await app.fetch(
-      new Request('https://isitalive.dev/_view', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: 'https://isitalive.dev.evil.example',
-        },
-        body: JSON.stringify({ r: 'owner/repo', s: 75, v: 'stable' }),
-      }),
-      {} as any,
-      executionCtx,
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({ ok: false });
-  });
-
-  it('accepts analytics beacons from the real site origin', async () => {
-    const send = vi.fn().mockResolvedValue(undefined);
-
+  it('rejects POST to removed /_view endpoint', async () => {
     const response = await app.fetch(
       new Request('https://isitalive.dev/_view', {
         method: 'POST',
@@ -74,14 +54,11 @@ describe('HTTP surface area hardening', () => {
         },
         body: JSON.stringify({ r: 'owner/repo', s: 75, v: 'stable' }),
       }),
-      {
-        USAGE_PIPELINE: { send },
-      } as any,
+      {} as any,
       executionCtx,
     );
 
-    expect(response.status).toBe(202);
-    await expect(response.json()).resolves.toEqual({ ok: true });
-    expect(send).toHaveBeenCalledOnce();
+    // /_view no longer exists — analytics tracked via API
+    expect(response.status).toBe(404);
   });
 });

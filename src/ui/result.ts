@@ -1,187 +1,47 @@
 // ---------------------------------------------------------------------------
-// Result page HTML — shows score gauge, verdict, signal breakdown
+// Result page HTML — thin shell + client-side rendering from API
+//
+// Server renders <head> with OG tags (for social sharing / SEO).
+// Client JS fetches /api/check/github/:owner/:repo and renders the UI.
+// Analytics are tracked by the API call — no separate beacon needed.
 // ---------------------------------------------------------------------------
 
-import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
-import { navbarHtml, footerHtml, componentCss } from './components';
-import { escapeHtml } from './error';
-import { ogTags } from './og';
-import type { Trend } from '../ingest/processor';
+import { navbarHtml, footerHtml, componentCss } from './components'
+import { escapeHtml } from './error'
+import { ogTags } from './og'
 
-const VERDICT_COLORS: Record<Verdict, string> = {
-  healthy: '#22c55e',
-  stable: '#eab308',
-  degraded: '#f97316',
-  critical: '#ef4444',
-  unmaintained: '#6b7280',
-};
+/**
+ * Render a result page shell. OG tags are populated from optional cached data.
+ * If no cached data is available, generic OG tags are used.
+ */
+export function resultPage(
+  owner: string,
+  repo: string,
+  analyticsToken?: string,
+  ogData?: { score: number; verdict: string } | null,
+): string {
+  const safeOwner = escapeHtml(owner)
+  const safeRepo = escapeHtml(repo)
+  const encodedOwner = encodeURIComponent(owner)
+  const encodedRepo = encodeURIComponent(repo)
 
-const VERDICT_EMOJI: Record<Verdict, string> = {
-  healthy: '🟢',
-  stable: '🟡',
-  degraded: '🟠',
-  critical: '🔴',
-  unmaintained: '⚫',
-};
+  const badgeUrl = `https://isitalive.dev/api/badge/github/${encodedOwner}/${encodedRepo}`
+  const pageUrl = `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`
 
-const VERDICT_LABELS: Record<Verdict, string> = {
-  healthy: 'Healthy',
-  stable: 'Stable',
-  degraded: 'Degraded',
-  critical: 'Critical',
-  unmaintained: 'Unmaintained',
-};
-
-/** Normalize legacy verdict values from KV cache */
-const VERDICT_NORMALIZE: Record<string, Verdict> = {
-  declining: 'degraded',
-  inactive: 'degraded',
-  stale: 'degraded',
-  at_risk: 'critical',
-  dormant: 'critical',
-  abandoned: 'unmaintained',
-  maintained: 'stable',
-};
-function normalizeVerdict(v: string): Verdict {
-  return (VERDICT_NORMALIZE[v] as Verdict) || (v as Verdict);
-}
-
-function signalBar(score: number, color: string): string {
-  return `<div style="
-    width: 100%;
-    height: 6px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 3px;
-    overflow: hidden;
-  "><div style="
-    width: ${score}%;
-    height: 100%;
-    background: ${color};
-    border-radius: 3px;
-    transition: width 0.8s ease;
-  "></div></div>`;
-}
-
-function scoreColor(score: number): string {
-  if (score >= 80) return '#22c55e';
-  if (score >= 60) return '#eab308';
-  if (score >= 40) return '#f97316';
-  if (score >= 20) return '#ef4444';
-  return '#6b7280';
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-  return String(n);
-}
-
-function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, repo: string, firstIndexed?: string | null): string {
-  if (!meta) return '';
-
-  const pills: string[] = [];
-  const safeOwner = escapeHtml(owner);
-  const safeRepo = escapeHtml(repo);
-  const ghUrl = `https://github.com/${safeOwner}/${safeRepo}`;
-
-  // Language
-  if (meta.language) {
-    const dotColor = escapeHtml(meta.languageColor || '#8b8b9e');
-    pills.push(`<span class="meta-pill"><span class="lang-dot" style="background:${dotColor}"></span>${escapeHtml(meta.language)}</span>`);
-  }
-
-  // License
-  if (meta.license && meta.license !== 'NOASSERTION') {
-    pills.push(`<span class="meta-pill">© ${escapeHtml(meta.license)}</span>`);
-  }
-
-  // Website
-  if (meta.homepageUrl) {
-    const display = meta.homepageUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    pills.push(`<a class="meta-pill" href="${escapeHtml(meta.homepageUrl)}" target="_blank" rel="noopener">🌐 ${escapeHtml(display)}</a>`);
-  }
-
-  // Repo link
-  pills.push(`<a class="meta-pill" href="${ghUrl}" target="_blank" rel="noopener">GitHub</a>`);
-
-  // Stars & forks
-  pills.push(`<span class="meta-pill">⭐ ${formatNumber(meta.stars)}</span>`);
-  pills.push(`<span class="meta-pill">🍴 ${formatNumber(meta.forks)}</span>`);
-
-  // First indexed date
-  if (firstIndexed) {
-    const date = escapeHtml(firstIndexed.split('T')[0]);
-    pills.push(`<span class="meta-pill">📅 Tracking since ${date}</span>`);
-  }
-
-  return `
-    <section class="meta-card">
-      ${meta.description ? `<div class="meta-description">${escapeHtml(meta.description)}</div>` : ''}
-      <div class="meta-pills">
-        ${pills.join('\n        ')}
-      </div>
-    </section>`;
-}
-
-export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
-  const owner = escapeHtml(rawOwner);
-  const repo = escapeHtml(rawRepo);
-  const verdict = normalizeVerdict(result.verdict);
-  const color = VERDICT_COLORS[verdict];
-  const emoji = VERDICT_EMOJI[verdict];
-  const label = VERDICT_LABELS[verdict];
-  const dashOffset = 283 - (283 * result.score) / 100; // for SVG circle gauge
-
-  // Trend display
-  const TREND_ICONS: Record<string, string> = { improving: '↗', stable: '→', declining: '↘' };
-  const TREND_COLORS: Record<string, string> = { improving: '#22c55e', stable: '#8b8b9e', declining: '#ef4444' };
-  const TREND_LABELS: Record<string, string> = { improving: 'Improving', stable: 'Stable', declining: 'Declining' };
-
-  let trendHtml = '';
-  if (trend) {
-    if (trend.direction) {
-      const tIcon = TREND_ICONS[trend.direction];
-      const tColor = TREND_COLORS[trend.direction];
-      const tLabel = TREND_LABELS[trend.direction];
-      const deltaStr = trend.delta > 0 ? `+${trend.delta}` : `${trend.delta}`;
-      trendHtml = `<span class="trend-pill" style="color: ${tColor}; border-color: ${tColor}33">${tIcon} ${tLabel} <span class="trend-delta">${deltaStr} pts over ${trend.daySpan}d</span></span>`;
-    } else {
-      trendHtml = `<span class="trend-pill trend-collecting">📊 Collecting trend data (${trend.dataPoints} point${trend.dataPoints !== 1 ? 's' : ''}, need ${trend.minDaysRequired}d span)</span>`;
-    }
-  }
-
-  const signalsHtml = result.signals.map(s => `
-    <div class="signal-row">
-      <div class="signal-header">
-        <span class="signal-name">${escapeHtml(s.label)}</span>
-        <span class="signal-score" style="color: ${scoreColor(s.score)}">${s.score}</span>
-      </div>
-      <div class="signal-meta">
-        <span class="signal-value">${escapeHtml(String(s.value))}</span>
-        <span class="signal-weight">${Math.round(s.weight * 100)}% weight</span>
-      </div>
-      ${signalBar(s.score, scoreColor(s.score))}
-    </div>
-  `).join('');
-
-  const encodedOwner = encodeURIComponent(rawOwner);
-  const encodedRepo = encodeURIComponent(rawRepo);
-  const badgeUrl = `https://isitalive.dev/api/badge/github/${encodedOwner}/${encodedRepo}`;
-  const apiUrl = `https://isitalive.dev/api/check/github/${owner}/${repo}`;
-  const githubUrl = `https://github.com/${owner}/${repo}`;
+  // OG tags: use cached score/verdict if available, otherwise generic
+  const ogTitle = `${owner}/${repo} — Is It Alive?`
+  const ogDescription = ogData
+    ? `${owner}/${repo} health score: ${ogData.score}/100 (${ogData.verdict}). Checked by Is It Alive?`
+    : `Check the health of ${owner}/${repo} — Is It Alive?`
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>${owner}/${repo} — Is It Alive?</title>
-  <meta name="description" content="${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
-  ${ogTags({
-    title: `${rawOwner}/${rawRepo} — Is It Alive?`,
-    description: `${rawOwner}/${rawRepo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
-    url: `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`,
-    image: badgeUrl,
-  })}
+  <title>${safeOwner}/${safeRepo} — Is It Alive?</title>
+  <meta name="description" content="${escapeHtml(ogDescription)}">
+  ${ogTags({ title: ogTitle, description: ogDescription, url: pageUrl, image: badgeUrl })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
@@ -215,7 +75,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       pointer-events: none;
       z-index: 0;
     }
-    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, ${color}22 0%, transparent 70%); top: -150px; right: -100px; }
+    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%); top: -150px; right: -100px; }
     .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
@@ -225,8 +85,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       margin: 0 auto;
       padding: 0 24px;
     }
-
-
 
     /* ── Score Hero ───────────────────────── */
     .hero {
@@ -246,7 +104,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       border-bottom: 1px dashed rgba(255,255,255,0.15);
       transition: color 0.2s;
     }
-
     .project-name a:hover { color: var(--accent); }
 
     .gauge-container {
@@ -265,13 +122,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     .gauge-bg { stroke: rgba(255,255,255,0.06); }
     .gauge-fill {
-      stroke: ${color};
+      stroke: var(--text-muted);
       stroke-dasharray: 283;
-      stroke-dashoffset: ${dashOffset};
-      transition: stroke-dashoffset 1.2s ease-out;
+      stroke-dashoffset: 283;
+      transition: stroke-dashoffset 1.2s ease-out, stroke 0.5s ease;
       transform: rotate(-90deg);
       transform-origin: center;
-      /* drop-shadow removed for iOS perf — filter triggers software rendering */
     }
 
     .gauge-text {
@@ -286,8 +142,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       font-size: 2.8rem;
       font-weight: 800;
       letter-spacing: -0.03em;
-      color: ${color};
+      color: var(--text-muted);
       line-height: 1;
+      transition: color 0.5s ease;
     }
 
     .gauge-label {
@@ -300,16 +157,16 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: ${color}18;
-      border: 1px solid ${color}30;
-      color: ${color};
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-muted);
       padding: 8px 20px;
       border-radius: 99px;
       font-size: 0.9rem;
       font-weight: 600;
+      transition: all 0.5s ease;
     }
 
-    ${result.overrideReason ? `
     .override-notice {
       margin-top: 16px;
       background: rgba(239,68,68,0.08);
@@ -319,15 +176,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       border-radius: 12px;
       font-size: 0.82rem;
     }
-    ` : ''}
 
-    ${result.cached ? `
     .cache-notice {
       margin-top: 10px;
       font-size: 0.72rem;
       color: var(--text-muted);
     }
-    ` : ''}
 
     /* ── Signals ─────────────────────────── */
     .signals {
@@ -348,7 +202,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .signal-row {
       margin-bottom: 20px;
     }
-
     .signal-row:last-child { margin-bottom: 0; }
 
     .signal-header {
@@ -392,10 +245,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       color: var(--text-secondary);
     }
 
-    .embed-row {
-      margin-bottom: 16px;
-    }
-
+    .embed-row { margin-bottom: 16px; }
     .embed-row:last-child { margin-bottom: 0; }
 
     .embed-label {
@@ -420,10 +270,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       transition: border-color 0.2s;
       position: relative;
     }
-
-    .embed-code:hover {
-      border-color: var(--accent);
-    }
+    .embed-code:hover { border-color: var(--accent); }
 
     .embed-code .copy-hint {
       position: absolute;
@@ -435,7 +282,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       opacity: 0;
       transition: opacity 0.2s;
     }
-
     .embed-code:hover .copy-hint { opacity: 1; }
 
     /* ── Metadata Card ──────────────────── */
@@ -474,7 +320,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       text-decoration: none;
       transition: border-color 0.2s, color 0.2s;
     }
-
     a.meta-pill:hover {
       border-color: var(--accent);
       color: var(--text-primary);
@@ -509,6 +354,50 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       font-weight: 400;
     }
 
+    /* ── Loading skeleton ──────────────── */
+    .skeleton {
+      animation: shimmer 1.5s infinite;
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      border-radius: 8px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton-signal {
+      height: 70px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+    }
+
+    /* ── Error state ────────────────────── */
+    .error-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .error-state .error-icon { font-size: 3rem; margin-bottom: 16px; }
+    .error-state .error-message {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+    .error-state .retry-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 28px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .error-state .retry-btn:hover { background: #5558e6; }
+
     @media (max-width: 640px) {
       .hero { padding: 24px 0 36px; }
       .signals, .embed-section, .meta-card { padding: 20px; }
@@ -531,80 +420,250 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     <section class="hero">
       <div class="project-name">
-        <a href="${githubUrl}" target="_blank" rel="noopener">${owner}/${repo}</a>
+        <a href="https://github.com/${safeOwner}/${safeRepo}" target="_blank" rel="noopener">${safeOwner}/${safeRepo}</a>
       </div>
 
       <div class="gauge-container">
         <svg viewBox="0 0 100 100">
           <circle class="gauge-bg" cx="50" cy="50" r="45" fill="none" stroke-width="8"/>
-          <circle class="gauge-fill" cx="50" cy="50" r="45" fill="none" stroke-width="8" stroke-linecap="round"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="50" cy="50" r="45" fill="none" stroke-width="8" stroke-linecap="round"/>
         </svg>
         <div class="gauge-text">
-          <div class="gauge-score">${result.score}</div>
+          <div class="gauge-score" id="gaugeScore">—</div>
           <div class="gauge-label">/ 100</div>
         </div>
       </div>
 
-      <div>
-        <span class="verdict-badge">${emoji} ${label}</span>
-        ${trendHtml}
+      <div id="verdictArea">
+        <span class="verdict-badge" id="verdictBadge">Loading…</span>
       </div>
-
-      ${result.overrideReason ? `<div class="override-notice">⚠️ ${escapeHtml(result.overrideReason)}</div>` : ''}
-      ${result.cached ? `<div class="cache-notice">Cached result · checked <time datetime="${escapeHtml(result.checkedAt)}" id="checkedTime">${escapeHtml(result.checkedAt.split('T')[0])}</time></div>` : ''}
+      <div id="overrideArea"></div>
+      <div id="cacheArea"></div>
     </section>
 
-    ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
-
-    ${result.signals.length > 0 ? `
-    <section class="signals">
-      <h2>Signal Breakdown</h2>
-      ${signalsHtml}
-    </section>
-    ` : ''}
-
-    <section class="embed-section">
-      <h2>Use It</h2>
-
-      <div class="embed-row">
-        <div class="embed-label">Badge (Markdown)</div>
-        <div class="embed-code" onclick="copyText(this)" data-text="![Is It Alive?](${badgeUrl})">
-          ![Is It Alive?](${badgeUrl})
-          <span class="copy-hint">click to copy</span>
+    <div id="metaArea">
+      <!-- Skeleton for metadata -->
+      <section class="meta-card">
+        <div class="skeleton" style="height: 20px; width: 80%; margin-bottom: 16px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="skeleton" style="height: 28px; width: 70px;"></div>
+          <div class="skeleton" style="height: 28px; width: 90px;"></div>
+          <div class="skeleton" style="height: 28px; width: 60px;"></div>
         </div>
-      </div>
+      </section>
+    </div>
 
-      <div class="embed-row">
-        <div class="embed-label">API Endpoint</div>
-        <div class="embed-code" onclick="copyText(this)" data-text="${apiUrl}">
-          GET ${apiUrl}
-          <span class="copy-hint">click to copy</span>
-        </div>
-      </div>
+    <div id="signalsArea">
+      <!-- Skeleton for signals -->
+      <section class="signals">
+        <h2>Signal Breakdown</h2>
+        <div class="skeleton skeleton-signal"></div>
+        <div class="skeleton skeleton-signal"></div>
+        <div class="skeleton skeleton-signal"></div>
+        <div class="skeleton skeleton-signal"></div>
+      </section>
+    </div>
 
-      <div class="embed-row">
-        <div class="embed-label">cURL</div>
-        <div class="embed-code" onclick="copyText(this)" data-text="curl -s ${apiUrl} | jq">
-          curl -s ${apiUrl} | jq
-          <span class="copy-hint">click to copy</span>
+    <div id="embedArea" style="display:none">
+      <section class="embed-section">
+        <h2>Use It</h2>
+        <div class="embed-row">
+          <div class="embed-label">Badge (Markdown)</div>
+          <div class="embed-code" onclick="copyText(this)" id="embedBadge">
+            <span class="copy-hint">click to copy</span>
+          </div>
         </div>
-      </div>
-    </section>
+        <div class="embed-row">
+          <div class="embed-label">API Endpoint</div>
+          <div class="embed-code" onclick="copyText(this)" id="embedApi">
+            <span class="copy-hint">click to copy</span>
+          </div>
+        </div>
+        <div class="embed-row">
+          <div class="embed-label">cURL</div>
+          <div class="embed-code" onclick="copyText(this)" id="embedCurl">
+            <span class="copy-hint">click to copy</span>
+          </div>
+        </div>
+      </section>
+    </div>
 
   </div>
 
   ${footerHtml}
 
   <script>
+    // ── Config (injected by server) ─────────────────────────────────────
+    var OWNER = '${owner.replace(/'/g, "\\'")}';
+    var REPO = '${repo.replace(/'/g, "\\'")}';
+    var API_URL = '/api/check/github/' + encodeURIComponent(OWNER) + '/' + encodeURIComponent(REPO);
+
+    // ── Color helpers ───────────────────────────────────────────────────
+    var VERDICT_COLORS = { healthy:'#22c55e', stable:'#eab308', degraded:'#f97316', critical:'#ef4444', unmaintained:'#6b7280' };
+    var VERDICT_EMOJI = { healthy:'🟢', stable:'🟡', degraded:'🟠', critical:'🔴', unmaintained:'⚫' };
+    var VERDICT_LABELS = { healthy:'Healthy', stable:'Stable', degraded:'Degraded', critical:'Critical', unmaintained:'Unmaintained' };
+    var VERDICT_NORMALIZE = { declining:'degraded', inactive:'degraded', stale:'degraded', at_risk:'critical', dormant:'critical', abandoned:'unmaintained', maintained:'stable' };
+
+    function scoreColor(s) {
+      if (s >= 80) return '#22c55e';
+      if (s >= 60) return '#eab308';
+      if (s >= 40) return '#f97316';
+      if (s >= 20) return '#ef4444';
+      return '#6b7280';
+    }
+
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function fmtNum(n) {
+      return n >= 1000 ? (n / 1000).toFixed(1).replace(/\\.0$/, '') + 'k' : String(n);
+    }
+
+    // ── Fetch + Render ──────────────────────────────────────────────────
+    fetch(API_URL)
+      .then(function(r) {
+        if (!r.ok) throw new Error(r.status === 404 ? 'Project not found' : 'Failed to fetch');
+        return r.json();
+      })
+      .then(function(data) {
+        var verdict = VERDICT_NORMALIZE[data.verdict] || data.verdict;
+        var color = VERDICT_COLORS[verdict] || '#6b7280';
+        var emoji = VERDICT_EMOJI[verdict] || '⚫';
+        var label = VERDICT_LABELS[verdict] || verdict;
+
+        // Update background orb color
+        document.querySelector('.bg-orb-1').style.background =
+          'radial-gradient(circle, ' + color + '22 0%, transparent 70%)';
+
+        // Animate gauge
+        var dashOffset = 283 - (283 * data.score) / 100;
+        var fill = document.getElementById('gaugeFill');
+        fill.style.stroke = color;
+        fill.style.strokeDashoffset = dashOffset;
+
+        var scoreEl = document.getElementById('gaugeScore');
+        scoreEl.textContent = data.score;
+        scoreEl.style.color = color;
+
+        // Verdict badge
+        var badge = document.getElementById('verdictBadge');
+        badge.textContent = emoji + ' ' + label;
+        badge.style.background = color + '18';
+        badge.style.borderColor = color + '30';
+        badge.style.color = color;
+
+        // Override reason
+        if (data.overrideReason) {
+          document.getElementById('overrideArea').innerHTML =
+            '<div class="override-notice">⚠️ ' + esc(data.overrideReason) + '</div>';
+        }
+
+        // Cache notice
+        if (data.cached) {
+          var d = new Date(data.checkedAt);
+          var fmt = d.toLocaleString(undefined, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+          document.getElementById('cacheArea').innerHTML =
+            '<div class="cache-notice">Cached result · checked ' + fmt + '</div>';
+        }
+
+        // Metadata card
+        var meta = data.metadata;
+        if (meta) {
+          var pills = [];
+          var ghUrl = 'https://github.com/' + esc(OWNER) + '/' + esc(REPO);
+
+          if (meta.language) {
+            var dotColor = meta.languageColor || '#8b8b9e';
+            pills.push('<span class="meta-pill"><span class="lang-dot" style="background:' + esc(dotColor) + '"></span>' + esc(meta.language) + '</span>');
+          }
+          if (meta.license && meta.license !== 'NOASSERTION') {
+            pills.push('<span class="meta-pill">© ' + esc(meta.license) + '</span>');
+          }
+          if (meta.homepageUrl) {
+            var display = meta.homepageUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');
+            pills.push('<a class="meta-pill" href="' + esc(meta.homepageUrl) + '" target="_blank" rel="noopener">🌐 ' + esc(display) + '</a>');
+          }
+          pills.push('<a class="meta-pill" href="' + ghUrl + '" target="_blank" rel="noopener">GitHub</a>');
+          pills.push('<span class="meta-pill">⭐ ' + fmtNum(meta.stars) + '</span>');
+          pills.push('<span class="meta-pill">🍴 ' + fmtNum(meta.forks) + '</span>');
+
+          document.getElementById('metaArea').innerHTML =
+            '<section class="meta-card">' +
+            (meta.description ? '<div class="meta-description">' + esc(meta.description) + '</div>' : '') +
+            '<div class="meta-pills">' + pills.join('') + '</div>' +
+            '</section>';
+        } else {
+          document.getElementById('metaArea').innerHTML = '';
+        }
+
+        // Signals
+        if (data.signals && data.signals.length) {
+          var html = '<section class="signals"><h2>Signal Breakdown</h2>';
+          data.signals.forEach(function(s) {
+            var sc = scoreColor(s.score);
+            html += '<div class="signal-row">' +
+              '<div class="signal-header">' +
+              '<span class="signal-name">' + esc(s.label) + '</span>' +
+              '<span class="signal-score" style="color:' + sc + '">' + s.score + '</span>' +
+              '</div>' +
+              '<div class="signal-meta">' +
+              '<span class="signal-value">' + esc(String(s.value)) + '</span>' +
+              '<span class="signal-weight">' + Math.round(s.weight * 100) + '% weight</span>' +
+              '</div>' +
+              '<div style="width:100%;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">' +
+              '<div style="width:' + s.score + '%;height:100%;background:' + sc + ';border-radius:3px;transition:width 0.8s ease"></div>' +
+              '</div></div>';
+          });
+          html += '</section>';
+          document.getElementById('signalsArea').innerHTML = html;
+        } else {
+          document.getElementById('signalsArea').innerHTML = '';
+        }
+
+        // Embed section
+        var badgeUrl = 'https://isitalive.dev/api/badge/github/' + encodeURIComponent(OWNER) + '/' + encodeURIComponent(REPO);
+        var apiUrl = 'https://isitalive.dev' + API_URL;
+        var embedBadge = document.getElementById('embedBadge');
+        var embedApi = document.getElementById('embedApi');
+        var embedCurl = document.getElementById('embedCurl');
+
+        var badgeText = '![Is It Alive?](' + badgeUrl + ')';
+        embedBadge.setAttribute('data-text', badgeText);
+        embedBadge.insertBefore(document.createTextNode(badgeText), embedBadge.firstChild);
+
+        var apiText = apiUrl;
+        embedApi.setAttribute('data-text', apiText);
+        embedApi.insertBefore(document.createTextNode('GET ' + apiText), embedApi.firstChild);
+
+        var curlText = 'curl -s ' + apiUrl + ' | jq';
+        embedCurl.setAttribute('data-text', curlText);
+        embedCurl.insertBefore(document.createTextNode(curlText), embedCurl.firstChild);
+
+        document.getElementById('embedArea').style.display = '';
+      })
+      .catch(function(err) {
+        var msg = err.message || 'Something went wrong';
+        document.querySelector('.container').innerHTML =
+          '<section class="error-state">' +
+          '<div class="error-icon">💀</div>' +
+          '<div class="error-message">' + esc(msg) + '</div>' +
+          '<button class="retry-btn" onclick="location.reload()">Try Again</button>' +
+          '</section>';
+      });
+
+    // ── Copy helper ─────────────────────────────────────────────────────
     function copyText(el) {
-      const text = el.getAttribute('data-text');
-      navigator.clipboard.writeText(text).then(() => {
-        const hint = el.querySelector('.copy-hint');
+      var text = el.getAttribute('data-text');
+      navigator.clipboard.writeText(text).then(function() {
+        var hint = el.querySelector('.copy-hint');
         if (hint) {
           hint.textContent = 'copied!';
           hint.style.opacity = '1';
           hint.style.color = '#22c55e';
-          setTimeout(() => {
+          setTimeout(function() {
             hint.textContent = 'click to copy';
             hint.style.color = '';
             hint.style.opacity = '';
@@ -612,27 +671,8 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         }
       });
     }
-    // Localize the checked-at time to user's timezone
-    const timeEl = document.getElementById('checkedTime');
-    if (timeEl) {
-      const d = new Date(timeEl.getAttribute('datetime'));
-      timeEl.textContent = d.toLocaleString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-      });
-    }
-  </script>
-  <script>
-    // Track real page views via sendBeacon — only fires in real browsers
-    try {
-      navigator.sendBeacon('/_view', JSON.stringify({
-        r: '${rawOwner}/${rawRepo}',
-        s: ${result.score},
-        v: '${result.verdict}',
-      }));
-    } catch(e) {}
   </script>
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
-</html>`;
+</html>`
 }

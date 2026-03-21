@@ -53,6 +53,18 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const cachedResponse = await cache.match(cacheKey)
   if (cachedResponse) {
     console.log(`⚡ Cache HIT for: ${c.req.url}`)
+    // Track edge-cached requests so we know what repos get queried
+    c.executionCtx.waitUntil(
+      buildUsageEvent(`${owner}/${repo}`, provider, 0, 'unknown', {
+        source: 'api',
+        apiKey: c.get('keyName') ?? 'anon',
+        cacheStatus: 'edge-hit',
+        responseTimeMs: 0,
+        cf: (c.req.raw as any).cf,
+        userAgent: c.req.header('User-Agent') ?? null,
+        ip: null,
+      }).then(ue => emitAll(c.env, { usage: [ue] })),
+    )
     return cachedResponse
   }
 

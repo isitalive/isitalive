@@ -3,15 +3,16 @@
 //
 // Turnstile protects the search form submission (POST /_check).
 // Direct URL visits (GET /:owner/:repo) are not gated — they're shareable
-// links and always hit cache. The POST form submission is what triggers
-// fresh GitHub API calls.
+// links and always hit cache.
+//
+// Result pages are thin HTML shells — the client fetches data from the API.
+// Analytics are tracked by the API call, not by the UI routes.
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
-import { providers, revalidateInBackground } from '../providers/index'
-import { scoreProject } from '../scoring/engine'
-import { getCached, putCache, getFirstSeen } from '../cache/index'
+import { providers } from '../providers/index'
+import { getCached } from '../cache/index'
 import { landingPage } from '../ui/landing'
 import { resultPage } from '../ui/result'
 import { errorPage } from '../ui/error'
@@ -19,36 +20,14 @@ import { methodologyPage } from '../ui/methodology'
 import { termsPage } from '../ui/terms'
 import { changelogPage } from '../ui/changelog'
 import { verifyTurnstile } from '../middleware/turnstile'
-import { getRecentQueries, trackRecentQuery } from '../cache/recentQueries'
+import { getRecentQueries } from '../cache/recentQueries'
 import { getTrending, getSitemapRepos } from '../cron/handler'
 import { trendingPage } from '../ui/trending'
 import { parseChangelog as parseChangelogMd } from '../changelog/parser'
 import changelogMd from '../../CHANGELOG.md'
-import { getScoreHistory, computeTrend } from '../ingest/processor'
 import { apiDocsPage } from '../ui/api-docs'
-import { buildPageViewUsageEvent, buildUsageEvent, type UsageContext } from '../events/usage'
-import { buildResultEvent } from '../events/result'
-import { buildProviderEvent } from '../events/provider'
-import { emitAll } from '../pipeline/emit'
 
 const ui = new Hono<{ Bindings: Env }>()
-
-
-
-const allowedViewHosts = new Set(['isitalive.dev', 'www.isitalive.dev', 'localhost', '127.0.0.1', '[::1]'])
-
-function hasAllowedViewOrigin(originHeader: string): boolean {
-  if (!originHeader) {
-    return false
-  }
-
-  try {
-    const { hostname } = new URL(originHeader)
-    return allowedViewHosts.has(hostname)
-  } catch {
-    return false
-  }
-}
 
 // Sitemap — dynamic XML based on top repos
 ui.get('/sitemap.xml', async (c) => {
@@ -94,36 +73,6 @@ ui.get('/api/recent', async (c) => {
   const recent = await getRecentQueries(c.env.CACHE_KV)
   c.header('Cache-Control', 'public, max-age=10, s-maxage=10')
   return c.json(recent)
-})
-
-// Page view beacon — client-side tracking (only real browser page loads)
-ui.post('/_view', async (c) => {
-  // Origin check — reject requests not from our domain
-  const origin = c.req.header('Origin') || c.req.header('Referer') || ''
-  if (!hasAllowedViewOrigin(origin)) {
-    return c.json({ ok: false }, 403)
-  }
-
-  try {
-    const body = await c.req.json() as { r?: string; s?: number; v?: string }
-    const repoSlug = body.r
-    if (!repoSlug || typeof repoSlug !== 'string' || !repoSlug.includes('/')) {
-      return c.json({ ok: false }, 400)
-    }
-
-    const [owner, repo] = repoSlug.split('/')
-    const score = typeof body.s === 'number' ? body.s : 0
-    const verdict = typeof body.v === 'string' ? body.v : 'unknown'
-
-    // Pipeline: usage event for page view
-    c.executionCtx.waitUntil(
-      emitAll(c.env, { usage: [buildPageViewUsageEvent('github', owner, repo, score, verdict)] }),
-    )
-
-    return c.json({ ok: true }, 202)
-  } catch {
-    return c.json({ ok: false }, 400)
-  }
 })
 
 // Methodology page — static per deploy
@@ -212,99 +161,31 @@ ui.post('/_check', verifyTurnstile, async (c) => {
   return c.redirect('/')
 })
 
-// Shared handler for fetching + rendering a result page
+// ---------------------------------------------------------------------------
+// Result page — thin HTML shell, client-side rendered from API
+//
+// The shell has correct OG tags for social sharing. If we have cached data
+// in KV, we use the score/verdict for OG description. Otherwise, generic.
+// The client JS fetches /api/check/github/:owner/:repo for the actual data.
+// ---------------------------------------------------------------------------
 async function handleCheck(c: any, provider: string, owner: string, repo: string) {
-  const startTime = Date.now()
-
-  // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
-  const cache = caches.default
-  // Use a pristine request object to avoid poisoning cache with auth headers
-  const cacheKey = new Request(c.req.url)
-
-  const cachedResponse = await cache.match(cacheKey)
-  if (cachedResponse) {
-    console.log(`⚡ Cache HIT for: ${c.req.url}`)
-    // Page views are tracked client-side via sendBeacon → /_view
-    return cachedResponse
-  }
-
-  console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`)
-
   if (!Object.hasOwn(providers, provider)) {
     return c.html(errorPage(`Unsupported provider: ${provider}`), 400)
   }
 
-  const buildUsageCtx = (cacheStatus: string): UsageContext => ({
-    source: 'browser',
-    apiKey: 'anon',
-    cacheStatus,
-    responseTimeMs: Date.now() - startTime,
-    cf: (c.req.raw as any).cf,
-    userAgent: c.req.header('User-Agent') ?? null,
-    ip: null,
-  })
-
+  // Quick KV lookup for OG tag data (optional — if miss, we use generic text)
+  let ogData: { score: number; verdict: string } | null = null
   try {
-    const { result: cached, status } = await getCached(c.env, provider, owner, repo)
-
-    if (cached && (status === 'l1-hit' || status === 'hit' || status === 'stale')) {
-      if (status === 'stale') {
-        c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo))
-      }
-      const usageCtx = buildUsageCtx(status)
-      c.executionCtx.waitUntil(Promise.all([
-        // Direct KV write for recent queries (landing page)
-        trackRecentQuery(c.env.CACHE_KV, {
-          owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
-        }),
-        // Pipeline events
-        buildUsageEvent(`${owner}/${repo}`, provider, cached.score, cached.verdict, usageCtx)
-          .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached, 'browser')] })),
-      ]))
-      const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
-      const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
-      const trend = computeTrend(history)
-      const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
-      c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
-      return response
+    const { result } = await getCached(c.env, provider, owner, repo)
+    if (result) {
+      ogData = { score: result.score, verdict: result.verdict }
     }
-
-    const prov = providers[provider as keyof typeof providers]
-    const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN)
-    const result = scoreProject(rawData, prov.name)
-
-    const usageCtx = buildUsageCtx('miss')
-    c.executionCtx.waitUntil(Promise.all([
-      putCache(c.env, provider, owner, repo, result),
-      // Direct KV write for recent queries (landing page)
-      trackRecentQuery(c.env.CACHE_KV, {
-        owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
-      }),
-      // Pipeline events
-      buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, {
-          usage: [ue],
-          result: [buildResultEvent(result, 'browser')],
-          provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
-        })),
-    ]))
-
-    const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
-    const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
-    const trend = computeTrend(history)
-    
-    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
-    const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
-
-    return response
-  } catch (err: any) {
-    c.header('Cache-Control', 'public, max-age=300')
-    const isNotFound = err.message?.includes('not found')
-    const status = isNotFound ? 404 : 502
-    const message = isNotFound ? 'Project not found' : 'Failed to fetch project data. Please try again later.'
-    return c.html(errorPage(message), status)
+  } catch {
+    // KV miss or error — no problem, shell renders with generic OG tags
   }
+
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  return c.html(resultPage(owner, repo, c.env.CF_ANALYTICS_TOKEN, ogData))
 }
 
 // Shortcut: /owner/repo → redirect to canonical /github/owner/repo
@@ -316,7 +197,7 @@ ui.get('/:owner/:repo', async (c) => {
   return c.redirect(`/github/${owner}/${repo}`, 301)
 })
 
-// Canonical: /github/owner/repo → renders result page
+// Canonical: /github/owner/repo → renders result page shell
 ui.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param()
   if (!isValidParam(owner) || !isValidParam(repo)) {
