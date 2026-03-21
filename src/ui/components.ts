@@ -13,6 +13,10 @@ export const componentCss = `
     /* Removed html/body overflow-x: hidden because it breaks iOS Safari viewport-fit=cover */
 
     /* ── iOS safe-area: dark bg extends behind browser chrome ── */
+    :root {
+      color-scheme: dark;
+    }
+    
     html {
       background: var(--bg-primary, #0a0a0f);
     }

@@ -9,6 +9,7 @@ export function errorPage(message: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0f">
+  <meta name="color-scheme" content="dark">
   <title>Error — Is It Alive?</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +20,7 @@ export function errorPage(message: string): string {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: #0a0a0f;
       color: #e8e8ed;
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;

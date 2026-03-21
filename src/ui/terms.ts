@@ -105,6 +105,7 @@ export function termsPage(analyticsToken?: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0f">
+  <meta name="color-scheme" content="dark">
   <title>Terms of Service — Is It Alive?</title>
   <meta name="description" content="Terms of Service for isitalive.dev — open-source project health checker.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,7 +131,7 @@ export function termsPage(analyticsToken?: string): string {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
-      min-height: 100vh;
+      min-height: 100dvh;
       line-height: 1.6;
     }
 

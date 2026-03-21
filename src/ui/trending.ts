@@ -40,7 +40,7 @@ export function trendingPage(analyticsToken?: string): string {
       background: var(--bg);
       color: var(--text-primary);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
+      min-height: 100dvh;
     }
 
     .bg-orb {

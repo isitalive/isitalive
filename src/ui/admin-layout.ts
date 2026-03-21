@@ -31,6 +31,7 @@ export function adminLayout(opts: AdminLayoutOpts): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0a0a0f">
+  <meta name="color-scheme" content="dark">
   <title>${title} — IsItAlive Admin</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -66,14 +67,14 @@ export function adminLayout(opts: AdminLayoutOpts): string {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
     }
 
     /* ── Sidebar ──────────────────────────── */
     .admin-sidebar {
       width: var(--sidebar-width);
-      min-height: 100vh;
+      min-height: 100dvh;
       background: var(--bg-secondary);
       border-right: 1px solid var(--border);
       padding: 24px 0;

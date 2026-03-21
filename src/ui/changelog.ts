@@ -45,7 +45,7 @@ export function changelogPage(analyticsToken?: string): string {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
-      min-height: 100vh;
+      min-height: 100dvh;
       line-height: 1.6;
     }
 

@@ -206,7 +206,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
-      min-height: 100vh;
+      min-height: 100dvh;
     }
 
     .bg-orb {

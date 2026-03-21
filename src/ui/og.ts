@@ -29,6 +29,7 @@ export function ogTags(meta: OgMeta): string {
 
   const lines: string[] = [
     `<meta name="theme-color" content="#0a0a0f">`,
+    `<meta name="color-scheme" content="dark">`,
     `<meta property="og:type" content="${type}">`,
     `<meta property="og:title" content="${t}">`,
     `<meta property="og:description" content="${d}">`,
@@ -42,7 +43,7 @@ export function ogTags(meta: OgMeta): string {
 
   if (meta.image) {
     const img = escapeHtml(meta.image)
-    lines.splice(6, 0, `<meta property="og:image" content="${img}">`)
+    lines.splice(7, 0, `<meta property="og:image" content="${img}">`)
     lines.push(`<meta name="twitter:image" content="${img}">`)
   }
 
