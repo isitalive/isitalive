@@ -134,7 +134,7 @@ async function resolveGo(dep: ParsedDep): Promise<ResolvedDep> {
 }
 
 /** gopkg.in/yaml.v3 → go-yaml/yaml, gopkg.in/check.v1 → go-check/check */
-function resolveGopkgIn(name: string): { owner: string; repo: string } | null {
+export function resolveGopkgIn(name: string): { owner: string; repo: string } | null {
   // gopkg.in/{owner}/{repo}.vN or gopkg.in/{repo}.vN
   const path = name.replace('gopkg.in/', '');
   const parts = path.split('/');
@@ -153,7 +153,7 @@ function resolveGopkgIn(name: string): { owner: string; repo: string } | null {
 }
 
 /** google.golang.org/grpc → grpc/grpc-go, etc. */
-function resolveGoogleGolang(name: string): { owner: string; repo: string } | null {
+export function resolveGoogleGolang(name: string): { owner: string; repo: string } | null {
   const known: Record<string, { owner: string; repo: string }> = {
     'google.golang.org/grpc': { owner: 'grpc', repo: 'grpc-go' },
     'google.golang.org/protobuf': { owner: 'protocolbuffers', repo: 'protobuf-go' },
@@ -272,7 +272,7 @@ async function resolveNpm(dep: ParsedDep): Promise<ResolvedDep> {
 }
 
 /** Extract GitHub owner/repo from various URL formats */
-function extractGitHub(url: string): { owner: string; repo: string } | null {
+export function extractGitHub(url: string): { owner: string; repo: string } | null {
   // Handles:
   //   https://github.com/owner/repo
   //   git+https://github.com/owner/repo.git
