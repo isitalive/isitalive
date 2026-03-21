@@ -18,5 +18,6 @@ export default defineConfig({
   ],
   test: {
     setupFiles: ['./src/test-setup.ts'],
+    testTimeout: 30_000, // fuzz job runs FC_NUM_RUNS=10000; default 5s is too tight
   },
 });

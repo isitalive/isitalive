@@ -266,22 +266,27 @@ describe('parseGoMod fuzz', () => {
 
 // ── Fuzz: parsePackageJson never throws on valid JSON (fast-check) ────
 describe('parsePackageJson fuzz', () => {
-  const depMapArb = fc.dictionary(
-    fc.stringMatching(/^@?[a-z][a-z0-9._-]{0,30}(\/[a-z][a-z0-9._-]{0,30})?$/),
-    fc.oneof(
-      fc.stringMatching(/^\^?\d{1,3}\.\d{1,3}\.\d{1,3}$/),
-      fc.constant('*'),
-      fc.constant('latest'),
-    ),
-  )
+  // Use fc.array of tuples instead of fc.dictionary to avoid its slow
+  // uniqueArray internals + shrinking that cause seed-dependent timeouts.
+  // Plain fc.string is fine — the parser accepts any JSON object shape.
+  const depMapArb = fc
+    .array(
+      fc.tuple(
+        fc.string({ minLength: 1, maxLength: 20 }),
+        fc.string({ maxLength: 10 }),
+      ),
+      { maxLength: 10 },
+    )
+    .map((pairs) => Object.fromEntries(pairs))
 
   const packageJsonArb = fc.record({
-    name: fc.option(fc.string(), { nil: undefined }),
-    version: fc.option(fc.string(), { nil: undefined }),
+    name: fc.option(fc.string({ maxLength: 50 }), { nil: undefined }),
+    version: fc.option(fc.string({ maxLength: 20 }), { nil: undefined }),
     dependencies: fc.option(depMapArb, { nil: undefined }),
     devDependencies: fc.option(depMapArb, { nil: undefined }),
   })
 
+  // Timeout set to 30s — the CI fuzz job runs 10k iterations (FC_NUM_RUNS=10000)
   test.prop([packageJsonArb])('never throws on valid package.json objects', (pkg) => {
     const content = JSON.stringify(pkg)
     expect(() => parsePackageJson(content)).not.toThrow()
@@ -295,7 +300,7 @@ describe('parsePackageJson fuzz', () => {
     }
   })
 
-  test.prop([fc.string()])('never throws on arbitrary string (may throw on non-JSON)', (input) => {
+  test.prop([fc.string({ maxLength: 200 })])('never throws on arbitrary string (may throw on non-JSON)', (input) => {
     try {
       const deps = parsePackageJson(input)
       for (const dep of deps) {
