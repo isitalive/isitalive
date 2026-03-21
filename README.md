@@ -61,4 +61,3 @@ See [AGENTS.md](./AGENTS.md) for instructions on using isitalive programmaticall
 ## License
 
 [AGPL-3.0](./LICENSE)
-
