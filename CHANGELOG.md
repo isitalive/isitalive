@@ -6,15 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [0.7.6] - 2026-03-21
 
+### Added
+- Property-based fuzzing via `fast-check` — replaces hand-rolled mulberry32 PRNG loops with typed arbitraries and automatic shrinking
+- 4 new fuzz test files: scoring engine, audit resolvers, R2 SQL injection resistance, webhook HMAC verification
+- `npm run test:fuzz` script for extended runs (10k iterations, configurable via `FC_NUM_RUNS`)
+- CI `fuzz` job runs property-based tests on every PR and push to main
+- Infinite scroll on trending page — auto-loads more entries when near page bottom (matching changelog pattern)
+
+### Changed
+- 3 existing fuzz tests upgraded from manual loops to `test.prop()` with structured arbitraries (`parsers.test.ts`, `changelog/parser.test.ts`, `r2sql.test.ts`)
+
 ### Fixed
 - iOS safe area: content now flows around notch and home indicator on all pages (`viewport-fit=cover` + `env(safe-area-inset-*)` padding)
 - Landing page badge snippets overflowing on mobile — text now truncates with ellipsis
 - Trending page hiding check count on mobile — now visible at smaller font size
 - Score gauge number not centered on mobile — SVG now scales responsively within its container
 - Trending `loadMore()` leaving the page stuck on fetch errors — added `.catch()` / `.finally()` recovery
-
-### Added
-- Infinite scroll on trending page — auto-loads more entries when near page bottom (matching changelog pattern)
 
 ## [0.7.5] - 2026-03-21
 
