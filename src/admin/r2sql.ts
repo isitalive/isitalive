@@ -30,23 +30,32 @@ export function validateReadOnly(sql: string): string | null {
     return 'Query cannot be empty'
   }
 
-  // Must start with SELECT, WITH (CTEs), SHOW, or DESCRIBE
-  if (!/^\s*(SELECT|WITH|SHOW|DESCRIBE)\b/i.test(trimmed)) {
-    return 'Only SELECT, SHOW, and DESCRIBE queries are allowed'
+  // Must start with SELECT or WITH (CTEs)
+  if (!/^\s*(SELECT|WITH)\b/i.test(trimmed)) {
+    return 'Only SELECT queries are allowed'
   }
 
   // Strip string literals before checking for blocked patterns —
   // keywords inside quotes (e.g. LIKE '%DROP%') are safe.
   const withoutStrings = trimmed.replace(/'[^']*'/g, '').replace(/"[^"]*"/g, '')
 
+  // Check blocked keywords BEFORE stripping comments — defense-in-depth:
+  // blocked keywords hidden inside comments (e.g. /* DROP TABLE */) are
+  // still rejected because we don't trust arbitrary content being proxied.
   for (const pattern of BLOCKED_PATTERNS) {
     if (pattern.test(withoutStrings)) {
       return `Query contains a blocked statement: ${withoutStrings.match(pattern)?.[0]}`
     }
   }
 
+  // Strip comments for the multi-statement check — semicolons inside
+  // comments (e.g. `-- comment with ;`) should not trigger rejection.
+  const withoutComments = withoutStrings
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments /* ... */
+    .replace(/--[^\n]*/g, '')           // line comments -- ...
+
   // Reject multiple statements (semicolon followed by more SQL)
-  if (withoutStrings.includes(';') && withoutStrings.indexOf(';') < withoutStrings.length - 1) {
+  if (withoutComments.includes(';') && withoutComments.indexOf(';') < withoutComments.length - 1) {
     return 'Multiple statements are not allowed'
   }
 

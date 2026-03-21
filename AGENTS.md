@@ -104,7 +104,7 @@ POST https://isitalive.dev/api/audit
 Content-Type: application/json
 
 {
-  "manifest": "<raw package.json or go.mod content>",
+  "content": "<raw package.json or go.mod content>",
   "format": "package.json"
 }
 ```
@@ -141,7 +141,7 @@ GET https://isitalive.dev/.well-known/ai-plugin.json
 
 ## Rate Limits
 
-- **Anonymous**: 30 requests/minute
+- **Anonymous**: 60 requests/minute
 - **With API key**: higher limits (include `Authorization: Bearer sk_your_api_key`)
 
 ## Tips for Agents

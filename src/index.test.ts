@@ -38,7 +38,7 @@ describe('HTTP surface area hardening', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       status: 'ok',
-      version: '0.4.0',
+      version: '0.7.2',
     });
   });
 

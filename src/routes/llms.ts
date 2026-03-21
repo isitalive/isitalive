@@ -73,10 +73,10 @@ Optional. Add \`Authorization: Bearer <key>\` for higher rate limits.
 
 | Tier | Rate Limit | Cache TTL |
 |------|-----------|-----------| 
-| No key | 10/hr | 24h |
-| Free key | 100/hr | 24h |
-| Pro key | 1,000/hr | 1h |
-| Enterprise | 10,000/hr | 15min |
+| No key | 60/min | 24h |
+| Free key | 60/min | 24h |
+| Pro key | 120/min | 1h |
+| Enterprise | 600/min | 15min |
 
 ## Scoring Signals
 
@@ -88,7 +88,7 @@ Optional. Add \`Authorization: Bearer <key>\` for higher rate limits.
 | PR Responsiveness | 15% | Median age of recent pull requests |
 | Recent Contributors | 10% | Unique contributors in last 90 days |
 | Stars | 5% | Community interest |
-| CI/CD | 5% | Whether CI workflows exist |
+| CI/CD | 10% | Whether CI workflows exist |
 | Bus Factor | 10% | Commit concentration (top contributor %) |
 
 ## Providers

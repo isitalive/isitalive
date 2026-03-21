@@ -15,7 +15,17 @@ import { aiPluginManifest } from './routes/aiPlugin';
 
 export const app = new Hono<{ Bindings: Env }>();
 
-app.use('*', cors({
+// Security headers — applied globally
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+});
+
+// CORS — scoped to API routes only (admin excluded)
+app.use('/api/*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   maxAge: 86400,
@@ -53,4 +63,4 @@ app.get('/.well-known/ai-plugin.json', (c) => {
   return c.json(aiPluginManifest);
 });
 
-app.get('/health', (c) => c.json({ status: 'ok', version: '0.4.0' }));
+app.get('/health', (c) => c.json({ status: 'ok', version: '0.7.2' }));

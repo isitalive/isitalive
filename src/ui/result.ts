@@ -4,6 +4,7 @@
 
 import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
 import { navbarHtml, footerHtml, componentCss } from './components';
+import { escapeHtml } from './error';
 import type { Trend } from '../ingest/processor';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
@@ -77,23 +78,25 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
   if (!meta) return '';
 
   const pills: string[] = [];
-  const ghUrl = `https://github.com/${owner}/${repo}`;
+  const safeOwner = escapeHtml(owner);
+  const safeRepo = escapeHtml(repo);
+  const ghUrl = `https://github.com/${safeOwner}/${safeRepo}`;
 
   // Language
   if (meta.language) {
-    const dotColor = meta.languageColor || '#8b8b9e';
-    pills.push(`<span class="meta-pill"><span class="lang-dot" style="background:${dotColor}"></span>${meta.language}</span>`);
+    const dotColor = escapeHtml(meta.languageColor || '#8b8b9e');
+    pills.push(`<span class="meta-pill"><span class="lang-dot" style="background:${dotColor}"></span>${escapeHtml(meta.language)}</span>`);
   }
 
   // License
   if (meta.license && meta.license !== 'NOASSERTION') {
-    pills.push(`<span class="meta-pill">© ${meta.license}</span>`);
+    pills.push(`<span class="meta-pill">© ${escapeHtml(meta.license)}</span>`);
   }
 
   // Website
   if (meta.homepageUrl) {
     const display = meta.homepageUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    pills.push(`<a class="meta-pill" href="${meta.homepageUrl}" target="_blank" rel="noopener">🌐 ${display}</a>`);
+    pills.push(`<a class="meta-pill" href="${escapeHtml(meta.homepageUrl)}" target="_blank" rel="noopener">🌐 ${escapeHtml(display)}</a>`);
   }
 
   // Repo link
@@ -105,20 +108,22 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
 
   // First indexed date
   if (firstIndexed) {
-    const date = firstIndexed.split('T')[0];
+    const date = escapeHtml(firstIndexed.split('T')[0]);
     pills.push(`<span class="meta-pill">📅 Tracking since ${date}</span>`);
   }
 
   return `
     <section class="meta-card">
-      ${meta.description ? `<div class="meta-description">${meta.description}</div>` : ''}
+      ${meta.description ? `<div class="meta-description">${escapeHtml(meta.description)}</div>` : ''}
       <div class="meta-pills">
         ${pills.join('\n        ')}
       </div>
     </section>`;
 }
 
-export function resultPage(result: ScoringResult, owner: string, repo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
+export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
+  const owner = escapeHtml(rawOwner);
+  const repo = escapeHtml(rawRepo);
   const verdict = normalizeVerdict(result.verdict);
   const color = VERDICT_COLORS[verdict];
   const emoji = VERDICT_EMOJI[verdict];
@@ -146,11 +151,11 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
   const signalsHtml = result.signals.map(s => `
     <div class="signal-row">
       <div class="signal-header">
-        <span class="signal-name">${s.label}</span>
+        <span class="signal-name">${escapeHtml(s.label)}</span>
         <span class="signal-score" style="color: ${scoreColor(s.score)}">${s.score}</span>
       </div>
       <div class="signal-meta">
-        <span class="signal-value">${s.value}</span>
+        <span class="signal-value">${escapeHtml(String(s.value))}</span>
         <span class="signal-weight">${Math.round(s.weight * 100)}% weight</span>
       </div>
       ${signalBar(s.score, scoreColor(s.score))}
@@ -492,6 +497,12 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
     @media (max-width: 640px) {
       .hero { padding: 24px 0 36px; }
       .signals, .embed-section, .meta-card { padding: 20px; }
+      .gauge-container { width: 140px; height: 140px; }
+      .gauge-score { font-size: 2.2rem; }
+      .project-name { word-break: break-all; }
+      .embed-code { font-size: 0.65rem; padding: 10px 12px; }
+      .meta-pills { gap: 6px; }
+      .meta-pill { font-size: 0.72rem; padding: 4px 10px; }
     }
   </style>
 </head>
@@ -524,8 +535,8 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
         ${trendHtml}
       </div>
 
-      ${result.overrideReason ? `<div class="override-notice">⚠️ ${result.overrideReason}</div>` : ''}
-      ${result.cached ? `<div class="cache-notice">Cached result · checked <time datetime="${result.checkedAt}" id="checkedTime">${result.checkedAt.split('T')[0]}</time></div>` : ''}
+      ${result.overrideReason ? `<div class="override-notice">⚠️ ${escapeHtml(result.overrideReason)}</div>` : ''}
+      ${result.cached ? `<div class="cache-notice">Cached result · checked <time datetime="${escapeHtml(result.checkedAt)}" id="checkedTime">${escapeHtml(result.checkedAt.split('T')[0])}</time></div>` : ''}
     </section>
 
     ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
@@ -600,7 +611,7 @@ export function resultPage(result: ScoringResult, owner: string, repo: string, a
     // Track real page views via sendBeacon — only fires in real browsers
     try {
       navigator.sendBeacon('/_view', JSON.stringify({
-        r: '${owner}/${repo}',
+        r: '${rawOwner}/${rawRepo}',
         s: ${result.score},
         v: '${result.verdict}',
       }));

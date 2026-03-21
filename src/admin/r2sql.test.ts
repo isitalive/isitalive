@@ -56,37 +56,37 @@ describe('r2sql', () => {
 
     it('should reject INSERT', () => {
       const err = validateReadOnly('INSERT INTO analytics (repo) VALUES ("test")')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
 
     it('should reject UPDATE', () => {
       const err = validateReadOnly('UPDATE analytics SET score = 100')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
 
     it('should reject DELETE', () => {
       const err = validateReadOnly('DELETE FROM analytics WHERE repo = "test"')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
 
     it('should reject DROP TABLE', () => {
       const err = validateReadOnly('DROP TABLE analytics')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
 
     it('should reject ALTER TABLE', () => {
       const err = validateReadOnly('ALTER TABLE analytics ADD COLUMN foo TEXT')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
 
     it('should reject CREATE TABLE', () => {
       const err = validateReadOnly('CREATE TABLE evil (id INT)')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
 
     it('should reject TRUNCATE', () => {
       const err = validateReadOnly('TRUNCATE analytics')
-      expect(err).toContain('Only SELECT, SHOW, and DESCRIBE queries are allowed')
+      expect(err).toContain('Only SELECT queries are allowed')
     })
   })
 
@@ -126,6 +126,34 @@ describe('r2sql', () => {
     }
   })
 
+  // ─── Comment-based injection bypass ───────────────────────────────
+  describe('validateReadOnly: comment-based injection', () => {
+    it('should reject DROP hidden in a block comment', () => {
+      const err = validateReadOnly('SELECT 1 /* DROP TABLE analytics */')
+      expect(err).not.toBeNull()
+    })
+
+    it('should reject DELETE hidden in a line comment', () => {
+      const err = validateReadOnly('SELECT 1 -- DELETE FROM analytics')
+      expect(err).not.toBeNull()
+    })
+
+    it('should reject INSERT hidden in a block comment', () => {
+      const err = validateReadOnly("SELECT 1 /* INSERT INTO analytics VALUES('x') */")
+      expect(err).not.toBeNull()
+    })
+
+    it('should allow safe block comments (no blocked keywords)', () => {
+      const err = validateReadOnly('SELECT repo /* filter by repo */ FROM usage_events')
+      expect(err).toBeNull()
+    })
+
+    it('should allow safe line comments', () => {
+      const err = validateReadOnly('SELECT repo FROM usage_events -- get all repos')
+      expect(err).toBeNull()
+    })
+  })
+
   // ─── Fuzz: random and adversarial inputs ─────────────────────────── 
   describe('fuzz: adversarial SQL inputs', () => {
     const adversarial = [
@@ -142,6 +170,7 @@ describe('r2sql', () => {
       'GRANT ALL ON analytics TO public',
       'REVOKE ALL ON analytics FROM admin',
       'EXPLAIN SELECT 1',
+      // SHOW and DESCRIBE are blocked — only SELECT/WITH allowed
       'SHOW TABLES',
       'DESCRIBE analytics',
       // Encoded attacks
