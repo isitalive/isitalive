@@ -7,9 +7,14 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Constant-time string comparison to prevent timing side-channel attacks.
- * Returns `false` immediately if lengths differ (length is not secret).
- * For equal-length inputs, compares every byte to avoid leaking mismatch position.
+ * String comparison that mitigates timing side-channel attacks.
+ *
+ * Returns `false` immediately when lengths differ (this leaks length but not
+ * content). When lengths match, compares every UTF-16 code unit (charCodeAt)
+ * regardless of where the first mismatch occurs.
+ *
+ * NOTE: operates on JS string code units, not raw bytes. This is sufficient
+ * for comparing hex-encoded hashes and API keys used in this codebase.
  */
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false

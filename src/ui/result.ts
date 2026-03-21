@@ -163,7 +163,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     </div>
   `).join('');
 
-  const badgeUrl = `https://isitalive.dev/api/badge/github/${owner}/${repo}`;
+  const encodedOwner = encodeURIComponent(rawOwner);
+  const encodedRepo = encodeURIComponent(rawRepo);
+  const badgeUrl = `https://isitalive.dev/api/badge/github/${encodedOwner}/${encodedRepo}`;
   const apiUrl = `https://isitalive.dev/api/check/github/${owner}/${repo}`;
   const githubUrl = `https://github.com/${owner}/${repo}`;
 
@@ -175,9 +177,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   <title>${owner}/${repo} — Is It Alive?</title>
   <meta name="description" content="${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
   ${ogTags({
-    title: `${owner}/${repo} — Is It Alive?`,
-    description: `${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
-    url: `https://isitalive.dev/github/${owner}/${repo}`,
+    title: `${rawOwner}/${rawRepo} — Is It Alive?`,
+    description: `${rawOwner}/${rawRepo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
+    url: `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`,
     image: badgeUrl,
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
