@@ -3,10 +3,11 @@ import { app } from './app';
 import { version } from '../package.json';
 
 const env = {} as any;
-const executionCtx = {
-  waitUntil: () => {},
+const executionCtx: ExecutionContext = {
+  waitUntil: (_p: Promise<unknown>) => {},
   passThroughOnException: () => {},
-} as unknown as ExecutionContext;
+  props: {},
+};
 
 describe('HTTP surface area hardening', () => {
   it('does not expose the manual cron trigger endpoint', async () => {

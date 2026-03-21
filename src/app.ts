@@ -27,8 +27,8 @@ app.use('*', async (c, next) => {
     'Content-Security-Policy',
     [
       "default-src 'none'",
-      "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cdn.jsdelivr.net 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https://img.shields.io",
       "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com",

@@ -5,7 +5,7 @@
 // separate GitHubProvider objects across routes, audit scorer, and cron.
 // ---------------------------------------------------------------------------
 
-import type { Env, ProviderName } from '../scoring/types';
+import type { Env } from '../scoring/types';
 import { GitHubProvider } from './github';
 import { scoreProject } from '../scoring/engine';
 import { putCache } from '../cache/index';
@@ -48,7 +48,7 @@ export async function revalidateInBackground(
     await putCache(env, provider, owner, repo, result)
     // Archive raw data via Pipeline
     await emitAll(env, {
-      provider: [buildProviderEvent(provider as ProviderName, owner, repo, rawData._rawResponse)],
+      provider: [buildProviderEvent(prov.name, owner, repo, rawData._rawResponse)],
       result: [buildResultEvent(result, 'revalidation')],
     })
   } catch {

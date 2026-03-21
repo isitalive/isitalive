@@ -8,7 +8,8 @@
 
 /**
  * Constant-time string comparison to prevent timing side-channel attacks.
- * Always compares every byte regardless of where the first mismatch occurs.
+ * Returns `false` immediately if lengths differ (length is not secret).
+ * For equal-length inputs, compares every byte to avoid leaking mismatch position.
  */
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false
