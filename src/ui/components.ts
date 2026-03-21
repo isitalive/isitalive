@@ -12,6 +12,14 @@ export const componentCss = `
     /* ── Prevent horizontal scroll from decorative orbs ── */
     html, body { overflow-x: hidden; }
 
+    /* ── iOS safe-area insets (notch, home indicator) ── */
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-right: env(safe-area-inset-right);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+    }
+
     /* ── Nav / Footer Wrapper ──────────────── */
     .site-chrome-wrapper {
       max-width: 1000px;

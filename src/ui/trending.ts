@@ -13,7 +13,7 @@ export function trendingPage(analyticsToken?: string): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Trending — Is It Alive?</title>
   <meta name="description" content="Most checked open-source projects in the last 24 hours. See what's trending on Is It Alive.">
   ${ogTags({
@@ -191,7 +191,7 @@ export function trendingPage(analyticsToken?: string): string {
     .total-count { color: var(--text-muted); font-size: 0.75rem; margin-top: 8px; }
 
     @media (max-width: 640px) {
-      .repo-meta { display: none; }
+      .repo-meta { font-size: 0.65rem; }
       .repo-card { padding: 12px 14px; gap: 10px; }
     }
   </style>
@@ -286,6 +286,22 @@ export function trendingPage(analyticsToken?: string): string {
           }
         });
     }
+
+    // Infinite scroll — load when near bottom
+    var scrollTimer;
+    window.addEventListener('scroll', function() {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(function() {
+        var loadMoreEl = document.getElementById('load-more');
+        if (!loadMoreEl || loadMoreEl.style.display === 'none') return;
+        var btn = document.getElementById('btn-load-more');
+        if (btn.disabled) return;
+        var scrollBottom = window.innerHeight + window.scrollY;
+        if (scrollBottom >= document.body.offsetHeight - 300) {
+          loadMore();
+        }
+      }, 100);
+    });
 
     // Initial load
     fetch('/api/trending?limit=' + pageSize + '&offset=0')

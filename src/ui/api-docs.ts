@@ -10,7 +10,7 @@ export function apiDocsPage(analyticsToken?: string): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>API Reference — Is It Alive?</title>
   <meta name="description" content="API documentation for Is It Alive? — check open-source project health with a single HTTP request.">
   ${ogTags({
