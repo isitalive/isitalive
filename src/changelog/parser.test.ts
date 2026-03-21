@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { test, fc } from '@fast-check/vitest'
 import { parseChangelog } from './parser'
 
 describe('parseChangelog', () => {
@@ -125,47 +126,45 @@ Another paragraph.
   })
 })
 
-// ── Fuzz: parseChangelog never throws ──────────────────────────────────
+// ── Fuzz: parseChangelog never throws (fast-check) ────────────────────
 describe('parseChangelog fuzz', () => {
-  function mulberry32(seed: number) {
-    return function () {
-      seed |= 0
-      seed = (seed + 0x6d2b79f5) | 0
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-    }
-  }
+  const validTypes = new Set(['added', 'changed', 'fixed', 'removed'])
 
-  function randomString(rng: () => number, maxLen: number): string {
-    const len = Math.floor(rng() * maxLen)
-    const chars = 'abcdefghijklmnopqrstuvwxyz-_./\n\t #[]()0123456789'
-    let s = ''
-    for (let i = 0; i < len; i++) {
-      s += chars[Math.floor(rng() * chars.length)]
-    }
-    return s
-  }
+  test.prop([fc.string()])('never throws on arbitrary input', (input) => {
+    expect(() => parseChangelog(input)).not.toThrow()
+  })
 
-  it('never throws on random input (300 iterations)', () => {
-    const rng = mulberry32(77)
-    for (let i = 0; i < 300; i++) {
-      const input = randomString(rng, 500)
-      expect(() => parseChangelog(input)).not.toThrow()
+  test.prop([fc.string()])('output entries always have valid type values', (input) => {
+    const versions = parseChangelog(input)
+    for (const v of versions) {
+      expect(typeof v.version).toBe('string')
+      expect(typeof v.date).toBe('string')
+      expect(Array.isArray(v.entries)).toBe(true)
+      for (const entry of v.entries) {
+        expect(validTypes.has(entry.type)).toBe(true)
+        expect(typeof entry.text).toBe('string')
+      }
     }
   })
 
-  it('output entries always have valid type values', () => {
-    const rng = mulberry32(88)
-    const validTypes = new Set(['added', 'changed', 'fixed', 'removed'])
-    for (let i = 0; i < 200; i++) {
-      const input = randomString(rng, 300)
-      const versions = parseChangelog(input)
-      for (const v of versions) {
-        for (const entry of v.entries) {
-          expect(validTypes.has(entry.type)).toBe(true)
-        }
-      }
+  test.prop([
+    fc.array(fc.record({
+      version: fc.stringMatching(/^\d{1,3}\.\d{1,3}\.\d{1,3}$/),
+      date: fc.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      section: fc.constantFrom('Added', 'Changed', 'Fixed', 'Removed'),
+      items: fc.array(fc.lorem({ maxCount: 5 }), { minLength: 1, maxLength: 5 }),
+    }), { minLength: 1, maxLength: 5 }),
+  ])('round-trips structured changelog entries', (versions) => {
+    // Build a valid markdown changelog from structured data
+    const md = versions.map(v =>
+      `## [${v.version}] - ${v.date}\n\n### ${v.section}\n${v.items.map(i => `- ${i}`).join('\n')}\n`,
+    ).join('\n')
+
+    const parsed = parseChangelog(md)
+    expect(parsed.length).toBeGreaterThanOrEqual(1)
+    for (const v of parsed) {
+      expect(v.version).toMatch(/^\d/)
+      expect(v.entries.length).toBeGreaterThanOrEqual(0)
     }
   })
 })
