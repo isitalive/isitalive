@@ -26,10 +26,14 @@ import { parseChangelog as parseChangelogMd } from '../changelog/parser'
 import changelogMd from '../../CHANGELOG.md'
 import { getScoreHistory, computeTrend } from '../ingest/processor'
 import { apiDocsPage } from '../ui/api-docs'
+import { auditResultPage } from '../ui/audit-result'
 import { buildPageViewUsageEvent } from '../events/usage'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
 import { emitAll } from '../pipeline/emit'
+import { parseManifest, type ManifestFormat } from '../audit/parsers'
+import { resolveAll } from '../audit/resolver'
+import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 
 const ui = new Hono<{ Bindings: Env }>()
 
@@ -188,7 +192,8 @@ ui.get('/_data/changelog', (c) => {
 })
 
 // POST /_check — form submission with Turnstile verification
-// This redirects to the result page after verifying the human
+// This redirects to the result page after verifying the human.
+// Smart detection: if the input is a manifest URL, redirect to the audit flow.
 ui.post('/_check', verifyTurnstile, async (c) => {
   // Body already parsed by turnstile middleware — use the stored copy
   const body = (c as any).get('parsedBody') ?? await c.req.parseBody()
@@ -196,6 +201,16 @@ ui.post('/_check', verifyTurnstile, async (c) => {
 
   if (!input) {
     return c.redirect('/')
+  }
+
+  // Detect manifest URL: github.com/owner/repo/blob/branch/.../package.json or go.mod
+  const manifestMatch = input.match(
+    /(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.(json|mod))$/i,
+  )
+  if (manifestMatch) {
+    const [, mOwner, mRepo, mBranch, mPath] = manifestMatch
+    const rawUrl = `https://raw.githubusercontent.com/${mOwner}/${mRepo}/${mBranch}/${mPath}`
+    return handleAuditFromUrl(c, rawUrl, mPath)
   }
 
   // Parse input: "owner/repo", "github.com/owner/repo", or full URL
@@ -211,6 +226,73 @@ ui.post('/_check', verifyTurnstile, async (c) => {
   }
 
   return c.redirect('/')
+})
+
+// POST /_audit — Turnstile-gated manifest audit from URL
+// Accepts a GitHub manifest URL, fetches the raw content, scores, redirects
+ui.post('/_audit', verifyTurnstile, async (c) => {
+  const body = (c as any).get('parsedBody') ?? await c.req.parseBody()
+  const url = (body['url'] as string || '').trim()
+
+  if (!url) {
+    return c.html(errorPage('Please provide a manifest URL.'), 400)
+  }
+
+  const manifestMatch = url.match(
+    /(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.(json|mod))$/i,
+  )
+  if (!manifestMatch) {
+    return c.html(errorPage('Invalid manifest URL. Paste a GitHub link to a package.json or go.mod file.'), 400)
+  }
+
+  const [, mOwner, mRepo, mBranch, mPath] = manifestMatch
+  const rawUrl = `https://raw.githubusercontent.com/${mOwner}/${mRepo}/${mBranch}/${mPath}`
+  return handleAuditFromUrl(c, rawUrl, mPath)
+})
+
+// GET /audit/:hash — audit result page (SSR from KV cache)
+ui.get('/audit/:hash', async (c) => {
+  const hash = c.req.param('hash')
+
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    return c.html(errorPage('Invalid audit hash.'), 400)
+  }
+
+  const cached = await c.env.CACHE_KV.get(`audit:result:${hash}`)
+  if (!cached) {
+    return c.html(errorPage('Audit not found. This result may have expired or the manifest has not been audited yet.'), 404)
+  }
+
+  let result: AuditResult
+  try {
+    result = JSON.parse(cached)
+  } catch {
+    return c.html(errorPage('Cached audit data is corrupted.'), 500)
+  }
+
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  return c.html(auditResultPage(result, c.env.CF_ANALYTICS_TOKEN))
+})
+
+// GET /_data/audit/:hash — JSON data endpoint for client-side use
+ui.get('/_data/audit/:hash', async (c) => {
+  const hash = c.req.param('hash')
+
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    return c.json({ error: 'Invalid hash' }, 400)
+  }
+
+  const cached = await c.env.CACHE_KV.get(`audit:result:${hash}`)
+  if (!cached) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+
+  c.header('Cache-Control', 'public, max-age=3600')
+  try {
+    return c.json(JSON.parse(cached))
+  } catch {
+    return c.json({ error: 'Corrupted data' }, 500)
+  }
 })
 
 // Shared handler for fetching + rendering a result page
@@ -292,6 +374,70 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const message = isNotFound ? 'Project not found' : 'Failed to fetch project data. Please try again later.'
     return c.html(errorPage(message), status)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Handle audit from a raw GitHub URL — shared by /_check and /_audit
+// ---------------------------------------------------------------------------
+
+const MANIFEST_FORMATS: Record<string, ManifestFormat> = {
+  'package.json': 'package.json',
+  'go.mod': 'go.mod',
+}
+
+async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Promise<Response> {
+  // Determine format from filename
+  const filename = filePath.split('/').pop() || ''
+  const format = MANIFEST_FORMATS[filename]
+  if (!format) {
+    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json and go.mod.`), 400)
+  }
+
+  // Fetch raw content from GitHub
+  let content: string
+  try {
+    const res = await fetch(rawUrl, {
+      headers: { 'User-Agent': 'isitalive/1.0' },
+    })
+    if (!res.ok) {
+      const status = res.status === 404 ? 'File not found' : `GitHub returned ${res.status}`
+      return c.html(errorPage(`Could not fetch manifest: ${status}. Check the URL and try again.`), 400)
+    }
+    content = await res.text()
+  } catch {
+    return c.html(errorPage('Failed to fetch the manifest from GitHub. Please try again.'), 502)
+  }
+
+  if (content.length > 512 * 1024) {
+    return c.html(errorPage('Manifest file is too large (max 512KB).'), 400)
+  }
+
+  // Hash + check cache first
+  const contentHash = await hashManifest(content)
+  const auditCacheKey = `audit:result:${contentHash}`
+  const cached = await c.env.CACHE_KV.get(auditCacheKey)
+
+  if (cached) {
+    // Already scored — redirect straight to result page
+    return c.redirect(`/audit/${contentHash}`)
+  }
+
+  // Parse + resolve + score
+  let deps
+  try {
+    deps = parseManifest(format, content)
+  } catch (err: any) {
+    return c.html(errorPage(`Could not parse ${filename}: ${err.message}`), 400)
+  }
+
+  if (deps.length === 0) {
+    return c.html(errorPage(`No dependencies found in ${filename}.`), 400)
+  }
+
+  const resolved = await resolveAll(deps, c.env)
+  await scoreAudit(resolved, format, contentHash, c.env, c.executionCtx)
+
+  return c.redirect(`/audit/${contentHash}`)
 }
 
 // Shortcut: /owner/repo → redirect to canonical /github/owner/repo
