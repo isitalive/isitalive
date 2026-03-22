@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "build": "npx tsx --import ./scripts/register-md.mjs scripts/build-static.ts",
+    "predeploy": "npm run build",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
