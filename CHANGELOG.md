@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.1] - 2026-03-22
+
+### Fixed
+
+- **CDN edge caching for HTML pages** — added `CDN-Cache-Control` headers to all 18 public routes (landing, result, methodology, trending, changelog, audit, sitemap, openapi, llms.txt, ai-plugin); previously only API check routes had this, so HTML responses always invoked the Worker
+- Cache API storing result page responses without `Cache-Control` header on KV cache-hit path — entries may have been evicted prematurely
+
 ## [0.9.0] - 2026-03-21
 
 ### Added

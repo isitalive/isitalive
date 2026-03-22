@@ -84,12 +84,14 @@ ${repos.map(repo => `  <url>
 
   c.header('Content-Type', 'application/xml')
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.text(xml)
 })
 
 // Landing page — static shell, chips hydrated client-side
 ui.get('/', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -97,6 +99,7 @@ ui.get('/', (c) => {
 ui.get('/api/recent', async (c) => {
   const recent = await getRecentQueries(c.env.CACHE_KV)
   c.header('Cache-Control', 'public, max-age=10, s-maxage=10')
+  c.header('CDN-Cache-Control', 'public, s-maxage=10')
   return c.json(recent)
 })
 
@@ -133,24 +136,28 @@ ui.post('/_view', async (c) => {
 // Methodology page — static per deploy
 ui.get('/methodology', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400')
   return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // API docs page
 ui.get('/api', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400')
   return c.html(apiDocsPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Terms of Service page — static per deploy
 ui.get('/terms', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400')
   return c.html(termsPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Trending page — static HTML shell (data hydrated client-side)
 ui.get('/trending', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(trendingPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -162,6 +169,7 @@ ui.get('/_data/trending', async (c) => {
   const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10))
   const page = allRepos.slice(offset, offset + limit)
   c.header('Cache-Control', 'public, max-age=60, s-maxage=60')
+  c.header('CDN-Cache-Control', 'public, s-maxage=60')
   return c.json({
     repos: page,
     total: allRepos.length,
@@ -174,6 +182,7 @@ ui.get('/_data/trending', async (c) => {
 // Changelog page — static HTML shell (data hydrated client-side)
 ui.get('/changelog', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(changelogPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -188,6 +197,7 @@ ui.get('/_data/changelog', (c) => {
   const hasMore = start + limit < all.length
 
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.json({ versions, page, hasMore, total: all.length })
 })
 
@@ -272,6 +282,7 @@ ui.get('/audit/:hash', async (c) => {
   }
 
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(auditResultPage(result, c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -289,6 +300,7 @@ ui.get('/_data/audit/:hash', async (c) => {
   }
 
   c.header('Cache-Control', 'public, max-age=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   try {
     return c.json(JSON.parse(cached))
   } catch {
@@ -337,6 +349,8 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
       const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
       const trend = computeTrend(history)
+      c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+      c.header('CDN-Cache-Control', 'public, s-maxage=3600')
       const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
       c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
       return response
@@ -364,6 +378,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const trend = computeTrend(history)
     
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
     const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
     c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
 
