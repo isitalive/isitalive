@@ -65,13 +65,9 @@ describe('cacheControlHeaders', () => {
       expect(headers['CDN-Cache-Control']).toBe('private, no-store')
     })
 
-    it('returns browser Cache-Control with tier TTL', () => {
+    it('returns browser Cache-Control private, no-store', () => {
       const headers = cacheControlHeaders('pro', true)
-      const pro = TIERS.pro
-      const swr = pro.staleTtl - pro.freshTtl
-      expect(headers['Cache-Control']).toBe(
-        `public, max-age=${pro.l1Ttl}, stale-while-revalidate=${swr}`,
-      )
+      expect(headers['Cache-Control']).toBe('private, no-store')
     })
 
     it('uses private CDN header for all tiers when authenticated', () => {

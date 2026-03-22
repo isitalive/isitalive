@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.8.0] - 2026-03-22
+## [Unreleased]
 
 ### Added
 - **Two-track request model** (ADR-002 Phase 1): anonymous traffic served from CDN edge cache at zero Worker cost; authenticated traffic goes through Worker for full analytics
