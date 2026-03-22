@@ -479,7 +479,7 @@ export const openApiSpec = {
       },
       AuditResult: {
         type: 'object',
-        required: ['auditHash', 'complete', 'format', 'scored', 'total', 'pending', 'unresolved', 'summary', 'dependencies'],
+        required: ['auditHash', 'complete', 'format', 'scored', 'total', 'pending', 'unresolved', 'freshlyScored', 'summary', 'dependencies'],
         properties: {
           auditHash: {
             type: 'string',
