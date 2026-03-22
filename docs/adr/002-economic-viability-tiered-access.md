@@ -186,6 +186,8 @@ Rate limits protect the Worker from burst traffic. They are enforced **per-reque
 
 These are not billing mechanisms — they prevent a single client from starving others, regardless of how much they've paid.
 
+These limits are **target policy values** for the steady-state system design. The current implementation in `src/middleware/rateLimit.ts` may enforce lower per-minute caps (at time of writing: Pro = 120 req/min, Enterprise = 600 req/min) until we validate and safely raise them.
+
 #### Quota-Based Prepaid Billing (Revenue)
 
 Billing is based on **health checks consumed per billing period** (monthly). A health check is the billable unit:

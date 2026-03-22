@@ -243,7 +243,8 @@ export function cacheControlHeaders(tier: Tier, isAuthenticated: boolean): Cache
 
   if (isAuthenticated) {
     return {
-      'Cache-Control': `public, max-age=${config.l1Ttl}, stale-while-revalidate=${swr}`,
+      // Authenticated: prevent browser/proxy caching so every request hits the Worker
+      'Cache-Control': 'private, no-store',
       'CDN-Cache-Control': 'private, no-store',
     }
   }

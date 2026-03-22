@@ -58,7 +58,7 @@ app.route('/api/manifest', audit);
 app.all('/api/audit', (c) => {
   const url = new URL(c.req.url)
   url.pathname = url.pathname.replace('/api/audit', '/api/manifest')
-  return c.redirect(url.toString(), 301)
+  return c.redirect(url.toString(), 308)
 });
 app.route('/github', githubWebhook);
 app.route('/admin', admin);

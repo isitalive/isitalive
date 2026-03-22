@@ -244,7 +244,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
         c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo))
       }
       // Browser checks are anonymous — no usage events (tracked via Web Analytics).
-      // Emit result events for trending data and track recent queries for landing page.
+      // Track recent queries for landing page (trending/emissions are handled elsewhere).
       c.executionCtx.waitUntil(Promise.all([
         trackRecentQuery(c.env.CACHE_KV, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,

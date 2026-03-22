@@ -47,13 +47,18 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const { provider, owner, repo } = c.req.param()
 
   // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
+  // Only use response-cache fast path for anonymous requests.
+  // Authenticated requests must always reach the Worker for metering.
   const cache = caches.default
   const cacheKey = new Request(c.req.url)
+  const isAuthenticated = c.get('isAuthenticated') ?? false
 
-  const cachedResponse = await cache.match(cacheKey)
-  if (cachedResponse) {
-    console.log(`⚡ Cache HIT for: ${c.req.url}`)
-    return cachedResponse
+  if (!isAuthenticated) {
+    const cachedResponse = await cache.match(cacheKey)
+    if (cachedResponse) {
+      console.log(`⚡ Cache HIT for: ${c.req.url}`)
+      return cachedResponse
+    }
   }
 
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`)
@@ -67,7 +72,6 @@ check.get('/:provider/:owner/:repo', async (c) => {
   }
 
   const tier: Tier = c.get('tier') ?? 'free'
-  const isAuthenticated = c.get('isAuthenticated') ?? false
 
   const headers = cacheControlHeaders(tier, isAuthenticated)
 
