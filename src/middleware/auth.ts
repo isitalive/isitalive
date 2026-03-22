@@ -55,12 +55,12 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
       try {
         const claims = await verifyOidcToken(token, c.env);
 
-        // Only public repos get free OIDC quota
+        // Only public repos get free OIDC quota — private repos upsell (ADR-006)
         if (claims.repository_visibility !== 'public') {
           return c.json({
-            error: 'OIDC authentication requires a public repository',
+            error: 'IsItAlive OIDC auth is free for open-source only.',
             repository_visibility: claims.repository_visibility,
-            hint: 'Add an ISITALIVE_API_KEY secret for private repositories.',
+            hint: 'To secure private corporate repositories, get a Pro API key at https://isitalive.dev/pricing and add it as an ISITALIVE_API_KEY GitHub Secret.',
           }, 401);
         }
 
