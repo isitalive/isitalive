@@ -1,7 +1,7 @@
 import type { Env } from '../scoring/types'
 import { providers } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
-import { putCache } from '../cache/index'
+import { CacheManager } from '../cache/index'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
 import { createEvent } from '../events/envelope'
@@ -57,13 +57,15 @@ export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean>
   if (parts.length < 2) return false;
   const [owner, repo] = parts;
 
+  const cacheManager = new CacheManager(env);
+
   try {
     const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
     const result = scoreProject(rawData, github.name);
     const today = new Date().toISOString().slice(0, 10);
 
     await Promise.all([
-      putCache(env, 'github', owner, repo, result),
+      cacheManager.put('github', owner, repo, result),
       appendScoreHistory(env.CACHE_KV, repoSlug, {
         date: today,
         score: result.score,

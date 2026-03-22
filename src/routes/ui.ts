@@ -11,7 +11,7 @@ import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
 import { providers, revalidateInBackground } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
-import { getCached, putCache, getFirstSeen } from '../cache/index'
+import { CacheManager, getFirstSeen } from '../cache/index'
 import { landingPage } from '../ui/landing'
 import { resultPage } from '../ui/result'
 import { errorPage } from '../ui/error'
@@ -301,11 +301,11 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   const startTime = Date.now()
 
   // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
-  const cache = caches.default
+  const cacheManager = new CacheManager(c.env, c.executionCtx)
   // Use a pristine request object to avoid poisoning cache with auth headers
   const cacheKey = new Request(c.req.url)
 
-  const cachedResponse = await cache.match(cacheKey)
+  const cachedResponse = await cacheManager.getResponse(cacheKey, false)
   if (cachedResponse) {
     console.log(`⚡ Cache HIT for: ${c.req.url}`)
     // Page views are tracked client-side via sendBeacon → /_view
@@ -321,7 +321,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
 
   try {
-    const { result: cached, status } = await getCached(c.env, provider, owner, repo)
+    const { result: cached, status } = await cacheManager.get(provider, owner, repo)
 
     if (cached && (status === 'l1-hit' || status === 'hit' || status === 'stale')) {
       if (status === 'stale') {
@@ -338,7 +338,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
       const trend = computeTrend(history)
       const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
-      c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+      c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
       return response
     }
 
@@ -349,7 +349,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     // Browser checks are anonymous — skip usage events.
     // Emit result/provider events on miss (powers trending) and track for landing page.
     c.executionCtx.waitUntil(Promise.all([
-      putCache(c.env, provider, owner, repo, result),
+      cacheManager.put(provider, owner, repo, result),
       trackRecentQuery(c.env.CACHE_KV, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
@@ -365,7 +365,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
     return response
   } catch (err: any) {

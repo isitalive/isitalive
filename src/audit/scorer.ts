@@ -9,7 +9,7 @@
 
 import type { ResolvedDep } from './resolver';
 import type { Env, ScoringResult } from '../scoring/types';
-import { getCached, putCache, type Tier } from '../cache/index';
+import { CacheManager, type Tier } from '../cache/index';
 import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { bufferToHex } from '../utils/crypto';
@@ -97,6 +97,7 @@ export async function scoreAudit(
   budgetMs = 28_000,
 ): Promise<AuditResult> {
   const start = Date.now();
+  const cacheManager = new CacheManager(env, ctx);
 
   // ── 1. Check for a cached full audit by manifest hash ──────────────
   const auditCacheKey = `${AUDIT_CACHE_PREFIX}${contentHash}`;
@@ -127,7 +128,7 @@ export async function scoreAudit(
   const cacheChecks = await Promise.allSettled(
     resolvable.map(async (dep) => {
       const { owner, repo } = dep.github!;
-      const cached = await getCached(env, 'github', owner, repo, 'free' as Tier);
+      const cached = await cacheManager.get('github', owner, repo, 'free' as Tier);
       return { dep, cached };
     }),
   );
@@ -180,7 +181,7 @@ export async function scoreAudit(
           const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
           const result = scoreProject(rawData, 'github');
           // Cache in background
-          ctx.waitUntil(putCache(env, 'github', owner, repo, result));
+          ctx.waitUntil(cacheManager.put('github', owner, repo, result));
           return { dep, result, error: null as string | null };
         } catch (err: any) {
           const is404 = err.message?.includes('not found');
@@ -312,6 +313,7 @@ async function scoreRemainingInBackground(
   remaining: AuditDep[],
   env: Env,
 ): Promise<void> {
+  const cacheManager = new CacheManager(env);
   // Process in parallel batches of 10 (less aggressive than foreground)
   const bgBatchSize = 10;
   for (let i = 0; i < remaining.length; i += bgBatchSize) {
@@ -323,7 +325,7 @@ async function scoreRemainingInBackground(
         try {
           const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
           const result = scoreProject(rawData, 'github');
-          await putCache(env, 'github', owner, repo, result);
+          await cacheManager.put('github', owner, repo, result);
         } catch {
           // Best effort
         }

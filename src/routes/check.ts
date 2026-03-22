@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
 import { providers, revalidateInBackground } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
-import { getCached, putCache, cacheControlHeaders, TIERS, type Tier } from '../cache/index'
+import { CacheManager, cacheControlHeaders, TIERS, type Tier } from '../cache/index'
 import { buildResultEvent } from '../events/result'
 import { buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildProviderEvent } from '../events/provider'
@@ -59,17 +59,12 @@ check.get('/:provider/:owner/:repo', async (c) => {
   // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
   // Only use response-cache fast path for anonymous requests.
   // Authenticated requests must always reach the Worker for metering.
-  const cache = caches.default
+  const cacheManager = new CacheManager(c.env, c.executionCtx)
   const cacheKey = new Request(c.req.url)
   const isAuthenticated = c.get('isAuthenticated') ?? false
 
-  if (!isAuthenticated) {
-    const cachedResponse = await cache.match(cacheKey)
-    if (cachedResponse) {
-      console.log(`⚡ Cache HIT for: ${c.req.url}`)
-      return cachedResponse
-    }
-  }
+  const cachedResponse = await cacheManager.getResponse(cacheKey, isAuthenticated)
+  if (cachedResponse) return cachedResponse
 
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`)
 
@@ -96,7 +91,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
   })
 
   // ── Check cache ─────────────────────────────────────────────────
-  const cached = await getCached(c.env, provider, owner, repo, tier)
+  const cached = await cacheManager.get(provider, owner, repo, tier)
 
   if ((cached.status === 'l1-hit' || cached.status === 'hit') && cached.result) {
     // Usage events only for authenticated requests (billing/metering)
@@ -117,7 +112,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
     response.headers.set('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT')
 
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
     return response
   }
 
@@ -146,7 +141,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
     response.headers.set('X-Cache', 'STALE')
 
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
     return response
   }
 
@@ -157,7 +152,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const result = scoreProject(rawData, prov.name)
 
     const bgTasks: Promise<unknown>[] = [
-      putCache(c.env, provider, owner, repo, result),
+      cacheManager.put(provider, owner, repo, result, tier),
     ]
 
     // Always emit result/provider events on cache miss (powers trending + data freshness)
@@ -191,7 +186,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
     response.headers.set('X-Cache', 'MISS')
 
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
     return response
   } catch (err: any) {

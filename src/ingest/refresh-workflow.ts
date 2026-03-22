@@ -26,7 +26,7 @@ import {
   TIER_STALENESS,
   type TrackedIndex,
 } from '../aggregate/tracked'
-import { getCached } from '../cache/index'
+import { CacheManager } from '../cache/index'
 
 const BUDGET_PER_RUN = 2500
 const BATCH_SIZE = 10
@@ -45,6 +45,7 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
 
       // Find repos that need refreshing based on their tier staleness
       const toRefresh: { repo: string; tier: string; staleMs: number }[] = []
+      const cacheManager = new CacheManager(this.env)
 
       for (const [repo, entry] of Object.entries(index)) {
         const maxStaleness = TIER_STALENESS[entry.tier]
@@ -55,7 +56,7 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
         const [owner, repoName] = parts
 
         // Use the cached result's storedAt timestamp to determine staleness
-        const cached = await getCached(this.env, 'github', owner, repoName)
+        const cached = await cacheManager.get('github', owner, repoName)
         const lastCheckedMs = cached.storedAt
           ? new Date(cached.storedAt).getTime()
           : 0 // never cached = infinitely stale

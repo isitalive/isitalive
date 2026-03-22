@@ -7,7 +7,7 @@ import type { Env } from '../scoring/types';
 import type { Verdict } from '../scoring/types';
 import { providers, revalidateInBackground } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
-import { getCached, putCache } from '../cache/index';
+import { CacheManager } from '../cache/index';
 
 const badge = new Hono<{ Bindings: Env }>();
 
@@ -59,8 +59,10 @@ badge.get('/:provider/:owner/:repo', async (c) => {
     return c.text('Unsupported provider', 400);
   }
 
+  const cacheManager = new CacheManager(c.env, c.executionCtx);
+
   try {
-    const { result: cached, status } = await getCached(c.env, provider, owner, repo);
+    const { result: cached, status } = await cacheManager.get(provider, owner, repo);
 
     let result = cached;
 
@@ -73,7 +75,7 @@ badge.get('/:provider/:owner/:repo', async (c) => {
       const prov = providers[provider as keyof typeof providers];
       const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
       result = scoreProject(rawData, prov.name);
-      c.executionCtx.waitUntil(putCache(c.env, provider, owner, repo, result));
+      c.executionCtx.waitUntil(cacheManager.put(provider, owner, repo, result));
     }
 
     const svg = generateSvg(result.score, result.verdict);
