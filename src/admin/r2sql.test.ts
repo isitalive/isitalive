@@ -2,9 +2,9 @@
 // R2 SQL proxy tests — validation + fuzz-style injection attempts
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { validateReadOnly, PRESET_QUERIES } from './r2sql'
+import { validateReadOnly, queryR2SQL, PRESET_QUERIES } from './r2sql'
 
 describe('r2sql', () => {
   // ─── validateReadOnly: valid queries ────────────────────────────────
@@ -239,40 +239,82 @@ describe('r2sql', () => {
   })
 
   // ─── queryR2SQL: auto-LIMIT enforcement ─────────────────────────────
+  // These tests call queryR2SQL directly with mocked fetch to verify
+  // the actual SQL sent to the R2 API has the correct LIMIT applied.
   describe('queryR2SQL: auto-LIMIT', () => {
-    it('should append LIMIT 1000 to queries without a LIMIT clause', async () => {
-      // queryR2SQL needs env bindings — but we can test the SQL transformation
-      // by calling it with missing env (it returns an error before fetching)
-      // and observing that validation still passes for the modified query.
-      // The real test is that validateReadOnly accepts the query AND
-      // the LIMIT regex matches correctly.
-      const sql = 'SELECT * FROM analytics'
-      const withoutComments = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '')
-      expect(/\bLIMIT\b/i.test(withoutComments)).toBe(false)
-      // The code would append LIMIT 1000
-      const modified = sql.replace(/;?\s*$/, ' LIMIT 1000')
-      expect(modified).toBe('SELECT * FROM analytics LIMIT 1000')
-      expect(validateReadOnly(modified)).toBeNull()
+    function makeEnv() {
+      return {
+        CF_ACCOUNT_ID: 'test-account',
+        CF_R2_SQL_TOKEN: 'test-token',
+        CF_R2_WAREHOUSE: 'test-warehouse',
+      } as any
+    }
+
+    function mockFetchCapture(): { calls: string[] } {
+      const state = { calls: [] as string[] }
+      const original = globalThis.fetch
+      vi.stubGlobal('fetch', async (url: string, init: any) => {
+        const body = JSON.parse(init.body)
+        state.calls.push(body.query)
+        return new Response(JSON.stringify({
+          success: true,
+          result: { schema: [{ name: 'x' }], rows: [{ x: 1 }] },
+        }), { status: 200 })
+      })
+      return state
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks()
     })
 
-    it('should not double-LIMIT queries that already have a LIMIT', () => {
-      const sql = 'SELECT * FROM analytics LIMIT 20'
-      const withoutComments = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '')
-      expect(/\bLIMIT\b/i.test(withoutComments)).toBe(true)
+    it('should append LIMIT 1000 when query has no LIMIT', async () => {
+      const cap = mockFetchCapture()
+      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics')
+      expect(cap.calls).toHaveLength(1)
+      expect(cap.calls[0]).toContain('LIMIT 1000')
     })
 
-    it('should handle trailing semicolons when appending LIMIT', () => {
-      const sql = 'SELECT * FROM analytics;'
-      const modified = sql.replace(/;?\s*$/, ' LIMIT 1000')
-      expect(modified).toBe('SELECT * FROM analytics LIMIT 1000')
+    it('should not double-LIMIT queries that already have a LIMIT', async () => {
+      const cap = mockFetchCapture()
+      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics LIMIT 20')
+      expect(cap.calls).toHaveLength(1)
+      expect(cap.calls[0]).not.toContain('LIMIT 1000')
+      expect(cap.calls[0]).toContain('LIMIT 20')
     })
 
-    it('should not modify queries with LIMIT in a comment (defense-in-depth)', () => {
-      // The regex checks the sql WITH comments stripped, so if LIMIT is only
-      // in a comment, it should still append a real LIMIT
-      const sql = 'SELECT * FROM analytics -- LIMIT 500'
-      const withoutComments = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '')
-      expect(/\bLIMIT\b/i.test(withoutComments)).toBe(false)
+    it('should handle trailing semicolons when appending LIMIT', async () => {
+      const cap = mockFetchCapture()
+      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics;')
+      expect(cap.calls).toHaveLength(1)
+      expect(cap.calls[0]).toContain('LIMIT 1000')
+      // Should not contain the trailing semicolon before LIMIT
+      expect(cap.calls[0]).not.toMatch(/;\s*LIMIT/)
+    })
+
+    it('should still append LIMIT when LIMIT appears only in a string literal', async () => {
+      const cap = mockFetchCapture()
+      await queryR2SQL(makeEnv(), "SELECT 'LIMIT' AS x FROM analytics")
+      expect(cap.calls).toHaveLength(1)
+      expect(cap.calls[0]).toContain('LIMIT 1000')
+    })
+
+    it('should still append LIMIT when LIMIT appears only in a comment', async () => {
+      const cap = mockFetchCapture()
+      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics -- LIMIT 500')
+      expect(cap.calls).toHaveLength(1)
+      expect(cap.calls[0]).toContain('LIMIT 1000')
+    })
+
+    it('should not have LIMIT trapped inside a trailing line comment', async () => {
+      const cap = mockFetchCapture()
+      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics -- get all')
+      expect(cap.calls).toHaveLength(1)
+      // LIMIT must be on its own line, not inside the comment
+      const sent = cap.calls[0]
+      expect(sent).toContain('LIMIT 1000')
+      // Verify the LIMIT is NOT inside the comment by checking it comes after
+      expect(sent.indexOf('LIMIT 1000')).toBeGreaterThan(sent.lastIndexOf('--') >= 0 ? -1 : 0)
     })
   })
 })

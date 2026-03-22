@@ -76,11 +76,22 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
 
   // Auto-limit queries that don't already specify a LIMIT to prevent
   // unbounded result sets from exhausting Worker memory.
-  const withoutCommentsForLimit = sql
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/--[^\n]*/g, '')
-  if (!/\bLIMIT\b/i.test(withoutCommentsForLimit)) {
-    sql = sql.replace(/;?\s*$/, ' LIMIT 1000')
+  // Strip strings, comments, and blocked patterns before checking for LIMIT
+  // to prevent bypass via 'LIMIT' inside a string literal or comment.
+  const limitCheckSql = sql
+    .replace(/'[^']*'/g, '')           // strip single-quoted strings
+    .replace(/"[^"]*"/g, '')           // strip double-quoted strings
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // strip block comments
+    .replace(/--[^\n]*/g, '')          // strip line comments
+
+  if (!/\bLIMIT\b/i.test(limitCheckSql)) {
+    // Remove trailing line comments and semicolon/whitespace so that
+    // the appended LIMIT cannot end up inside a comment.
+    sql = sql
+      .replace(/--[^\n]*$/gm, '')      // drop trailing line comments
+      .replace(/\s*;?\s*$/, '')         // drop trailing semicolon/whitespace
+
+    sql = sql + '\nLIMIT 1000'
   }
 
   const accountId = env.CF_ACCOUNT_ID
