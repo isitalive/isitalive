@@ -16,7 +16,7 @@ curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
 ## Links
 
 - **Website**: [isitalive.dev](https://isitalive.dev)
-- **API docs**: [isitalive.dev/docs/api](https://isitalive.dev/docs/api)
+- **API Docs**: [isitalive.dev/docs/api](https://isitalive.dev/docs/api)
 - **Methodology**: [isitalive.dev/methodology](https://isitalive.dev/methodology)
 - **Audit Action**: [isitalive/audit-action](https://github.com/isitalive/audit-action)
 
