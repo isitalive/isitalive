@@ -187,6 +187,7 @@ audit.post('/', async (c) => {
       total: 0,
       pending: 0,
       unresolved: 0,
+      freshlyScored: 0,
       summary: { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0, avgScore: 0 },
       dependencies: [],
     });
