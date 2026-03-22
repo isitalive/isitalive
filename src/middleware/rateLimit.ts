@@ -1,78 +1,56 @@
 // ---------------------------------------------------------------------------
 // Rate limiting middleware — native Cloudflare Rate Limiting
 //
-// Tier limits (per minute):
-//   - Unauthenticated (no key): 60 req/min
-//   - Free key:                 60 req/min
-//   - Pro key:                  120 req/min
-//   - Enterprise key:           600 req/min
+// Two-level infra protection (not billing — that's handled by usage quotas):
+//   - Unauthenticated (no key): 10 req/min per IP     (edge-cached, shouldn't hit Worker often)
+//   - Authenticated (any key):  1000 req/min per key   (identified client, higher burst allowed)
 //
-// Unauthenticated limit is generous because most responses are served from
-// KV cache (~1ms, no GitHub API calls). The edge cache layer would bypass
-// the rate limiter entirely for cached responses, but the Cache API may not
-// be functional on all zones — this higher limit compensates.
+// Rate limiting prevents a single client from starving others. Tier-based
+// usage billing is a separate concern tracked via usage events → Iceberg.
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono';
 import type { Env } from '../scoring/types';
-import type { Tier } from '../cache/index';
 
-const WINDOW_MS = 60 * 1000; // 1 minute
+const ANON_LIMIT = 10;
+const AUTH_LIMIT = 1000;
 
-const TIER_LIMITS: Record<Tier, number> = {
-  free: 60,
-  pro: 120,
-  enterprise: 600,
-};
-
-/** Unauthenticated (no API key) limit */
-const UNAUTHENTICATED_LIMIT = 60;
-
-type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } };
+type AppEnv = { Bindings: Env; Variables: { tier: string; keyName: string | null; isAuthenticated: boolean } };
 
 /**
  * Rate limiter using native Cloudflare Rate Limiting bindings.
+ *
+ * Two bindings configured in wrangler.toml:
+ *   RATE_LIMITER_ANON  → 10 req/min  (keyed by IP)
+ *   RATE_LIMITER_AUTH  → 1000 req/min (keyed by API key name)
  */
 export async function rateLimit(c: Context<AppEnv>, next: Next) {
+  const isAuthenticated = c.get('isAuthenticated') ?? false;
   const keyName = c.get('keyName');
-  const isAuthenticated = !!c.get('keyName');
-  const tier = (c.get('tier') || 'free') as Tier;
-  const limitValue = isAuthenticated ? (TIER_LIMITS[tier] || TIER_LIMITS['free']) : UNAUTHENTICATED_LIMIT;
 
-  // Rate limit key: by API key name if authenticated, by IP if not
+  // Pick binding and key based on auth status
+  const rateLimiter = isAuthenticated ? c.env.RATE_LIMITER_AUTH : c.env.RATE_LIMITER_ANON;
+  const limit = isAuthenticated ? AUTH_LIMIT : ANON_LIMIT;
+
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
   const rateLimitKey = isAuthenticated ? `key:${keyName}` : `ip:${ip}`;
 
-  // Select the appropriate native Rate Limiter binding based on tier
-  let rateLimiter: RateLimit;
-  if (tier === 'pro') rateLimiter = c.env.RATE_LIMITER_PRO;
-  else if (tier === 'enterprise') rateLimiter = c.env.RATE_LIMITER_ENTERPRISE;
-  else rateLimiter = c.env.RATE_LIMITER_FREE;
-
-  // Call the native Rate Limiting API
   const result = await rateLimiter.limit({ key: rateLimitKey });
-  
-  // The native Rate Limit API currently only returns { success: boolean }
-  // We use static fallbacks for headers
-  const resetSeconds = 60; // Configured window is 60s
-  
+
   // Set headers regardless of outcome
-  c.header('X-RateLimit-Limit', String(limitValue));
-  c.header('X-RateLimit-Tier', tier);
+  c.header('X-RateLimit-Limit', String(limit));
 
   if (!result.success) {
-    c.header('Retry-After', String(resetSeconds));
+    c.header('Retry-After', '60');
     return c.json(
       {
         error: 'Rate limit exceeded',
-        limit: limitValue,
-        tier,
+        limit,
         authenticated: isAuthenticated,
-        remaining: 0,
-        retryAfterSeconds: resetSeconds,
+        retryAfterSeconds: 60,
         message: isAuthenticated
-          ? `Upgrade to a higher tier for more requests. Current: ${tier} (${limitValue}/min).`
-          : `Add an API key for higher limits. Current (unauthenticated): ${limitValue}/min.`,
+          ? `Rate limit exceeded (${limit}/min). Please slow down.`
+          : `Rate limit exceeded (${limit}/min). Add an API key for higher limits.`,
       },
       429,
     );

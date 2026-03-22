@@ -15,9 +15,8 @@ export interface Pipeline {
 export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
-  RATE_LIMITER_FREE: RateLimit;
-  RATE_LIMITER_PRO: RateLimit;
-  RATE_LIMITER_ENTERPRISE: RateLimit;
+  RATE_LIMITER_ANON: RateLimit;   // 10 req/min — infra protection for anonymous
+  RATE_LIMITER_AUTH: RateLimit;   // 1000 req/min — infra protection for authenticated
   DATA_BUCKET: R2Bucket;         // R2 bucket for Iceberg tables (R2 Data Catalog)
   GITHUB_TOKEN?: string;
 

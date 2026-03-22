@@ -26,24 +26,18 @@ id = "660634f39fe641c5b186ac3cb7259ead"
 binding = "KEYS_KV"
 id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 
-# Native Rate Limiting (replaces Durable Objects)
+# Native Rate Limiting — two-level infra protection (not billing)
 [[unsafe.bindings]]
-name = "RATE_LIMITER_FREE"
+name = "RATE_LIMITER_ANON"
 type = "ratelimit"
 namespace_id = "1001"
-simple = { limit = 60, period = 60 }
+simple = { limit = 10, period = 60 }
 
 [[unsafe.bindings]]
-name = "RATE_LIMITER_PRO"
+name = "RATE_LIMITER_AUTH"
 type = "ratelimit"
 namespace_id = "1002"
-simple = { limit = 120, period = 60 }
-
-[[unsafe.bindings]]
-name = "RATE_LIMITER_ENTERPRISE"
-type = "ratelimit"
-namespace_id = "1003"
-simple = { limit = 600, period = 60 }
+simple = { limit = 1000, period = 60 }
 
 
 # Workflows — durable ingest pipeline

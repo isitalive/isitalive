@@ -179,14 +179,12 @@ Rate limits protect the Worker from burst traffic. They are enforced **per-reque
 
 | Tier | Limit | Key | Purpose |
 | --- | --- | --- | --- |
-| Anonymous (no key) | 60 req/min | IP | Prevent abuse from bots/scripts |
-| Free (API key) | 60 req/min | API key | Same as anonymous, identified |
-| Pro | 300 req/min | API key | Higher burst for integrations |
-| Enterprise | 1,000 req/min | API key | CI/CD pipelines at scale |
+| Anonymous (no key) | 10 req/min | IP | Prevent abuse — edge-cached traffic shouldn't hit Worker often |
+| Authenticated (any key) | 1,000 req/min | API key | High burst for integrations, identified user |
 
 These are not billing mechanisms — they prevent a single client from starving others, regardless of how much they've paid.
 
-These limits are **target policy values** for the steady-state system design. The current implementation in `src/middleware/rateLimit.ts` may enforce lower per-minute caps (at time of writing: Pro = 120 req/min, Enterprise = 600 req/min) until we validate and safely raise them.
+These limits are **target policy values** for the steady-state system design. The current implementation in `src/middleware/rateLimit.ts` may adjust these as we validate traffic patterns.
 
 #### Quota-Based Prepaid Billing (Revenue)
 
