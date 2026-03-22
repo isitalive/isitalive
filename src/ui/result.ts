@@ -698,9 +698,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         html += '<section class="deps-section-card">';
         html += '<div class="deps-section-header"><h2>Dependencies (' + prodDeps.length + ')</h2>';
         html += '<div class="deps-sort">';
-        html += '<button class="sort-btn active" onclick="sortResultDeps(&quot;score-asc&quot;)" id="rSortScoreAsc">Score ↑</button>';
-        html += '<button class="sort-btn" onclick="sortResultDeps(&quot;score-desc&quot;)" id="rSortScoreDesc">Score ↓</button>';
-        html += '<button class="sort-btn" onclick="sortResultDeps(&quot;name&quot;)" id="rSortName">A–Z</button>';
+        html += '<button class="sort-btn active" data-sort="score-asc" id="rSortScoreAsc">Score ↑</button>';
+        html += '<button class="sort-btn" data-sort="score-desc" id="rSortScoreDesc">Score ↓</button>';
+        html += '<button class="sort-btn" data-sort="name" id="rSortName">A–Z</button>';
         html += '</div></div>';
         html += '<table class="deps-table"><thead><tr><th>Dependency</th><th>Score</th><th>Verdict</th><th></th></tr></thead>';
         html += '<tbody id="resultProdBody">';
@@ -709,7 +709,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
         // Dev deps toggle
         if (devDeps.length > 0) {
-          html += '<button class="dev-toggle" id="resultDevToggle" onclick="toggleResultDevDeps()"><span class="arrow">▶</span> Dev Dependencies (' + devDeps.length + ')</button>';
+          html += '<button class="dev-toggle" id="resultDevToggle"><span class="arrow">▶</span> Dev Dependencies (' + devDeps.length + ')</button>';
           html += '<div class="dev-deps-content" id="resultDevContent">';
           html += '<table class="deps-table"><thead><tr><th>Dependency</th><th>Score</th><th>Verdict</th><th></th></tr></thead>';
           html += '<tbody id="resultDevBody">' + devDeps.map(renderRow).join('') + '</tbody></table>';
@@ -727,6 +727,22 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         html += '</section>';
 
         container.innerHTML = html;
+
+        // Bind sort buttons via data attributes (avoids quote-escaping issues)
+        container.querySelectorAll('.sort-btn[data-sort]').forEach(function(btn) {
+          btn.addEventListener('click', function() { sortResultDeps(btn.getAttribute('data-sort')); });
+        });
+
+        // Bind dev deps toggle
+        var devToggle = document.getElementById('resultDevToggle');
+        if (devToggle) {
+          devToggle.addEventListener('click', function() {
+            var content = document.getElementById('resultDevContent');
+            if (!content) return;
+            var visible = content.classList.toggle('visible');
+            devToggle.classList.toggle('expanded', visible);
+          });
+        }
 
         // Auto-retry if incomplete
         if (!data.complete && data.pending > 0) {
@@ -765,8 +781,8 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
           });
       }
 
-      // Global sort function
-      window.sortResultDeps = function(mode) {
+      // Sort function — called via addEventListener on sort buttons
+      function sortResultDeps(mode) {
         var tbody = document.getElementById('resultProdBody');
         if (!tbody) return;
         var rows = Array.from(tbody.querySelectorAll('.dep-row'));
@@ -783,16 +799,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         if (mode === 'score-asc') document.getElementById('rSortScoreAsc').classList.add('active');
         if (mode === 'score-desc') document.getElementById('rSortScoreDesc').classList.add('active');
         if (mode === 'name') document.getElementById('rSortName').classList.add('active');
-      };
-
-      // Global toggle for dev deps
-      window.toggleResultDevDeps = function() {
-        var content = document.getElementById('resultDevContent');
-        var toggle = document.getElementById('resultDevToggle');
-        if (!content || !toggle) return;
-        var visible = content.classList.toggle('visible');
-        toggle.classList.toggle('expanded', visible);
-      };
+      }
 
       // Start loading deps
       loadDeps();
