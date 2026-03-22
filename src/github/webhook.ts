@@ -23,9 +23,23 @@ githubWebhook.post('/webhook', async (c) => {
     return c.json({ error: 'GitHub App not configured' }, 500);
   }
 
+  // ── Guard against oversized payloads ────────────────────────────────
+  // GitHub webhook payloads are typically < 25 KB. Cap at 1 MB to prevent
+  // OOM / CPU-exhaustion — body is read into memory before HMAC verification.
+  const MAX_WEBHOOK_BODY = 1_048_576; // 1 MB
+  const contentLength = parseInt(c.req.header('content-length') ?? '0', 10);
+  if (contentLength > MAX_WEBHOOK_BODY) {
+    return c.json({ error: 'Payload too large' }, 413);
+  }
+
   // ── Verify signature ────────────────────────────────────────────────
   const signature = c.req.header('x-hub-signature-256') ?? null;
   const body = await c.req.text();
+
+  // Double-check actual body size (Content-Length can be spoofed or absent)
+  if (body.length > MAX_WEBHOOK_BODY) {
+    return c.json({ error: 'Payload too large' }, 413);
+  }
 
   const valid = await verifyWebhookSignature(webhookSecret, body, signature);
   if (!valid) {

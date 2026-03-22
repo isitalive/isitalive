@@ -291,13 +291,61 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/manifest/hash/{hash}': {
+      get: {
+        operationId: 'getManifestByHash',
+        summary: 'Lookup cached manifest audit by content hash',
+        description: 'Returns cached audit results for a previously-scored manifest, identified by its SHA-256 content hash. No authentication required. CDN-cached for 7 days (`s-maxage=604800`). Returns 404 if the manifest has not been audited yet. Used by the GitHub Action for $0-cost cache hits — hash your manifest locally, try GET first, POST only on miss.',
+        parameters: [
+          {
+            name: 'hash',
+            in: 'path',
+            required: true,
+            description: 'SHA-256 hex hash of the manifest file content (64 characters)',
+            schema: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Cached audit result',
+            headers: {
+              ETag: {
+                description: 'The content hash, quoted',
+                schema: { type: 'string' },
+              },
+            },
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuditResult' },
+              },
+            },
+          },
+          '400': {
+            description: 'Invalid hash format',
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { error: { type: 'string' } } },
+              },
+            },
+          },
+          '404': {
+            description: 'Manifest not yet audited',
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { error: { type: 'string' } } },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
-        description: 'API key for higher rate limits. Pass as `Authorization: Bearer sk_your_key`. Without auth: 60 req/min. Free key: 60/min. Pro: 120/min. Enterprise: 600/min.',
+        description: 'API key or GitHub Actions OIDC token. Pass as `Authorization: Bearer sk_your_key` or `Authorization: Bearer <oidc_jwt>`. Without auth: 10 req/min (IP-based). With any API key: 1,000 req/min (key-based).',
       },
     },
     schemas: {
@@ -465,6 +513,10 @@ export const openApiSpec = {
             type: 'integer',
             description: 'When complete is false, suggested wait in ms before calling again',
           },
+          freshlyScored: {
+            type: 'integer',
+            description: 'Number of dependencies freshly scored this request (consumed quota). Cache hits are 0 quota.',
+          },
           summary: {
             type: 'object',
             properties: {
@@ -493,6 +545,7 @@ export const openApiSpec = {
           github: { type: 'string', nullable: true, description: 'Resolved GitHub owner/repo (e.g. "vercel/next.js") or null' },
           score: { type: 'integer', nullable: true, description: 'Health score 0-100, or null if unresolved' },
           verdict: { type: 'string', enum: ['healthy', 'stable', 'degraded', 'critical', 'unmaintained', 'pending', 'unresolved'] },
+          cacheStatus: { type: 'string', enum: ['fresh', 'cached', 'pending', 'unresolved'], description: 'Whether this dep was freshly scored or served from cache' },
           unresolvedReason: { type: 'string', description: 'Why this dep could not be resolved (e.g. "gitlab_not_supported_yet", "no_github_repo", "repo_not_found")' },
         },
       },

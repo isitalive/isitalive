@@ -164,7 +164,9 @@ audit.post('/', async (c) => {
     c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
 
     // Emit usage events in background — parse cached JSON AFTER response
-    // is sent so it doesn't affect latency
+    // is sent so it doesn't affect latency.
+    // NOTE: these events have cacheStatus='kv-hit' so quota aggregation
+    // cron must exclude them (ADR-004: only Layer 3 misses consume quota).
     c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
 
     return response;
