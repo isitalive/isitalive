@@ -50,7 +50,7 @@ function hasAllowedViewOrigin(originHeader: string): boolean {
 
   try {
     const { hostname } = new URL(originHeader)
-    return allowedViewHosts.has(hostname)
+    return allowedViewHosts.has(hostname) || hostname.endsWith('.rootd.workers.dev')
   } catch {
     return false
   }
