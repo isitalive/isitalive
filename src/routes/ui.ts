@@ -203,14 +203,16 @@ ui.post('/_check', verifyTurnstile, async (c) => {
     return c.redirect('/')
   }
 
-  // Detect manifest URL: github.com/owner/repo/blob/branch/.../package.json or go.mod
-  const manifestMatch = input.match(
-    /(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.(json|mod))$/i,
-  )
+  // Detect manifest URL: github.com/owner/repo/blob/.../package.json or go.mod
+  // Uses a permissive path match (.+/) to support slashed branch names (e.g. feature/foo).
+  const manifestMatch = input.match(MANIFEST_URL_RE)
   if (manifestMatch) {
-    const [, mOwner, mRepo, mBranch, mPath] = manifestMatch
-    const rawUrl = `https://raw.githubusercontent.com/${mOwner}/${mRepo}/${mBranch}/${mPath}`
-    return handleAuditFromUrl(c, rawUrl, mPath)
+    const filename = manifestMatch[1]
+    // Append ?raw=1 to the GitHub blob URL — GitHub resolves branch vs path
+    // correctly regardless of slashes in the ref.
+    const blobUrl = input.replace(/^(?!https?:\/\/)/, 'https://')
+    const rawUrl = blobUrl + (blobUrl.includes('?') ? '&' : '?') + 'raw=1'
+    return handleAuditFromUrl(c, rawUrl, filename)
   }
 
   // Parse input: "owner/repo", "github.com/owner/repo", or full URL
@@ -238,16 +240,15 @@ ui.post('/_audit', verifyTurnstile, async (c) => {
     return c.html(errorPage('Please provide a manifest URL.'), 400)
   }
 
-  const manifestMatch = url.match(
-    /(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.(json|mod))$/i,
-  )
+  const manifestMatch = url.match(MANIFEST_URL_RE)
   if (!manifestMatch) {
     return c.html(errorPage('Invalid manifest URL. Paste a GitHub link to a package.json or go.mod file.'), 400)
   }
 
-  const [, mOwner, mRepo, mBranch, mPath] = manifestMatch
-  const rawUrl = `https://raw.githubusercontent.com/${mOwner}/${mRepo}/${mBranch}/${mPath}`
-  return handleAuditFromUrl(c, rawUrl, mPath)
+  const filename = manifestMatch[1]
+  const blobUrl = url.replace(/^(?!https?:\/\/)/, 'https://')
+  const rawUrl = blobUrl + (blobUrl.includes('?') ? '&' : '?') + 'raw=1'
+  return handleAuditFromUrl(c, rawUrl, filename)
 })
 
 // GET /audit/:hash — audit result page (SSR from KV cache)
@@ -385,6 +386,9 @@ const MANIFEST_FORMATS: Record<string, ManifestFormat> = {
   'go.mod': 'go.mod',
 }
 
+/** Matches GitHub blob URLs ending in package.json or go.mod (supports slashed branch names) */
+const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|go\.mod)$/i
+
 async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Promise<Response> {
   // Determine format from filename
   const filename = filePath.split('/').pop() || ''
@@ -435,7 +439,15 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
   }
 
   const resolved = await resolveAll(deps, c.env)
-  await scoreAudit(resolved, format, contentHash, c.env, c.executionCtx)
+  const auditResult = await scoreAudit(resolved, format, contentHash, c.env, c.executionCtx)
+
+  // Write KV synchronously before redirect — scoreAudit only writes via
+  // waitUntil for complete results, so the redirect could race.
+  // Always persist (even partial results) so /audit/:hash can render.
+  const auditCacheKey2 = `audit:result:${contentHash}`
+  await c.env.CACHE_KV.put(auditCacheKey2, JSON.stringify(auditResult), {
+    expirationTtl: 6 * 60 * 60, // 6 hours
+  })
 
   return c.redirect(`/audit/${contentHash}`)
 }
