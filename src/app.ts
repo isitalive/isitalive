@@ -20,20 +20,20 @@ export const app = new Hono<{ Bindings: Env }>();
 app.use('*', async (c, next) => {
   await next();
   c.header('X-Content-Type-Options', 'nosniff');
-  c.header('X-Frame-Options', 'DENY');
+  c.header('X-Frame-Options', 'SAMEORIGIN');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   c.header(
     'Content-Security-Policy',
     [
-      "default-src 'none'",
-      "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cdn.jsdelivr.net 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+      "default-src 'self'",
+      "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval' blob: data:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://challenges.cloudflare.com data:",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https://img.shields.io",
-      "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com",
-      "frame-src https://challenges.cloudflare.com",
-      "frame-ancestors 'none'",
+      "img-src 'self' data: https://img.shields.io https://challenges.cloudflare.com https://static.cloudflareinsights.com",
+      "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com https://static.cloudflareinsights.com",
+      "frame-src 'self' https://challenges.cloudflare.com",
+      "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
     ].join('; '),

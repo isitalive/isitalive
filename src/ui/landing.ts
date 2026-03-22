@@ -537,7 +537,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               <span class="btn-spinner"></span>
             </button>
           </div>
-          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible"></div>` : ''}
+          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="normal"></div>` : ''}
         </form>
         <p class="search-hint">Try <code>vercel/next.js</code> or paste a link to a <code>package.json</code> or <code>go.mod</code></p>
       </div>
