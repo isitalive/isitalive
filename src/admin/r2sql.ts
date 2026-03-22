@@ -74,6 +74,15 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
     return { columns: [], rows: [], rowCount: 0, timing: 0, error }
   }
 
+  // Auto-limit queries that don't already specify a LIMIT to prevent
+  // unbounded result sets from exhausting Worker memory.
+  const withoutCommentsForLimit = sql
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--[^\n]*/g, '')
+  if (!/\bLIMIT\b/i.test(withoutCommentsForLimit)) {
+    sql = sql.replace(/;?\s*$/, ' LIMIT 1000')
+  }
+
   const accountId = env.CF_ACCOUNT_ID
   const token = env.CF_R2_SQL_TOKEN
   const warehouse = env.CF_R2_WAREHOUSE

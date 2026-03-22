@@ -42,9 +42,19 @@ function cacheMeta(
   }
 }
 
+/** Validate path params — only allow valid GitHub-style identifiers */
+function isValidParam(value: string): boolean {
+  return /^[a-zA-Z0-9._-]+$/.test(value) && value.length <= 100
+}
+
 check.get('/:provider/:owner/:repo', async (c) => {
   const startTime = Date.now()
   const { provider, owner, repo } = c.req.param()
+
+  // Validate path params — blocks XSS / path-traversal payloads
+  if (!isValidParam(owner) || !isValidParam(repo)) {
+    return c.json({ error: 'Invalid owner or repo name' }, 400)
+  }
 
   // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
   // Only use response-cache fast path for anonymous requests.

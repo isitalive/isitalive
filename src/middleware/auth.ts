@@ -68,9 +68,10 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
         c.set('keyName', `oidc:${claims.repository}`);
         c.set('isAuthenticated', true);
         c.set('oidcClaims', claims);
+        return next();
       } catch {
-        // Invalid OIDC token — silently fall through to free tier
-        // (doesn't reveal whether a token is valid or not)
+        // Invalid OIDC token — fall through to free tier (not API key,
+        // since OIDC tokens are unambiguously identified by 'eyJ' prefix)
       }
       return next();
     }

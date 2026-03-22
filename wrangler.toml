@@ -92,7 +92,7 @@ enabled = true
 [observability.logs]
 enabled = true
 invocation_logs = true  # Log every invocation
-head_sampling_rate = 1  # 100% sampling (reduce in prod if costs are high)
+head_sampling_rate = 0.1  # 10% sampling — reduce cost while retaining signal
 
 [observability.traces]
 enabled = true
