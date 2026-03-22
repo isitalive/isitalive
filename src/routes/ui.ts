@@ -96,10 +96,11 @@ ui.get('/', (c) => {
 })
 
 // Recent queries API — lightweight JSON for client-side hydration
-ui.get('/api/recent', async (c) => {
+// Mounted under /_data/ to avoid /api/* rate-limit + auth middleware
+ui.get('/_data/recent', async (c) => {
   const recent = await getRecentQueries(c.env.CACHE_KV)
-  c.header('Cache-Control', 'public, max-age=10, s-maxage=10')
-  c.header('CDN-Cache-Control', 'public, s-maxage=10')
+  c.header('Cache-Control', 'public, max-age=60, s-maxage=60')
+  c.header('CDN-Cache-Control', 'public, s-maxage=60')
   return c.json(recent)
 })
 
