@@ -99,10 +99,14 @@ head_sampling_rate = 0.1  # 10% sampling — reduce cost while retaining signal
 [observability.traces]
 enabled = true
 
-# Static Assets — Phase 2 (ADR-006)
-# Pre-render UI templates to static HTML; serve without waking Worker (free, unlimited).
-# Uncomment when build step is implemented:
-# [assets]
-# directory = "./dist"
-# binding = "ASSETS"
-# run_worker_first = ["/api/*", "/admin/*", "/github/*", "/health"]
+# Static Assets (Phase 2 — ADR-006)
+# Pre-rendered UI pages served WITHOUT invoking the Worker — free & unlimited.
+# Build: npx tsx scripts/build-static.ts → public/
+#
+# Default behavior: if a request matches a static file, it's served directly
+# (no Worker invocation). If no match, the Worker handles it.
+# run_worker_first: paths where the Worker should run EVEN IF a static file matches.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "none"
