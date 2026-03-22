@@ -1,7 +1,11 @@
 // ---------------------------------------------------------------------------
 // Three-tier caching with stale-while-revalidate
 //
-// L1: Cloudflare Cache API — free, ~0ms, per-datacenter, volatile
+// IMPORTANT (ADR-006): CDN-Cache-Control / s-maxage does NOT prevent Worker
+// invocations. Every request wakes the Worker (~$0.30/M). The Cache API (L1)
+// is Worker-internal (free read/write ops), not CDN-external.
+//
+// L1: Cloudflare Cache API — free ops, ~0ms, per-datacenter, volatile
 // L2: Workers KV — $0.50/M reads, ~1ms, globally replicated, persistent
 // SWR: managed via KV storedAt timestamps (Cache API doesn't support SWR)
 //

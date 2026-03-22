@@ -27,11 +27,13 @@ binding = "KEYS_KV"
 id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 
 # Native Rate Limiting — two-level infra protection (not billing)
+# Note: CDN-Cache-Control does NOT prevent Worker invocations (ADR-006).
+# Every request — anonymous or authenticated — wakes the Worker (~$0.30/M).
 [[unsafe.bindings]]
 name = "RATE_LIMITER_ANON"
 type = "ratelimit"
 namespace_id = "1001"
-simple = { limit = 10, period = 60 }
+simple = { limit = 5, period = 60 }  # Tightened from 10 — ADR-006
 
 [[unsafe.bindings]]
 name = "RATE_LIMITER_AUTH"
@@ -96,3 +98,11 @@ head_sampling_rate = 0.1  # 10% sampling — reduce cost while retaining signal
 
 [observability.traces]
 enabled = true
+
+# Static Assets — Phase 2 (ADR-006)
+# Pre-render UI templates to static HTML; serve without waking Worker (free, unlimited).
+# Uncomment when build step is implemented:
+# [assets]
+# directory = "./dist"
+# binding = "ASSETS"
+# run_worker_first = ["/api/*", "/admin/*", "/github/*", "/health"]

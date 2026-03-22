@@ -227,7 +227,7 @@ describe('apiKeyAuth middleware', () => {
       }, env)
       expect(res.status).toBe(401)
       const body = await res.json() as any
-      expect(body.error).toContain('public repository')
+      expect(body.error).toContain('free for open-source')
     })
 
     it('falls through to free tier for invalid OIDC token', async () => {

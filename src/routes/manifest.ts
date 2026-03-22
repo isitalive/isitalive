@@ -1,12 +1,14 @@
 // ---------------------------------------------------------------------------
-// /api/manifest — manifest audit endpoints
+// /api/manifest — manifest audit endpoint
 //
-// POST /api/manifest      — submit a manifest for scoring (auth required)
-// GET  /api/manifest/hash/:hash — CDN-cacheable lookup by content hash
+// POST /api/manifest — submit a manifest for scoring (auth required)
 //
-// Accepts a manifest file (go.mod or package.json) and returns a scored
-// health report for every dependency. Cache-first and idempotent — calling
-// again with the same manifest is instant.
+// Accepts X-Manifest-Hash header for fast-path cache lookup BEFORE parsing the
+// JSON body. If the hash matches a cached result, returns immediately (<1ms CPU).
+// Supports If-None-Match → 304 for ETag-based client caching.
+//
+// GET /api/manifest/hash/:hash was removed in ADR-006 — Workers always wake
+// up, so the GET was a redundant round-trip at the same $0.30/M cost.
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
@@ -29,41 +31,10 @@ const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
 const OIDC_FREE_QUOTA_LIMIT = 500; // deps scored/month per public repo (ADR-004)
 
 // ---------------------------------------------------------------------------
-// GET /api/manifest/hash/:hash — content-addressed CDN-cacheable lookup
-//
-// No authentication required — returns public cached health scores.
-// CDN caches for 7 days (s-maxage=604800). Safe because hashes are
-// content-addressed: the cache key changes whenever the manifest changes.
-// ---------------------------------------------------------------------------
-
-audit.get('/hash/:hash', async (c) => {
-  const hash = c.req.param('hash');
-
-  // Validate hash format (SHA-256 = 64 hex chars)
-  if (!/^[a-f0-9]{64}$/.test(hash)) {
-    return c.json({ error: 'Invalid hash format — expected 64-char hex SHA-256' }, 400);
-  }
-
-  const cached = await c.env.CACHE_KV.get(`audit:result:${hash}`);
-  if (!cached) {
-    return c.json({ error: 'Not found' }, 404);
-  }
-
-  // 7-day edge cache — hash is content-addressed, result is immutable
-  c.header('CDN-Cache-Control', 'public, s-maxage=604800');
-  c.header('Cache-Control', 'public, max-age=3600');
-  c.header('ETag', `"${hash}"`);
-  try {
-    return c.json(JSON.parse(cached));
-  } catch {
-    // Corrupted KV entry — remove and return controlled error
-    await c.env.CACHE_KV.delete(`audit:result:${hash}`);
-    return c.json({ error: 'Cached result is corrupted' }, 500);
-  }
-});
-
-// ---------------------------------------------------------------------------
 // POST /api/manifest — submit manifest for scoring (auth required)
+//
+// Fast path: if X-Manifest-Hash header is present, checks L1/L2 cache BEFORE
+// parsing the JSON body — returns in <1ms CPU on cache hits.
 // ---------------------------------------------------------------------------
 
 audit.post('/', async (c) => {
@@ -89,6 +60,45 @@ audit.post('/', async (c) => {
         period: quotaEntry.period,
         hint: 'Add an ISITALIVE_API_KEY secret for higher limits. See https://isitalive.dev/docs/api-keys',
       }, 429)
+    }
+  }
+
+  // ── FAST PATH: X-Manifest-Hash header check BEFORE parsing body (ADR-006)
+  // If the client sends a hash, we can check L1/L2 cache without the cost of
+  // JSON.parse() on the request body. Saves ~50ms CPU on cache hits.
+  const clientHash = c.req.header('X-Manifest-Hash');
+  if (clientHash && /^[a-f0-9]{64}$/.test(clientHash)) {
+    const auditCacheKey = `audit:result:${clientHash}`;
+    const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/manifest/${clientHash}`);
+    const cache = caches.default;
+
+    // L1: Cache API hit (Worker-internal, free ops)
+    const l1Hit = await cache.match(syntheticCacheUrl);
+    if (l1Hit) {
+      if (c.req.header('If-None-Match') === `"${clientHash}"`) {
+        return new Response(null, { status: 304, headers: { ETag: `"${clientHash}"` } });
+      }
+      return l1Hit;
+    }
+
+    // L2: KV cache hit
+    const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
+    if (kvCached) {
+      if (c.req.header('If-None-Match') === `"${clientHash}"`) {
+        return new Response(null, { status: 304, headers: { ETag: `"${clientHash}"` } });
+      }
+
+      // Return raw cached string directly (0 CPU parse time)
+      const response = new Response(kvCached, {
+        headers: {
+          'Content-Type': 'application/json',
+          'ETag': `"${clientHash}"`,
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
+      c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
+      c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
+      return response;
     }
   }
 
