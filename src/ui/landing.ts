@@ -528,7 +528,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               type="text"
               name="repo"
               id="searchInput"
-              placeholder="owner/repo (e.g. vercel/next.js)"
+              placeholder="owner/repo or link to package.json / go.mod"
               required
               autofocus
             />
@@ -539,7 +539,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           </div>
           ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible"></div>` : ''}
         </form>
-        <p class="search-hint">Try <code>vercel/next.js</code> or paste a link to a <code>package.json</code></p>
+        <p class="search-hint">Try <code>vercel/next.js</code> or paste a link to a <code>package.json</code> or <code>go.mod</code></p>
       </div>
     </header>
 
@@ -626,8 +626,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       // No Turnstile (local dev) — do client-side redirect
       e.preventDefault();
 
-      // Detect manifest URL: github.com/.../package.json or go.mod
-      var manifestRx = /(?:https?:\/\/)?(?:www\.)?github\.com\/[^/]+\/[^/]+\/blob\/.+\.(json|mod)$/i;
+      // Detect manifest URL: github.com/.../package.json or go.mod (only these filenames)
+      var manifestRx = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|go\.mod)$/i;
       if (manifestRx.test(input)) {
         // Submit as audit — POST to /_audit with url field
         var form = document.createElement('form');
