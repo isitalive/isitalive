@@ -12,6 +12,7 @@ function makeAuditResult(overrides: Partial<AuditResult> = {}): AuditResult {
     total: 4,
     pending: 0,
     unresolved: 1,
+    freshlyScored: 0,
     summary: {
       healthy: 1,
       stable: 1,
