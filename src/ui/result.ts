@@ -698,9 +698,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         html += '<section class="deps-section-card">';
         html += '<div class="deps-section-header"><h2>Dependencies (' + prodDeps.length + ')</h2>';
         html += '<div class="deps-sort">';
-        html += '<button class="sort-btn active" onclick="sortResultDeps(\'score-asc\')" id="rSortScoreAsc">Score ↑</button>';
-        html += '<button class="sort-btn" onclick="sortResultDeps(\'score-desc\')" id="rSortScoreDesc">Score ↓</button>';
-        html += '<button class="sort-btn" onclick="sortResultDeps(\'name\')" id="rSortName">A–Z</button>';
+        html += '<button class="sort-btn active" onclick="sortResultDeps(&quot;score-asc&quot;)" id="rSortScoreAsc">Score ↑</button>';
+        html += '<button class="sort-btn" onclick="sortResultDeps(&quot;score-desc&quot;)" id="rSortScoreDesc">Score ↓</button>';
+        html += '<button class="sort-btn" onclick="sortResultDeps(&quot;name&quot;)" id="rSortName">A–Z</button>';
         html += '</div></div>';
         html += '<table class="deps-table"><thead><tr><th>Dependency</th><th>Score</th><th>Verdict</th><th></th></tr></thead>';
         html += '<tbody id="resultProdBody">';
