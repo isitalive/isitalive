@@ -16,7 +16,7 @@ import { Context, Next } from 'hono';
 import type { Env, ApiKeyEntry } from '../scoring/types';
 import type { Tier } from '../cache/index';
 
-type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } };
+type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean } };
 
 /**
  * API key auth — looks up Bearer token in KV and sets tier + key name.
@@ -26,6 +26,7 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
   // Default to free tier, unauthenticated
   c.set('tier', 'free');
   c.set('keyName', null);
+  c.set('isAuthenticated', false);
 
   const authHeader = c.req.header('Authorization');
 
@@ -38,6 +39,7 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
     if (entry && entry.active !== false) {
       c.set('tier', (entry.tier || 'free') as Tier);
       c.set('keyName', entry.name || 'unnamed');
+      c.set('isAuthenticated', true);
     }
     // Invalid/inactive keys silently fall through to free tier —
     // doesn't reveal whether a key exists (OSS-safe)

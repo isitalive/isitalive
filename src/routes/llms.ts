@@ -30,9 +30,9 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 - \`cache.nextRefreshSeconds\`: When to re-poll for fresh data
 
 ### Audit Dependency Manifest
-\`POST /api/audit\`
+\`POST /api/manifest\`
 
-Upload a go.mod or package.json and get a scored health report for every dependency. Synchronous, idempotent, cache-first.
+**Requires authentication** (API key). Upload a go.mod or package.json and get a scored health report for every dependency. Synchronous, idempotent, cache-first.
 
 **Request body (JSON):**
 - \`format\`: "go.mod" | "package.json"
@@ -40,7 +40,8 @@ Upload a go.mod or package.json and get a scored health report for every depende
 
 **Example:**
 \`\`\`
-curl -X POST https://isitalive.dev/api/audit \\
+curl -X POST https://isitalive.dev/api/manifest \\
+  -H "Authorization: Bearer sk_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{"format":"go.mod","content":"<contents of go.mod>"}'
 \`\`\`
@@ -69,7 +70,7 @@ Returns an SVG badge for README embedding.
 
 ## Authentication
 
-Optional. Add \`Authorization: Bearer <key>\` for higher rate limits.
+Optional for health checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` for higher rate limits and access to all endpoints.
 
 | Tier | Rate Limit | Cache TTL |
 |------|-----------|-----------| 

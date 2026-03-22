@@ -278,7 +278,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="code-block">https://isitalive.dev</div>
 
     <h2>Authentication</h2>
-    <p>Authentication is optional. Include an API key for higher rate limits:</p>
+    <p>Authentication is optional for health checks and badges. It is <strong>required</strong> for the manifest audit endpoint. Include an API key for higher rate limits and access to all endpoints:</p>
     <div class="code-block"><span class="comment"># Add to any request</span><br>Authorization: Bearer sk_your_api_key</div>
 
     <h2>Endpoints</h2>
@@ -362,8 +362,8 @@ export function apiDocsPage(analyticsToken?: string): string {
     <h3>Audit Dependency Manifest</h3>
     <div class="endpoint">
       <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
-      <span class="endpoint-path">/api/audit</span>
-      <p class="endpoint-desc">Upload a <span class="inline-code">go.mod</span> or <span class="inline-code">package.json</span> and get a scored health report for every dependency. Synchronous, idempotent, cache-first (~50ms cached).</p>
+      <span class="endpoint-path">/api/manifest</span>
+      <p class="endpoint-desc">Upload a <span class="inline-code">go.mod</span> or <span class="inline-code">package.json</span> and get a scored health report for every dependency. <strong>Requires API key.</strong> Synchronous, idempotent, cache-first (~50ms cached).</p>
     </div>
 
     <h3>Request Body</h3>
@@ -373,7 +373,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Example Request</h3>
-    <div class="code-block"><span class="comment"># Audit a go.mod file</span><br>curl -X POST https://isitalive.dev/api/audit \<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
+    <div class="code-block"><span class="comment"># Audit a go.mod file</span><br>curl -X POST https://isitalive.dev/api/manifest \<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
 
     <h3>Example Response</h3>
     <div class="code-block">{<br>
@@ -410,7 +410,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>
       <span class="endpoint-path">/api/badge/{provider}/{owner}/{repo}</span>
-      <p class="endpoint-desc">Returns an SVG health badge for README embedding. Cached for 1 hour.</p>
+      <p class="endpoint-desc">Returns an SVG health badge for README embedding. Edge-cached for 24 hours.</p>
     </div>
 
     <div class="code-block"><span class="comment"># Markdown</span><br>[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)<br><br><span class="comment"># HTML</span><br>&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;<br>&nbsp;&nbsp;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;<br>&lt;/a&gt;</div>
@@ -434,6 +434,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     <table class="tier-table">
       <tr><th>Status</th><th>Meaning</th></tr>
       <tr><td>400</td><td>Invalid or unsupported provider</td></tr>
+      <tr><td>401</td><td>Authentication required (manifest audit endpoint)</td></tr>
       <tr><td>404</td><td>Repository not found on GitHub</td></tr>
       <tr><td>429</td><td>Rate limit exceeded — check <span class="inline-code">Retry-After</span> header</td></tr>
     </table>

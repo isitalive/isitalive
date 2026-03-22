@@ -6,13 +6,13 @@ import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
 import { providers, revalidateInBackground } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
-import { getCached, putCache, cacheControlHeader, TIERS, type Tier } from '../cache/index'
+import { getCached, putCache, cacheControlHeaders, TIERS, type Tier } from '../cache/index'
 import { buildResultEvent } from '../events/result'
 import { buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildProviderEvent } from '../events/provider'
 import { emitAll } from '../pipeline/emit'
 
-type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null } }
+type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean } }
 const check = new Hono<AppEnv>()
 
 
@@ -67,6 +67,9 @@ check.get('/:provider/:owner/:repo', async (c) => {
   }
 
   const tier: Tier = c.get('tier') ?? 'free'
+  const isAuthenticated = c.get('isAuthenticated') ?? false
+
+  const headers = cacheControlHeaders(tier, isAuthenticated)
 
   const buildUsageCtx = (cacheStatus: string): UsageContext => ({
     source: 'api',
@@ -82,18 +85,22 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const cached = await getCached(c.env, provider, owner, repo, tier)
 
   if ((cached.status === 'l1-hit' || cached.status === 'hit') && cached.result) {
-    const usageCtx = buildUsageCtx(cached.status)
-    c.executionCtx.waitUntil(
-      buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
-    )
+    // Usage events only for authenticated requests (billing/metering)
+    if (isAuthenticated) {
+      const usageCtx = buildUsageCtx(cached.status)
+      c.executionCtx.waitUntil(
+        buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
+          .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
+      )
+    }
 
     const response = c.json({
       ...cached.result,
       ...cacheMeta(cached.status, tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
 
-    response.headers.set('Cache-Control', cacheControlHeader(tier))
+    response.headers.set('Cache-Control', headers['Cache-Control'])
+    response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
     response.headers.set('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT')
 
     c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
@@ -101,19 +108,28 @@ check.get('/:provider/:owner/:repo', async (c) => {
   }
 
   if (cached.status === 'stale' && cached.result) {
-    const usageCtx = buildUsageCtx('stale')
-    c.executionCtx.waitUntil(Promise.all([
+    const bgTasks: Promise<unknown>[] = [
       revalidateInBackground(c.env, provider, owner, repo),
-      buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
-    ]))
+    ]
+
+    // Usage events only for authenticated requests
+    if (isAuthenticated) {
+      const usageCtx = buildUsageCtx('stale')
+      bgTasks.push(
+        buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
+          .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
+      )
+    }
+
+    c.executionCtx.waitUntil(Promise.all(bgTasks))
 
     const response = c.json({
       ...cached.result,
       ...cacheMeta('stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
 
-    response.headers.set('Cache-Control', cacheControlHeader(tier))
+    response.headers.set('Cache-Control', headers['Cache-Control'])
+    response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
     response.headers.set('X-Cache', 'STALE')
 
     c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
@@ -126,16 +142,29 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN)
     const result = scoreProject(rawData, prov.name)
 
-    const usageCtx = buildUsageCtx('miss')
-    c.executionCtx.waitUntil(Promise.all([
+    const bgTasks: Promise<unknown>[] = [
       putCache(c.env, provider, owner, repo, result),
-      buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, {
-          usage: [ue],
-          result: [buildResultEvent(result, 'api')],
-          provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
-        })),
-    ]))
+    ]
+
+    // Always emit result/provider events on cache miss (powers trending + data freshness)
+    const resultEvents = {
+      result: [buildResultEvent(result, 'api')],
+      provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+    }
+
+    // Usage events only for authenticated requests (billing/metering)
+    if (isAuthenticated) {
+      const usageCtx = buildUsageCtx('miss')
+      bgTasks.push(
+        buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
+          .then(ue => emitAll(c.env, { usage: [ue], ...resultEvents })),
+      )
+    } else {
+      // Anonymous: emit result/provider events only (no usage)
+      bgTasks.push(emitAll(c.env, resultEvents))
+    }
+
+    c.executionCtx.waitUntil(Promise.all(bgTasks))
 
     const now = new Date().toISOString()
     
@@ -144,7 +173,8 @@ check.get('/:provider/:owner/:repo', async (c) => {
       ...cacheMeta('miss', tier, 0, now, now, now),
     })
 
-    response.headers.set('Cache-Control', cacheControlHeader(tier))
+    response.headers.set('Cache-Control', headers['Cache-Control'])
+    response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
     response.headers.set('X-Cache', 'MISS')
 
     c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))

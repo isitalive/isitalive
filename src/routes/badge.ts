@@ -80,7 +80,8 @@ badge.get('/:provider/:owner/:repo', async (c) => {
 
     return c.body(svg, 200, {
       'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      'CDN-Cache-Control': 'public, s-maxage=86400',
     });
   } catch {
     // Fallback badge on error

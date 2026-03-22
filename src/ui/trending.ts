@@ -258,7 +258,7 @@ export function trendingPage(analyticsToken?: string): string {
         + '<span class="repo-rank">#' + (i+1) + '</span>'
         + '<div class="repo-info">'
         + '<div class="repo-name">' + r.repo + '</div>'
-        + '<div class="repo-meta">' + r.checks + ' check' + (r.checks !== 1 ? 's' : '') + ' today</div>'
+        + '<div class="repo-meta">Score: ' + r.avgScore + '</div>'
         + '</div>'
         + '<span class="repo-verdict" style="background:' + color + '20;color:' + color + '">' + verdictLabel(verdict) + '</span>'
         + '<span class="repo-score" style="color:' + color + '">' + r.avgScore + '</span>'
