@@ -1,82 +1,25 @@
-# isitalive
+# IsItAlive
+
+**Check the health of any open-source project — instantly.**
 
 [![Is It Alive?](https://isitalive.dev/api/badge/github/isitalive/isitalive)](https://isitalive.dev/github/isitalive/isitalive)
+<!-- audited by isitalive/audit-action -->
 
-> Is this project safe to depend on?
-
-Lightning-fast open-source dependency health checker. One query, one score, one answer.
-
-Built with [Cloudflare Workers](https://workers.cloudflare.com/) + [Hono](https://hono.dev/).
+IsItAlive scores open-source projects on 8 maintenance signals and gives you a single health score (0–100). Use it to evaluate dependencies before you adopt them, or monitor the ones you already use.
 
 ## Quick Start
 
 ```bash
-npm install
-echo "GITHUB_TOKEN=ghp_your_token_here" > .dev.vars
-npm run dev
-# Visit: http://localhost:8787/zitadel/zitadel
+curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
 ```
 
-## API
+## Links
 
-```bash
-# Check any GitHub project
-curl https://isitalive.dev/api/check/github/vercel/next.js | jq
-
-# Get a badge for your README
-# ![Is It Alive?](https://isitalive.dev/api/badge/github/vercel/next.js)
-```
-
-## Scoring
-
-We check 8 signals and produce a weighted health score (0-100):
-
-| Signal | Weight |
-|---|---|
-| Last commit | 25% |
-| PR responsiveness | 15% |
-| Release cadence | 15% |
-| Issue staleness | 10% |
-| Contributor diversity | 10% |
-| Bus factor | 10% |
-| CI/CD presence | 10% |
-| Community size | 5% |
-
-**Archived repos** are instantly scored 0 (Abandoned).
-
-## GitHub App
-
-Install the [IsItAlive GitHub App](https://github.com/apps/isitalive) to get automatic dependency audits on every pull request.
-
-**What it does:**
-- Audits your `package.json` / `go.mod` dependencies on every PR
-- Posts a Check Run with pass/fail and inline annotations
-- Posts (and updates) a PR comment with the audit summary
-- Falls back to baseline audit when no manifest files are changed
-
-## GitHub Action
-
-Use the [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for lightweight CI dependency auditing.
-
-```yaml
-# .github/workflows/audit.yml
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: isitalive/audit-action@v1
-```
-
-**Zero config for public repos** — uses GitHub OIDC for free (500 deps/month). Add an `api-key` input for private repos.
-
-## For AI Agents
-
-See [AGENTS.md](./AGENTS.md) for instructions on using isitalive programmatically.
+- **Website**: [isitalive.dev](https://isitalive.dev)
+- **API docs**: [isitalive.dev/docs/api](https://isitalive.dev/docs/api)
+- **Methodology**: [isitalive.dev/methodology](https://isitalive.dev/methodology)
+- **Audit Action**: [isitalive/audit-action](https://github.com/isitalive/audit-action)
 
 ## License
 
-[AGPL-3.0](./LICENSE)
+[AGPL-3.0](LICENSE)
