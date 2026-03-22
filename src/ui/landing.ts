@@ -539,7 +539,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           </div>
           ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible"></div>` : ''}
         </form>
-        <p class="search-hint">Try <code>vercel/next.js</code> or <code>facebook/react</code></p>
+        <p class="search-hint">Try <code>vercel/next.js</code> or paste a link to a <code>package.json</code></p>
       </div>
     </header>
 
@@ -622,9 +622,28 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       bar.classList.add('active');
       document.getElementById('searchInput').readOnly = true;
 
-      ${hasTurnstile ? `// Let the form POST with Turnstile token — server handles redirect` : `
+      ${hasTurnstile ? `// Let the form POST with Turnstile token — server handles redirect and manifest detection` : `
       // No Turnstile (local dev) — do client-side redirect
       e.preventDefault();
+
+      // Detect manifest URL: github.com/.../package.json or go.mod
+      var manifestRx = /(?:https?:\/\/)?(?:www\.)?github\.com\/[^/]+\/[^/]+\/blob\/.+\.(json|mod)$/i;
+      if (manifestRx.test(input)) {
+        // Submit as audit — POST to /_audit with url field
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/_audit';
+        var urlInput = document.createElement('input');
+        urlInput.type = 'hidden';
+        urlInput.name = 'url';
+        urlInput.value = input;
+        form.appendChild(urlInput);
+        document.body.appendChild(form);
+        document.body.classList.add('navigating');
+        form.submit();
+        return;
+      }
+
       let path = input
         .replace(/^https?:\\/\\//, '')
         .replace(/^(www\\.)?github\\.com\\//, '')
