@@ -34,10 +34,11 @@ npx tsc --noEmit      # type-check without emitting
 ## Architecture
 
 - **Runtime**: Cloudflare Workers + Hono router
-- **Storage**: Cloudflare KV (cache), R2 (analytics), Queues (events)
+- **Storage**: Cloudflare KV (cache), R2 (analytics), Pipelines (events → Iceberg)
 - **GitHub integration**: Direct REST API calls — no Octokit dependency
 - **Scoring**: 8 weighted signals from the GitHub GraphQL API
 - **GitHub App**: Webhook handler that audits PR dependencies and posts results
+- **GitHub Action**: [`isitalive/audit-action`](https://github.com/isitalive/audit-action) — composite action using OIDC for zero-config CI
 
 ## Key directories
 
@@ -45,9 +46,10 @@ npx tsc --noEmit      # type-check without emitting
 src/
 ├── audit/       # manifest parsing, dependency resolution, scoring
 ├── cache/       # KV cache helpers (stale-while-revalidate)
-├── github/      # GitHub App (auth, API client, handlers, report)
-├── middleware/   # rate limiting
-├── queue/       # Cloudflare Queue consumer (analytics, trending)
+├── cron/        # scheduled aggregation (trending, quota, sitemap)
+├── github/      # GitHub App (auth, API client, handlers, report, OIDC)
+├── middleware/   # auth (API key + OIDC), rate limiting
+├── pipeline/    # event emission to Cloudflare Pipelines
 ├── routes/      # Hono route handlers (check, badge, UI, manifest)
 ├── scoring/     # health score engine and signal definitions
 └── ui/          # HTML page templates (landing, result, changelog, etc.)
@@ -111,9 +113,29 @@ Content-Type: application/json
 ```
 
 Audits all dependencies in a manifest file and returns per-dependency health scores.
-Requires authentication (API key). The old `/api/audit` path redirects here.
+Requires authentication (API key or GitHub Actions OIDC token). The old `/api/audit` path redirects here.
 
 Supported formats: `package.json`, `go.mod`.
+
+### Authentication
+
+Two authentication methods are supported:
+
+1. **API key** (all repos): `Authorization: Bearer sk_your_api_key`
+2. **GitHub Actions OIDC** (public repos only): `Authorization: Bearer <oidc_jwt>`
+
+OIDC tokens are obtained automatically by the [`isitalive/audit-action`](https://github.com/isitalive/audit-action). Public repos get 500 deps scored/month free.
+
+## Manifest Hash Lookup (CDN-cached)
+
+```
+GET https://isitalive.dev/api/manifest/hash/{sha256_hash}
+```
+
+Returns cached audit results by manifest content hash. No authentication required.
+CDN-cached for 7 days (`s-maxage=604800`). Returns 404 if the manifest hasn't been audited yet.
+
+Used by the GitHub Action for $0-cost cache hits — hash your manifest locally, try GET first, POST only on miss.
 
 ## Badge
 
@@ -151,8 +173,10 @@ Rate limiting is purely infrastructure protection (not billing):
 ## Tips for Agents
 
 1. **Cache results** — scores are cached for 6 hours; avoid redundant checks
-2. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key)
-3. **Check the `verdict` field** for a quick human-readable assessment
-4. **The `signals` array** gives granular detail if you need to explain the score
-5. **Archived repos** are instantly scored 0 — no need to check signals
-6. **Anonymous check requests** are served from CDN edge cache (24h TTL) at zero Worker cost
+2. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
+3. **Use the hash endpoint first** — `GET /api/manifest/hash/{hash}` is free (CDN-cached); only POST on miss
+4. **Check the `verdict` field** for a quick human-readable assessment
+5. **The `signals` array** gives granular detail if you need to explain the score
+6. **Archived repos** are instantly scored 0 — no need to check signals
+7. **Anonymous check requests** are served from CDN edge cache (24h TTL) at zero Worker cost
+8. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI
