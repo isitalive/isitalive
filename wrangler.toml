@@ -86,9 +86,9 @@ crons = ["*/10 * * * *", "0 6 * * *"]
 
 # Public tokens — safe to commit (already embedded in HTML source).
 # Available at runtime via env AND parsed by scripts/build-static.ts at build time.
+# CF_ANALYTICS_TOKEN is NOT needed — CF auto-injects the RUM beacon when enabled.
 [vars]
-TURNSTILE_SITE_KEY = ""  # TODO: paste your Turnstile site key here
-CF_ANALYTICS_TOKEN = ""  # TODO: paste your CF Web Analytics token here
+TURNSTILE_SITE_KEY = "0x4AAAAAACtWfG0E4_y8k0Dy"
 
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
