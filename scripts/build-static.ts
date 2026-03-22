@@ -21,31 +21,48 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const OUT = resolve(ROOT, 'public');
 
-// ── Load tokens from environment or .dev.vars ──────────────────────────
+// ── Load tokens from environment, .dev.vars, or wrangler.toml [vars] ───
 
 function loadDevVars(): Record<string, string> {
   const devVarsPath = resolve(ROOT, '.dev.vars');
   if (!existsSync(devVarsPath)) return {};
+  return parseKeyValueFile(readFileSync(devVarsPath, 'utf-8'));
+}
+
+function loadWranglerVars(): Record<string, string> {
+  const tomlPath = resolve(ROOT, 'wrangler.toml');
+  if (!existsSync(tomlPath)) return {};
+  const content = readFileSync(tomlPath, 'utf-8');
+  // Simple parser: find [vars] section and extract key = "value" pairs
+  const varsMatch = content.match(/\[vars\]\n([\s\S]*?)(?:\n\[|\n$)/);
+  if (!varsMatch) return {};
+  return parseKeyValueFile(varsMatch[1]);
+}
+
+function parseKeyValueFile(content: string): Record<string, string> {
   const vars: Record<string, string> = {};
-  for (const line of readFileSync(devVarsPath, 'utf-8').split('\n')) {
+  for (const line of content.split('\n')) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('[')) continue;
     const eq = trimmed.indexOf('=');
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
     let val = trimmed.slice(eq + 1).trim();
-    // Strip surrounding quotes
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1);
+    // Strip surrounding quotes and inline comments
+    if ((val.startsWith('"') && val.includes('"', 1))) {
+      val = val.slice(1, val.indexOf('"', 1));
+    } else if ((val.startsWith("'") && val.includes("'", 1))) {
+      val = val.slice(1, val.indexOf("'", 1));
     }
-    vars[key] = val;
+    if (val) vars[key] = val;
   }
   return vars;
 }
 
 const devVars = loadDevVars();
-const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || devVars.TURNSTILE_SITE_KEY || '';
-const CF_ANALYTICS_TOKEN = process.env.CF_ANALYTICS_TOKEN || devVars.CF_ANALYTICS_TOKEN || '';
+const wranglerVars = loadWranglerVars();
+const TURNSTILE_SITE_KEY = process.env.TURNSTILE_SITE_KEY || devVars.TURNSTILE_SITE_KEY || wranglerVars.TURNSTILE_SITE_KEY || '';
+const CF_ANALYTICS_TOKEN = process.env.CF_ANALYTICS_TOKEN || devVars.CF_ANALYTICS_TOKEN || wranglerVars.CF_ANALYTICS_TOKEN || '';
 
 if (!TURNSTILE_SITE_KEY) {
   console.warn('⚠️  TURNSTILE_SITE_KEY not set — landing page Turnstile widget will be empty');
