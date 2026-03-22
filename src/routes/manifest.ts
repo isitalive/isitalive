@@ -1,5 +1,8 @@
 // ---------------------------------------------------------------------------
-// POST /api/manifest — synchronous manifest audit endpoint
+// /api/manifest — manifest audit endpoints
+//
+// POST /api/manifest      — submit a manifest for scoring (auth required)
+// GET  /api/manifest/hash/:hash — CDN-cacheable lookup by content hash
 //
 // Accepts a manifest file (go.mod or package.json) and returns a scored
 // health report for every dependency. Cache-first and idempotent — calling
@@ -10,6 +13,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../scoring/types';
 import type { Tier } from '../cache/index';
+import type { OidcClaims } from '../github/oidc';
 import { parseManifest, type ManifestFormat } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
 import { scoreAudit, hashManifest } from '../audit/scorer';
@@ -17,11 +21,43 @@ import { buildManifestEvent } from '../events/manifest';
 import { buildUsageEvent } from '../events/usage';
 import { emitAll } from '../pipeline/emit';
 
-type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean } }
+type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
 
 const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
+
+// ---------------------------------------------------------------------------
+// GET /api/manifest/hash/:hash — content-addressed CDN-cacheable lookup
+//
+// No authentication required — returns public cached health scores.
+// CDN caches for 7 days (s-maxage=604800). Safe because hashes are
+// content-addressed: the cache key changes whenever the manifest changes.
+// ---------------------------------------------------------------------------
+
+audit.get('/hash/:hash', async (c) => {
+  const hash = c.req.param('hash');
+
+  // Validate hash format (SHA-256 = 64 hex chars)
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    return c.json({ error: 'Invalid hash format — expected 64-char hex SHA-256' }, 400);
+  }
+
+  const cached = await c.env.CACHE_KV.get(`audit:result:${hash}`);
+  if (!cached) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+
+  // 7-day edge cache — hash is content-addressed, result is immutable
+  c.header('CDN-Cache-Control', 'public, s-maxage=604800');
+  c.header('Cache-Control', 'public, max-age=3600');
+  c.header('ETag', `"${hash}"`);
+  return c.json(JSON.parse(cached));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/manifest — submit manifest for scoring (auth required)
+// ---------------------------------------------------------------------------
 
 audit.post('/', async (c) => {
   // ── Auth gate — require authentication for API access ──────────────
@@ -32,6 +68,22 @@ audit.post('/', async (c) => {
       hint: 'Get an API key at https://isitalive.dev or use the website to audit manifests for free.',
     }, 401)
   }
+
+  // ── OIDC quota enforcement — read KV counter (populated by cron) ───
+  const oidcClaims = c.get('oidcClaims') ?? null
+  if (oidcClaims) {
+    const quotaEntry = await c.env.CACHE_KV.get(`oidc:quota:${oidcClaims.repository}`, 'json') as { used: number; limit: number; period: string } | null
+    if (quotaEntry && quotaEntry.used >= quotaEntry.limit) {
+      return c.json({
+        error: 'OIDC quota exceeded',
+        used: quotaEntry.used,
+        limit: quotaEntry.limit,
+        period: quotaEntry.period,
+        hint: 'Add an ISITALIVE_API_KEY secret for higher limits. See https://isitalive.dev/docs/api-keys',
+      }, 429)
+    }
+  }
+
   // ── Parse request ──────────────────────────────────────────────────
   let body: { format?: string; content?: string };
   try {
@@ -174,12 +226,14 @@ audit.post('/', async (c) => {
           d.verdict,
           {
             source: 'audit',
-            apiKey: c.req.header('Authorization')?.replace('Bearer ', '') ?? 'anon',
+            apiKey: c.get('keyName') ?? 'anon',
             cacheStatus: 'n/a',
             responseTimeMs: 0,
             cf: { country: (c.req.raw as any).cf?.country },
             userAgent: c.req.header('User-Agent') ?? null,
             ip: c.req.header('CF-Connecting-IP') ?? null,
+            oidcRepository: oidcClaims?.repository ?? null,
+            oidcOwner: oidcClaims?.repository_owner ?? null,
           },
         )),
     )
@@ -212,6 +266,8 @@ async function emitUsageFromCached(cachedJson: string, c: Context<AppEnv>): Prom
     )
     if (scoredDeps.length === 0) return
 
+    const oidcClaims = c.get('oidcClaims') ?? null
+
     const usageEvents = await Promise.all(
       scoredDeps.map((d: any) => buildUsageEvent(
         d.github,
@@ -220,12 +276,14 @@ async function emitUsageFromCached(cachedJson: string, c: Context<AppEnv>): Prom
         d.verdict,
         {
           source: 'audit',
-          apiKey: c.req.header('Authorization')?.replace('Bearer ', '') ?? 'anon',
+          apiKey: c.get('keyName') ?? 'anon',
           cacheStatus: 'kv-hit',
           responseTimeMs: 0,
           cf: { country: (c.req.raw as any).cf?.country },
           userAgent: c.req.header('User-Agent') ?? null,
           ip: c.req.header('CF-Connecting-IP') ?? null,
+          oidcRepository: oidcClaims?.repository ?? null,
+          oidcOwner: oidcClaims?.repository_owner ?? null,
         },
       )),
     )

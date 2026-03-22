@@ -20,9 +20,9 @@ export interface UsageEventData {
   score: number
   /** Verdict at time of request */
   verdict: string
-  /** Source: 'api' | 'browser' | 'badge' | 'page-view' | 'github-app' */
+  /** Source: 'api' | 'browser' | 'badge' | 'page-view' | 'github-app' | 'audit' */
   source: string
-  /** API key name hash, or 'anon' */
+  /** API key name hash, or 'anon', or 'oidc:{owner}/{repo}' */
   api_key: string
   /** Cache status: 'l1-hit' | 'hit' | 'stale' | 'miss' */
   cache_status: string
@@ -34,6 +34,10 @@ export interface UsageEventData {
   response_time_ms: number
   /** SHA-256 hashed IP for privacy-safe analytics */
   ip_hash: string
+  /** OIDC source repository (e.g. "vercel/next.js"), null for API key auth */
+  oidc_repository: string | null
+  /** OIDC repository owner (e.g. "vercel"), null for API key auth */
+  oidc_owner: string | null
 }
 
 export type UsageEvent = Event<'usage', UsageEventData>
@@ -66,6 +70,10 @@ export interface UsageContext {
   cf?: { country?: string }
   userAgent: string | null
   ip: string | null
+  /** OIDC source repository (e.g. "vercel/next.js"), null for API key auth */
+  oidcRepository?: string | null
+  /** OIDC repository owner, null for API key auth */
+  oidcOwner?: string | null
 }
 
 /** Build a usage event from request context */
@@ -88,6 +96,8 @@ export async function buildUsageEvent(
     user_agent: classifyUserAgent(ctx.userAgent),
     response_time_ms: ctx.responseTimeMs,
     ip_hash: await hashIp(ctx.ip),
+    oidc_repository: ctx.oidcRepository ?? null,
+    oidc_owner: ctx.oidcOwner ?? null,
   })
 }
 
@@ -111,5 +121,7 @@ export function buildPageViewUsageEvent(
     user_agent: 'browser',
     response_time_ms: 0,
     ip_hash: 'unknown',
+    oidc_repository: null,
+    oidc_owner: null,
   })
 }

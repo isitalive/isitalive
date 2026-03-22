@@ -39,7 +39,7 @@ We check 8 signals and produce a weighted health score (0-100):
 | Issue staleness | 10% |
 | Contributor diversity | 10% |
 | Bus factor | 10% |
-| CI/CD presence | 5% |
+| CI/CD presence | 10% |
 | Community size | 5% |
 
 **Archived repos** are instantly scored 0 (Abandoned).
@@ -53,6 +53,25 @@ Install the [IsItAlive GitHub App](https://github.com/apps/isitalive) to get aut
 - Posts a Check Run with pass/fail and inline annotations
 - Posts (and updates) a PR comment with the audit summary
 - Falls back to baseline audit when no manifest files are changed
+
+## GitHub Action
+
+Use the [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for lightweight CI dependency auditing.
+
+```yaml
+# .github/workflows/audit.yml
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: isitalive/audit-action@v1
+```
+
+**Zero config for public repos** — uses GitHub OIDC for free (500 deps/month). Add an `api-key` input for private repos.
 
 ## For AI Agents
 

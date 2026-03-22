@@ -1,0 +1,20 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write        # OIDC token for isitalive API
+      pull-requests: write   # Post PR comment
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: isitalive/audit-action@main
+        with:
+          fail-threshold: 20
