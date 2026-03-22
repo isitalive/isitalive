@@ -72,12 +72,12 @@ Returns an SVG badge for README embedding.
 
 Optional for health checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` for higher rate limits and access to all endpoints.
 
-| Tier | Rate Limit | Cache TTL |
-|------|-----------|-----------| 
-| No key | 60/min | 24h |
-| Free key | 60/min | 24h |
-| Pro key | 120/min | 1h |
-| Enterprise | 600/min | 15min |
+Rate limiting is infrastructure protection (not billing). Usage quotas are tracked separately.
+
+| Level | Rate Limit | Cache TTL |
+|-------|-----------|-----------|
+| No key | 10/min | 24h |
+| With key | 1,000/min | Tier-based |
 
 ## Scoring Signals
 

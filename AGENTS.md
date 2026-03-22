@@ -143,8 +143,10 @@ GET https://isitalive.dev/.well-known/ai-plugin.json
 
 ## Rate Limits
 
-- **Anonymous**: 60 requests/minute
-- **With API key**: higher limits (include `Authorization: Bearer sk_your_api_key`)
+Rate limiting is purely infrastructure protection (not billing):
+
+- **Anonymous**: 10 requests/minute (edge-cached, shouldn't hit Worker often)
+- **With API key**: 1,000 requests/minute
 
 ## Tips for Agents
 

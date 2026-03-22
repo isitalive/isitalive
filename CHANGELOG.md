@@ -13,12 +13,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - 401 authentication gate on `POST /api/manifest` — API key now required for manifest audits
 
 ### Changed
-- Renamed `/api/audit` → `/api/manifest` with 301 redirect from old path for backward compatibility
+- Renamed `/api/audit` → `/api/manifest` with 308 redirect from old path for backward compatibility (preserves POST method/body)
 - Trending data source migrated from `usage_events` to `result_events` (avoids data gaps when usage events are skipped for anonymous traffic)
 - Trending page no longer displays raw check counts — shows score instead
 - Badge `CDN-Cache-Control` increased from 1 hour to 24 hours (badges are always anonymous)
 - Usage events now only emitted for authenticated requests — anonymous traffic relies on Cloudflare Web Analytics
 - Cache tests rewritten for new `cacheControlHeaders(tier, isAuthenticated)` signature
+- **Rate limiting simplified** from 4 per-tier limits (60/60/120/600) to 2 levels: 10 req/min per IP (anonymous) and 1,000 req/min per key (authenticated) — rate limiting is purely infra protection, not billing
 
 ### Fixed
 - API docs showing badge cached for 1 hour (now correctly says 24 hours)

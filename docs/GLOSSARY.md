@@ -30,7 +30,7 @@ Common terms used throughout the IsItAlive codebase, documentation, and API.
 | **Tier** | The access level associated with an API key: `free`, `pro`, or `enterprise`. Determines rate limits and cache TTLs. |
 | **Anonymous** | A request without an API key. Served from CDN edge cache (24h TTL) at zero Worker cost. No usage events emitted. |
 | **Authenticated** | A request with a valid API key. Always hits the Worker for metering. Full usage events emitted. |
-| **Rate Limit** | Per-key (or per-IP for anonymous) request throttle. Free: 60/min, Pro: 120/min, Enterprise: 600/min. |
+| **Rate Limit** | Per-key (or per-IP for anonymous) request throttle for infra protection. Anonymous: 10/min, Authenticated: 1,000/min. Separate from billing quotas. |
 | **Quota** | Prepaid pool of health checks consumed per billing period. Distinct from rate limits (which protect infrastructure). |
 
 ## Caching
