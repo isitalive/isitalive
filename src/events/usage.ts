@@ -22,7 +22,7 @@ export interface UsageEventData {
   verdict: string
   /** Source: 'api' | 'browser' | 'badge' | 'page-view' | 'github-app' | 'audit' */
   source: string
-  /** API key name hash, or 'anon', or 'oidc:{owner}/{repo}' */
+  /** API key display name or non-secret identifier (e.g. 'anon', or 'oidc:{owner}/{repo}') */
   api_key: string
   /** Cache status: 'l1-hit' | 'hit' | 'stale' | 'miss' */
   cache_status: string

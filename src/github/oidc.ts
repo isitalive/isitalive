@@ -23,6 +23,8 @@ const JWKS_CACHE_KEY = 'github:oidc:jwks'
 const JWKS_CACHE_TTL = 3600 // 1 hour
 const EXPECTED_AUDIENCE = 'https://isitalive.dev'
 const CLOCK_SKEW_SECONDS = 60 // tolerance for clock drift
+const JWKS_REFETCH_COOLDOWN = 60 // min seconds between forced refetches
+const JWKS_LAST_FETCH_KEY = 'github:oidc:jwks:last_fetch'
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -92,8 +94,14 @@ export async function verifyOidcToken(jwt: string, env: Env): Promise<OidcClaims
   let jwk = await findJwk(env, header.kid, false)
 
   // If KID not found, refetch JWKS once (handles key rotation)
+  // Throttled to prevent DoS via random KIDs triggering repeated outbound fetches
   if (!jwk) {
-    jwk = await findJwk(env, header.kid, true)
+    const lastFetch = await env.CACHE_KV.get(JWKS_LAST_FETCH_KEY)
+    const now = Math.floor(Date.now() / 1000)
+    if (!lastFetch || (now - Number(lastFetch)) > JWKS_REFETCH_COOLDOWN) {
+      await env.CACHE_KV.put(JWKS_LAST_FETCH_KEY, String(now), { expirationTtl: JWKS_REFETCH_COOLDOWN * 2 })
+      jwk = await findJwk(env, header.kid, true)
+    }
   }
 
   if (!jwk) {
@@ -198,9 +206,10 @@ function validateClaims(payload: any): void {
     throw new Error(`Invalid issuer: ${payload.iss}`)
   }
 
-  // Audience
-  if (payload.aud !== EXPECTED_AUDIENCE) {
-    throw new Error(`Invalid audience: ${payload.aud}`)
+  // Audience (string or array)
+  const aud = payload.aud
+  if (!(aud === EXPECTED_AUDIENCE || (Array.isArray(aud) && aud.includes(EXPECTED_AUDIENCE)))) {
+    throw new Error(`Invalid audience: ${aud}`)
   }
 
   // Expiration
@@ -236,20 +245,24 @@ function extractClaims(payload: any): OidcClaims {
 // Base64url helpers
 // ---------------------------------------------------------------------------
 
-/** Decode a base64url string to a UTF-8 string */
-function base64urlDecode(str: string): string {
-  // Restore standard base64
+/** Decode a base64url string to raw bytes */
+function base64urlToBytes(str: string): Uint8Array {
   const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-  return atob(padded)
-}
-
-/** Decode a base64url string to an ArrayBuffer (for signature verification) */
-function base64urlToBuffer(str: string): ArrayBuffer {
-  const binary = base64urlDecode(str)
+  const binary = atob(padded)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i)
   }
-  return bytes.buffer as ArrayBuffer
+  return bytes
+}
+
+/** Decode a base64url string to a UTF-8 string (per JWT spec) */
+function base64urlDecode(str: string): string {
+  return new TextDecoder('utf-8').decode(base64urlToBytes(str))
+}
+
+/** Decode a base64url string to an ArrayBuffer (for signature verification) */
+function base64urlToBuffer(str: string): ArrayBuffer {
+  return base64urlToBytes(str).buffer as ArrayBuffer
 }

@@ -26,6 +26,7 @@ const audit = new Hono<AppEnv>();
 
 const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
+const OIDC_FREE_QUOTA_LIMIT = 500; // deps scored/month per public repo (ADR-004)
 
 // ---------------------------------------------------------------------------
 // GET /api/manifest/hash/:hash — content-addressed CDN-cacheable lookup
@@ -52,7 +53,13 @@ audit.get('/hash/:hash', async (c) => {
   c.header('CDN-Cache-Control', 'public, s-maxage=604800');
   c.header('Cache-Control', 'public, max-age=3600');
   c.header('ETag', `"${hash}"`);
-  return c.json(JSON.parse(cached));
+  try {
+    return c.json(JSON.parse(cached));
+  } catch {
+    // Corrupted KV entry — remove and return controlled error
+    await c.env.CACHE_KV.delete(`audit:result:${hash}`);
+    return c.json({ error: 'Cached result is corrupted' }, 500);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -72,12 +79,13 @@ audit.post('/', async (c) => {
   // ── OIDC quota enforcement — read KV counter (populated by cron) ───
   const oidcClaims = c.get('oidcClaims') ?? null
   if (oidcClaims) {
-    const quotaEntry = await c.env.CACHE_KV.get(`oidc:quota:${oidcClaims.repository}`, 'json') as { used: number; limit: number; period: string } | null
-    if (quotaEntry && quotaEntry.used >= quotaEntry.limit) {
+    const quotaEntry = await c.env.CACHE_KV.get(`oidc:quota:${oidcClaims.repository}`, 'json') as { used: number; limit?: number; period: string } | null
+    const limit = quotaEntry?.limit ?? OIDC_FREE_QUOTA_LIMIT
+    if (quotaEntry && quotaEntry.used >= limit) {
       return c.json({
         error: 'OIDC quota exceeded',
         used: quotaEntry.used,
-        limit: quotaEntry.limit,
+        limit,
         period: quotaEntry.period,
         hint: 'Add an ISITALIVE_API_KEY secret for higher limits. See https://isitalive.dev/docs/api-keys',
       }, 429)
