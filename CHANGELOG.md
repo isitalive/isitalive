@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.1] - 2026-03-22
+
+### Security
+
+- **Refined Content Security Policy (CSP)** — improved compatibility with Cloudflare Turnstile and Web Analytics by allowing `blob:`, `data:`, and `'unsafe-eval'` in `script-src`, and adding necessary Cloudflare domains to `connect-src`, `img-src`, and `style-src`.
+- Relaxed `X-Frame-Options` to `SAMEORIGIN` and `frame-ancestors` to `'self'` to allow Turnstile's nested iframes to function correctly while still preventing third-party clickjacking.
+
+### Fixed
+
+- Changed Turnstile widget size from `flexible` to `normal` on the landing page — resolves various iframe-related browser console errors and "UNSUPPORTED_OS" warnings in certain environments.
+- Added `https://static.cloudflareinsights.com` to `connect-src` and `img-src` in CSP to prevent `net::ERR_BLOCKED_BY_CLIENT` when analytics are not blocked by the browser.
+
 ## [0.9.0] - 2026-03-21
 
 ### Added
