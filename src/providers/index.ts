@@ -8,7 +8,7 @@
 import type { Env } from '../scoring/types';
 import { GitHubProvider } from './github';
 import { scoreProject } from '../scoring/engine';
-import { putCache } from '../cache/index';
+import { CacheManager } from '../cache/index';
 import { buildProviderEvent } from '../events/provider';
 import { buildResultEvent } from '../events/result';
 import { emitAll } from '../pipeline/emit';
@@ -45,7 +45,8 @@ export async function revalidateInBackground(
     const prov = getProvider(provider)
     const rawData = await prov.fetchProject(owner, repo, env.GITHUB_TOKEN)
     const result = scoreProject(rawData, prov.name)
-    await putCache(env, provider, owner, repo, result)
+    const cacheManager = new CacheManager(env)
+    await cacheManager.put(provider, owner, repo, result)
     // Archive raw data via Pipeline
     await emitAll(env, {
       provider: [buildProviderEvent(prov.name, owner, repo, rawData._rawResponse)],

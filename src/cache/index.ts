@@ -70,64 +70,6 @@ interface CachedEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Cache keys
-// ---------------------------------------------------------------------------
-
-function kvKey(provider: string, owner: string, repo: string): string {
-  return `${CACHE_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
-}
-
-function l1CacheUrl(provider: string, owner: string, repo: string): string {
-  return `${CACHE_DOMAIN}/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
-}
-
-// ---------------------------------------------------------------------------
-// L1: Cache API helpers
-// ---------------------------------------------------------------------------
-
-async function getL1(
-  provider: string,
-  owner: string,
-  repo: string,
-): Promise<ScoringResult | null> {
-  try {
-    const cache = caches.default;
-    const url = l1CacheUrl(provider, owner, repo);
-    const response = await cache.match(new Request(url));
-    if (!response) return null;
-    const result = await response.json() as ScoringResult;
-    return { ...result, cached: true };
-  } catch {
-    return null; // Cache API not available (e.g. local dev)
-  }
-}
-
-async function putL1(
-  provider: string,
-  owner: string,
-  repo: string,
-  result: ScoringResult,
-  tier: Tier = 'free',
-): Promise<void> {
-  try {
-    const cache = caches.default;
-    const url = l1CacheUrl(provider, owner, repo);
-    const ttl = TIERS[tier].l1Ttl;
-
-    const response = new Response(JSON.stringify(result), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': `public, max-age=${ttl}`,
-      },
-    });
-
-    await cache.put(new Request(url), response);
-  } catch {
-    // Cache API not available — silently skip
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Cache read — three-tier lookup
 // ---------------------------------------------------------------------------
 
@@ -146,83 +88,189 @@ export interface CacheResult {
   staleUntil: string | null;
 }
 
-export async function getCached(
-  env: Env,
-  provider: string,
-  owner: string,
-  repo: string,
-  tier: Tier = 'free',
-): Promise<CacheResult> {
-  // ── L1: Cache API (free, same-datacenter) ─────────────────────
-  const l1Result = await getL1(provider, owner, repo);
-  if (l1Result) {
-    return { result: l1Result, status: 'l1-hit', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
-  }
-
-  // ── L2: KV (persistent, global) ───────────────────────────────
-  const key = kvKey(provider, owner, repo);
-  const entry = await env.CACHE_KV.get(key, 'json') as CachedEntry | null;
-
-  if (!entry) {
-    return { result: null, status: 'miss', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
-  }
-
-  const ageSeconds = Math.round((Date.now() - entry.storedAt) / 1000);
-  const config = TIERS[tier];
-  const storedAt = new Date(entry.storedAt).toISOString();
-  const freshUntil = new Date(entry.storedAt + config.freshTtl * 1000).toISOString();
-  const staleUntil = new Date(entry.storedAt + config.staleTtl * 1000).toISOString();
-
-  if (ageSeconds <= config.freshTtl) {
-    // Fresh from KV — also populate L1 for next same-datacenter hit
-    await putL1(provider, owner, repo, entry.result, tier);
-    return {
-      result: { ...entry.result, cached: true },
-      status: 'hit',
-      ageSeconds, storedAt, freshUntil, staleUntil,
-    };
-  }
-
-  if (ageSeconds <= config.staleTtl) {
-    // Stale — serve + caller triggers background revalidation
-    return {
-      result: { ...entry.result, cached: true },
-      status: 'stale',
-      ageSeconds, storedAt, freshUntil, staleUntil,
-    };
-  }
-
-  // Too old
-  return { result: null, status: 'miss' as const, ageSeconds, storedAt, freshUntil, staleUntil };
-}
-
 // ---------------------------------------------------------------------------
-// Cache write — writes to both L1 and L2
+// CacheManager class
 // ---------------------------------------------------------------------------
 
-export async function putCache(
-  env: Env,
-  provider: string,
-  owner: string,
-  repo: string,
-  result: ScoringResult,
-  tier: Tier = 'free',
-): Promise<void> {
-  const key = kvKey(provider, owner, repo);
-  const entry: CachedEntry = {
-    result,
-    storedAt: Date.now(),
-  };
+export class CacheManager {
+  constructor(private env: Env, private ctx?: ExecutionContext) {}
 
-  // Write to both tiers concurrently
-  await Promise.all([
+  private kvKey(provider: string, owner: string, repo: string): string {
+    return `${CACHE_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  }
+
+  private l1CacheUrl(provider: string, owner: string, repo: string): string {
+    return `${CACHE_DOMAIN}/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  }
+
+  private async getL1(
+    provider: string,
+    owner: string,
+    repo: string,
+  ): Promise<ScoringResult | null> {
+    try {
+      const cache = caches.default;
+      const url = this.l1CacheUrl(provider, owner, repo);
+      const response = await cache.match(new Request(url));
+      if (!response) return null;
+      const result = await response.json() as ScoringResult;
+      return { ...result, cached: true };
+    } catch {
+      return null; // Cache API not available (e.g. local dev)
+    }
+  }
+
+  private async putL1(
+    provider: string,
+    owner: string,
+    repo: string,
+    result: ScoringResult,
+    tier: Tier = 'free',
+  ): Promise<void> {
+    try {
+      const cache = caches.default;
+      const url = this.l1CacheUrl(provider, owner, repo);
+      const ttl = TIERS[tier].l1Ttl;
+
+      const response = new Response(JSON.stringify(result), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `public, max-age=${ttl}`,
+        },
+      });
+
+      const putPromise = cache.put(new Request(url), response);
+      if (this.ctx) {
+        this.ctx.waitUntil(putPromise);
+      } else {
+        await putPromise;
+      }
+    } catch {
+      // Cache API not available — silently skip
+    }
+  }
+
+  /**
+   * Consolidates L1 fast-path and L2 check. Returns the same robust CacheResult.
+   */
+  async get(
+    provider: string,
+    owner: string,
+    repo: string,
+    tier: Tier = 'free',
+  ): Promise<CacheResult> {
+    // ── L1: Cache API (free, same-datacenter) ─────────────────────
+    const l1Result = await this.getL1(provider, owner, repo);
+    if (l1Result) {
+      return { result: l1Result, status: 'l1-hit', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
+    }
+
+    // ── L2: KV (persistent, global) ───────────────────────────────
+    const key = this.kvKey(provider, owner, repo);
+    const entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
+
+    if (!entry) {
+      return { result: null, status: 'miss', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
+    }
+
+    const ageSeconds = Math.round((Date.now() - entry.storedAt) / 1000);
+    const config = TIERS[tier];
+    const storedAt = new Date(entry.storedAt).toISOString();
+    const freshUntil = new Date(entry.storedAt + config.freshTtl * 1000).toISOString();
+    const staleUntil = new Date(entry.storedAt + config.staleTtl * 1000).toISOString();
+
+    if (ageSeconds <= config.freshTtl) {
+      // Fresh from KV — also populate L1 for next same-datacenter hit
+      // We don't await putL1 here to avoid blocking KV hit
+      const p = this.putL1(provider, owner, repo, entry.result, tier);
+      if (this.ctx) {
+        this.ctx.waitUntil(p);
+      }
+      return {
+        result: { ...entry.result, cached: true },
+        status: 'hit',
+        ageSeconds, storedAt, freshUntil, staleUntil,
+      };
+    }
+
+    if (ageSeconds <= config.staleTtl) {
+      // Stale — serve + caller triggers background revalidation
+      return {
+        result: { ...entry.result, cached: true },
+        status: 'stale',
+        ageSeconds, storedAt, freshUntil, staleUntil,
+      };
+    }
+
+    // Too old
+    return { result: null, status: 'miss' as const, ageSeconds, storedAt, freshUntil, staleUntil };
+  }
+
+  /**
+   * Handles putting results into L1 and L2 concurrently.
+   */
+  async put(
+    provider: string,
+    owner: string,
+    repo: string,
+    result: ScoringResult,
+    tier: Tier = 'free',
+  ): Promise<void> {
+    const key = this.kvKey(provider, owner, repo);
+    const entry: CachedEntry = {
+      result,
+      storedAt: Date.now(),
+    };
+
     // L2: KV (persistent)
-    env.CACHE_KV.put(key, JSON.stringify(entry), {
+    const kvPromise = this.env.CACHE_KV.put(key, JSON.stringify(entry), {
       expirationTtl: KV_MAX_TTL,
-    }),
+    });
+    
     // L1: Cache API (free, same-datacenter)
-    putL1(provider, owner, repo, result, tier),
-  ]);
+    const l1Promise = this.putL1(provider, owner, repo, result, tier);
+
+    if (this.ctx) {
+      this.ctx.waitUntil(Promise.all([kvPromise, l1Promise]));
+    } else {
+      await Promise.all([kvPromise, l1Promise]);
+    }
+  }
+
+  /**
+   * L1 Response caching fast-path for full responses (anonymous only).
+   */
+  async getResponse(request: Request, isAuthenticated: boolean): Promise<Response | null> {
+    if (isAuthenticated) return null;
+    try {
+      const cache = caches.default;
+      const cachedResponse = await cache.match(request);
+      if (cachedResponse) {
+        console.log(`⚡ Cache HIT for: ${request.url}`);
+        return cachedResponse;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  /**
+   * Cache a full response in L1.
+   */
+  async putResponse(request: Request, response: Response): Promise<void> {
+    try {
+      const cache = caches.default;
+      const promise = cache.put(request, response.clone());
+      if (this.ctx) {
+        this.ctx.waitUntil(promise);
+      } else {
+        await promise;
+      }
+    } catch {
+      // ignore
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -296,4 +344,3 @@ export async function getFirstSeen(
   const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
   return await kv.get(key);
 }
-
