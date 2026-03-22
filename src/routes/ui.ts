@@ -150,13 +150,14 @@ ui.get('/trending', (c) => {
   return c.html(trendingPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
-// Trending API — paginated JSON endpoint for client-side hydration
-ui.get('/api/trending', async (c) => {
+// Trending data — paginated JSON for client-side hydration
+// Mounted under /_data/ to avoid /api/* rate-limit + auth middleware
+ui.get('/_data/trending', async (c) => {
   const allRepos = await getTrending(c.env.CACHE_KV)
   const limit = Math.max(1, parseInt(c.req.query('limit') || '20', 10))
   const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10))
   const page = allRepos.slice(offset, offset + limit)
-  c.header('Cache-Control', 'public, max-age=10, s-maxage=10')
+  c.header('Cache-Control', 'public, max-age=60, s-maxage=60')
   return c.json({
     repos: page,
     total: allRepos.length,
@@ -172,8 +173,8 @@ ui.get('/changelog', (c) => {
   return c.html(changelogPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
-// Changelog API — paginated JSON endpoint
-ui.get('/api/changelog', (c) => {
+// Changelog data — paginated JSON for client-side hydration
+ui.get('/_data/changelog', (c) => {
   const page = Math.max(1, parseInt(c.req.query('page') || '1', 10))
   const limit = Math.min(20, Math.max(1, parseInt(c.req.query('limit') || '5', 10)))
 

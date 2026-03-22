@@ -2,7 +2,7 @@
 // Trending page — HTML shell with client-side hydration
 //
 // The HTML shell (layout, CSS, nav) is edge-cached for a long time.
-// Fresh trending data is fetched client-side from /api/trending.
+// Fresh trending data is fetched client-side from /_data/trending.
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
@@ -268,7 +268,7 @@ export function trendingPage(analyticsToken?: string): string {
       var btn = document.getElementById('btn-load-more');
       btn.disabled = true;
       btn.textContent = 'Loading...';
-      fetch('/api/trending?limit=' + pageSize + '&offset=' + currentOffset)
+      fetch('/_data/trending?limit=' + pageSize + '&offset=' + currentOffset)
         .then(r => r.json())
         .then(data => {
           var el = document.getElementById('trending-list');
@@ -306,7 +306,7 @@ export function trendingPage(analyticsToken?: string): string {
     });
 
     // Initial load
-    fetch('/api/trending?limit=' + pageSize + '&offset=0')
+    fetch('/_data/trending?limit=' + pageSize + '&offset=0')
       .then(r => r.json())
       .then(data => {
         const el = document.getElementById('trending-list');

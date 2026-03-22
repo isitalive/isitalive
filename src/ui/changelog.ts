@@ -2,7 +2,7 @@
 // Changelog page — static HTML shell with client-side infinite scroll
 //
 // The HTML shell is edge-cached. Changelog data is hydrated client-side
-// via fetch('/api/changelog?page=1&limit=5') with infinite scroll loading.
+// via fetch('/_data/changelog?page=1&limit=5') with infinite scroll loading.
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss } from './components';
@@ -301,7 +301,7 @@ export function changelogPage(analyticsToken?: string): string {
       loading = true;
       loadMoreBtn.textContent = 'Loading…';
 
-      fetch('/api/changelog?page=' + page + '&limit=' + PAGE_SIZE)
+      fetch('/_data/changelog?page=' + page + '&limit=' + PAGE_SIZE)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           // First load — clear skeletons
