@@ -291,54 +291,6 @@ export const openApiSpec = {
         },
       },
     },
-    '/api/manifest/hash/{hash}': {
-      get: {
-        operationId: 'getManifestByHash',
-        summary: 'Lookup cached manifest audit by content hash',
-        description: 'Returns cached audit results for a previously-scored manifest, identified by its SHA-256 content hash. No authentication required. CDN-cached for 7 days (`s-maxage=604800`). Returns 404 if the manifest has not been audited yet. Used by the GitHub Action for $0-cost cache hits — hash your manifest locally, try GET first, POST only on miss.',
-        parameters: [
-          {
-            name: 'hash',
-            in: 'path',
-            required: true,
-            description: 'SHA-256 hex hash of the manifest file content (64 characters)',
-            schema: { type: 'string', pattern: '^[a-f0-9]{64}$' },
-          },
-        ],
-        responses: {
-          '200': {
-            description: 'Cached audit result',
-            headers: {
-              ETag: {
-                description: 'The content hash, quoted',
-                schema: { type: 'string' },
-              },
-            },
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/AuditResult' },
-              },
-            },
-          },
-          '400': {
-            description: 'Invalid hash format',
-            content: {
-              'application/json': {
-                schema: { type: 'object', properties: { error: { type: 'string' } } },
-              },
-            },
-          },
-          '404': {
-            description: 'Manifest not yet audited',
-            content: {
-              'application/json': {
-                schema: { type: 'object', properties: { error: { type: 'string' } } },
-              },
-            },
-          },
-        },
-      },
-    },
   },
   components: {
     securitySchemes: {

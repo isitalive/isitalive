@@ -226,13 +226,15 @@ export async function putCache(
 }
 
 // ---------------------------------------------------------------------------
-// Cache-Control headers for downstream (browser/CDN)
+// Cache-Control headers for downstream (browser)
 //
 // Two separate concerns:
 //   Cache-Control: browser caching (per-tier TTL)
 //   CDN-Cache-Control: Cloudflare CDN edge caching
 //
-// Anonymous requests get s-maxage=86400 so CDN serves without waking Worker.
+// NOTE (ADR-006): CDN-Cache-Control does NOT prevent Worker invocations.
+// The Worker always wakes (~$0.30/M). These headers control the L1 Cache API
+// behavior within the Worker and downstream browser caching.
 // Authenticated requests get private,no-store so every request hits Worker.
 // ---------------------------------------------------------------------------
 
