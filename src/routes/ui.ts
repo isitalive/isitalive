@@ -34,6 +34,8 @@ import { emitAll } from '../pipeline/emit'
 import { parseManifest, type ManifestFormat } from '../audit/parsers'
 import { resolveAll } from '../audit/resolver'
 import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
+import { discoverManifests } from '../audit/discovery'
+import type { ParsedDep } from '../audit/parsers'
 
 const ui = new Hono<{ Bindings: Env }>()
 
@@ -202,7 +204,107 @@ ui.get('/_data/changelog', (c) => {
   return c.json({ versions, page, hasMore, total: all.length })
 })
 
-// POST /_check — form submission with Turnstile verification
+// Dependency health data — JSON for client-side hydration on result pages
+// Discovers manifests at repo root, parses + deduplicates deps, scores them.
+ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
+  const { provider, owner, repo } = c.req.param()
+
+  if (provider !== 'github' || !isValidParam(owner) || !isValidParam(repo)) {
+    return c.json({ manifests: [], error: 'Invalid parameters' }, 400)
+  }
+
+  // Check for cached deps result first
+  const depsCacheKey = `deps:github:${owner}/${repo}`
+  const cachedDeps = await c.env.CACHE_KV.get(depsCacheKey)
+  if (cachedDeps) {
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+    return c.json(JSON.parse(cachedDeps))
+  }
+
+  // Discover manifests at repo root
+  if (!c.env.GITHUB_TOKEN) {
+    return c.json({ manifests: [] }, 500)
+  }
+  const manifests = await discoverManifests(owner, repo, c.env.GITHUB_TOKEN, c.env.CACHE_KV)
+
+  if (manifests.length === 0) {
+    const empty = { manifests: [] as string[] }
+    // Cache the "no manifests" result briefly (1 hour)
+    await c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+    return c.json(empty)
+  }
+
+  // Fetch and parse all discovered manifests
+  let allDeps: ParsedDep[] = []
+  const manifestNames: string[] = []
+
+  for (const manifest of manifests) {
+    try {
+      const res = await fetch(manifest.downloadUrl, {
+        headers: { 'User-Agent': 'isitalive/1.0' },
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!res.ok) continue
+
+      const content = await res.text()
+      if (content.length > 512 * 1024) continue // Skip oversized manifests
+
+      const deps = parseManifest(manifest.format, content)
+      allDeps.push(...deps)
+      manifestNames.push(manifest.filename)
+    } catch {
+      // Non-critical — skip this manifest
+    }
+  }
+
+  if (allDeps.length === 0) {
+    const empty = { manifests: manifestNames, dependencies: [], summary: { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0, avgScore: 0 }, total: 0, scored: 0, pending: 0, complete: true }
+    await c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+    return c.json(empty)
+  }
+
+  // Deduplicate deps by name (keep first occurrence)
+  const seen = new Set<string>()
+  allDeps = allDeps.filter((d) => {
+    if (seen.has(d.name)) return false
+    seen.add(d.name)
+    return true
+  })
+
+  // Resolve to GitHub repos + score
+  const resolved = await resolveAll(allDeps, c.env)
+
+  // Hash the combined content for scoreAudit's cache key
+  const combinedContent = allDeps.map(d => `${d.name}@${d.version}`).join('\n')
+  const contentHash = await hashManifest(combinedContent)
+
+  const auditResult = await scoreAudit(resolved, manifestNames.join('+'), contentHash, c.env, c.executionCtx)
+
+  const result = {
+    manifests: manifestNames,
+    dependencies: auditResult.dependencies,
+    summary: auditResult.summary,
+    total: auditResult.total,
+    scored: auditResult.scored,
+    pending: auditResult.pending,
+    complete: auditResult.complete,
+  }
+
+  // Cache complete results for 6 hours, partial for 5 min
+  const ttl = auditResult.complete ? 6 * 60 * 60 : 5 * 60
+  c.executionCtx.waitUntil(
+    c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(result), { expirationTtl: ttl }),
+  )
+
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+  return c.json(result)
+})
 // This redirects to the result page after verifying the human.
 // Smart detection: if the input is a manifest URL, redirect to the audit flow.
 ui.post('/_check', verifyTurnstile, async (c) => {
