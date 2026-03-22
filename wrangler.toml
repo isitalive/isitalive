@@ -3,6 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2025-03-14"
 compatibility_flags = ["nodejs_compat"]
 
+# Build step — pre-renders static pages to public/ before deploy
+[build]
+command = "npm run build"
+
 [placement]
 mode = "smart"
 
