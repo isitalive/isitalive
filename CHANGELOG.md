@@ -9,20 +9,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **ADR-006: Static Assets, Worker Caching & Cost Architecture** — corrects the assumption that Workers can sit behind CDN cache (they can't); documents Cache API + KV as optimal strategy; includes full cost model
-- `X-Manifest-Hash` fast-path on `POST /api/manifest` — Worker checks L1/L2 cache *before* parsing JSON body, returning in <1ms CPU on cache hits
-- `If-None-Match` → 304 support on manifest endpoint — ETag-based client caching
-- AI-friendly 429 response messages — LLMs relay the upsell to users in-chat
-- Static Assets Phase 2 placeholder in `wrangler.toml` (commented out, requires build step)
+- **Phase 2: Static Assets** — pre-render 10 UI pages at build time; served by Cloudflare Static Assets without invoking the Worker (free & unlimited). Includes `scripts/build-static.ts`, custom `.md` loader, and `[assets]` config in `wrangler.toml`
+- `X-Manifest-Hash` fast-path on `POST /api/manifest` — Worker checks L1/L2 cache *before* parsing JSON body, returning in <1ms CPU on cache hits; hash normalized to lowercase for case-insensitive matching
+- AI-friendly 429 response: short `message` for humans, separate `hint` and `upgrade_url` fields for programmatic use by AI agents
+- `npm run build` / `npm run predeploy` scripts — auto-build static assets before deploy
 
 ### Changed
 
 - **Anonymous rate limit tightened** from 10 to 5 req/min per IP — every request wakes Worker (~$0.30/M), ADR-006
 - OIDC private-repo 401 message now includes pricing link and `ISITALIVE_API_KEY` instructions (PLG upsell)
 - ADR-005 updated to reference ADR-006: corrected architecture diagram, decision chain, invariants, and implementation status
+- Cache comments in `cache/index.ts` corrected: `CDN-Cache-Control` does NOT prevent Worker invocations
+- Audit result page API embed changed from removed GET endpoint to `curl -X POST` with `X-Manifest-Hash`
 
 ### Removed
 
-- `GET /api/manifest/hash/:hash` endpoint — Workers always invoke, making the GET a redundant round-trip at the same $0.30/M cost (ADR-006)
+- `GET /api/manifest/hash/:hash` endpoint and OpenAPI spec — Workers always invoke, making the GET a redundant round-trip at the same $0.30/M cost (ADR-006)
+- `.DS_Store` from git tracking
 
 ## [0.9.1] - 2026-03-22
 
