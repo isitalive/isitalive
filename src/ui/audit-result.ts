@@ -98,7 +98,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
   const formatLabel = result.format === 'package.json' ? 'package.json' : 'go.mod'
 
   const hashUrl = `https://isitalive.dev/audit/${result.auditHash}`
-  const apiUrl = `https://isitalive.dev/api/manifest/hash/${result.auditHash}`
+  const apiUrl = `curl -X POST https://isitalive.dev/api/manifest -H 'X-Manifest-Hash: ${result.auditHash}'`
 
   return `<!DOCTYPE html>
 <html lang="en">

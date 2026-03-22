@@ -66,7 +66,8 @@ audit.post('/', async (c) => {
   // ── FAST PATH: X-Manifest-Hash header check BEFORE parsing body (ADR-006)
   // If the client sends a hash, we can check L1/L2 cache without the cost of
   // JSON.parse() on the request body. Saves ~50ms CPU on cache hits.
-  const clientHash = c.req.header('X-Manifest-Hash');
+  const rawHash = c.req.header('X-Manifest-Hash');
+  const clientHash = rawHash?.toLowerCase();
   if (clientHash && /^[a-f0-9]{64}$/.test(clientHash)) {
     const auditCacheKey = `audit:result:${clientHash}`;
     const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/manifest/${clientHash}`);
