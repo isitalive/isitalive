@@ -553,7 +553,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       <p class="badge-subtitle">Add a live health badge to your README in seconds.</p>
 
       <div class="badge-preview">
-        <img src="https://isitalive.dev/api/badge/github/vercel/next.js" alt="Is It Alive? badge" class="badge-img" />
+        <img src="/api/badge/github/vercel/next.js" alt="Is It Alive? badge" class="badge-img" />
       </div>
 
       <div class="badge-snippets">
