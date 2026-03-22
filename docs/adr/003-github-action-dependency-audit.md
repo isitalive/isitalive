@@ -117,7 +117,7 @@ For **private repositories** (or public repos needing more than the free OIDC qu
 
 ```text
 1. Authorization: Bearer sk_...    → API key lookup in KEYS_KV (existing flow)
-2. Authorization: Bearer oidc_...  → JWT validation → check repository_visibility
+2. Authorization: Bearer eyJ...    → JWT validation → check repository_visibility
 3. No auth                         → 401
 ```
 

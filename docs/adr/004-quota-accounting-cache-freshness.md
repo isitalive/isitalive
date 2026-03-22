@@ -84,7 +84,7 @@ Public repos using GitHub Actions OIDC get a separate, fixed free quota:
 | Per public repository | 500 deps scored/month | Monthly |
 | Per organization | 5,000 deps scored/month (aggregate) | Monthly |
 
-Tracked via KV: `oidc:quota:{repository}` → `{ used: 142, period: "2026-03" }`
+Tracked via KV: `oidc:quota:{repository}` → `{ used: 142, limit: 500, period: "2026-03" }`
 
 When quota is exceeded, the POST returns 429 with:
 
