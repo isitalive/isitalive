@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Manifest Events — dependency scanning results
 //
-// "What they scanned" — captures manifest submissions from the /api/audit
+// "What they scanned" — captures manifest submissions from the /api/manifest
 // endpoint and GitHub App PR checks. Links to result events via repo names
 // and to usage events via timestamps.
 // ---------------------------------------------------------------------------

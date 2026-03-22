@@ -26,7 +26,7 @@ import { parseChangelog as parseChangelogMd } from '../changelog/parser'
 import changelogMd from '../../CHANGELOG.md'
 import { getScoreHistory, computeTrend } from '../ingest/processor'
 import { apiDocsPage } from '../ui/api-docs'
-import { buildPageViewUsageEvent, buildUsageEvent, type UsageContext } from '../events/usage'
+import { buildPageViewUsageEvent } from '../events/usage'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
 import { emitAll } from '../pipeline/emit'
@@ -234,15 +234,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     return c.html(errorPage(`Unsupported provider: ${provider}`), 400)
   }
 
-  const buildUsageCtx = (cacheStatus: string): UsageContext => ({
-    source: 'browser',
-    apiKey: 'anon',
-    cacheStatus,
-    responseTimeMs: Date.now() - startTime,
-    cf: (c.req.raw as any).cf,
-    userAgent: c.req.header('User-Agent') ?? null,
-    ip: null,
-  })
+
 
   try {
     const { result: cached, status } = await getCached(c.env, provider, owner, repo)
@@ -251,15 +243,12 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       if (status === 'stale') {
         c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo))
       }
-      const usageCtx = buildUsageCtx(status)
+      // Browser checks are anonymous — no usage events (tracked via Web Analytics).
+      // Emit result events for trending data and track recent queries for landing page.
       c.executionCtx.waitUntil(Promise.all([
-        // Direct KV write for recent queries (landing page)
         trackRecentQuery(c.env.CACHE_KV, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
-        // Pipeline events
-        buildUsageEvent(`${owner}/${repo}`, provider, cached.score, cached.verdict, usageCtx)
-          .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached, 'browser')] })),
       ]))
       const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
       const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
@@ -273,20 +262,17 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN)
     const result = scoreProject(rawData, prov.name)
 
-    const usageCtx = buildUsageCtx('miss')
+    // Browser checks are anonymous — skip usage events.
+    // Emit result/provider events on miss (powers trending) and track for landing page.
     c.executionCtx.waitUntil(Promise.all([
       putCache(c.env, provider, owner, repo, result),
-      // Direct KV write for recent queries (landing page)
       trackRecentQuery(c.env.CACHE_KV, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
-      // Pipeline events
-      buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, {
-          usage: [ue],
-          result: [buildResultEvent(result, 'browser')],
-          provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
-        })),
+      emitAll(c.env, {
+        result: [buildResultEvent(result, 'browser')],
+        provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+      }),
     ]))
 
     const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)

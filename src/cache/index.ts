@@ -222,13 +222,37 @@ export async function putCache(
 }
 
 // ---------------------------------------------------------------------------
-// Cache-Control header for downstream (browser/CDN)
+// Cache-Control headers for downstream (browser/CDN)
+//
+// Two separate concerns:
+//   Cache-Control: browser caching (per-tier TTL)
+//   CDN-Cache-Control: Cloudflare CDN edge caching
+//
+// Anonymous requests get s-maxage=86400 so CDN serves without waking Worker.
+// Authenticated requests get private,no-store so every request hits Worker.
 // ---------------------------------------------------------------------------
 
-export function cacheControlHeader(tier: Tier): string {
-  const config = TIERS[tier];
-  const swr = config.staleTtl - config.freshTtl;
-  return `public, max-age=${config.l1Ttl}, s-maxage=${config.l1Ttl}, stale-while-revalidate=${swr}`;
+export interface CacheHeaders {
+  'Cache-Control': string
+  'CDN-Cache-Control': string
+}
+
+export function cacheControlHeaders(tier: Tier, isAuthenticated: boolean): CacheHeaders {
+  const config = TIERS[tier]
+  const swr = config.staleTtl - config.freshTtl
+
+  if (isAuthenticated) {
+    return {
+      'Cache-Control': `public, max-age=${config.l1Ttl}, stale-while-revalidate=${swr}`,
+      'CDN-Cache-Control': 'private, no-store',
+    }
+  }
+
+  // Anonymous: CDN caches for 24h, browser uses tier TTL
+  return {
+    'Cache-Control': `public, max-age=${config.l1Ttl}, stale-while-revalidate=${swr}`,
+    'CDN-Cache-Control': `public, s-maxage=86400`,
+  }
 }
 
 // ---------------------------------------------------------------------------

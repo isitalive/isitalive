@@ -194,7 +194,7 @@ export const openApiSpec = {
         },
       },
     },
-    '/api/audit': {
+    '/api/manifest': {
       post: {
         operationId: 'auditManifest',
         summary: 'Audit dependency manifest',

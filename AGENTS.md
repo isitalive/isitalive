@@ -48,7 +48,7 @@ src/
 ├── github/      # GitHub App (auth, API client, handlers, report)
 ├── middleware/   # rate limiting
 ├── queue/       # Cloudflare Queue consumer (analytics, trending)
-├── routes/      # Hono route handlers (check, badge, UI, audit)
+├── routes/      # Hono route handlers (check, badge, UI, manifest)
 ├── scoring/     # health score engine and signal definitions
 └── ui/          # HTML page templates (landing, result, changelog, etc.)
 ```
@@ -97,10 +97,11 @@ curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
 | critical | 20–39 | Significant maintenance concerns |
 | unmaintained | 0–19 | Likely abandoned |
 
-## Audit (Manifest)
+## Manifest Audit
 
 ```
-POST https://isitalive.dev/api/audit
+POST https://isitalive.dev/api/manifest
+Authorization: Bearer sk_your_api_key
 Content-Type: application/json
 
 {
@@ -110,6 +111,7 @@ Content-Type: application/json
 ```
 
 Audits all dependencies in a manifest file and returns per-dependency health scores.
+Requires authentication (API key). The old `/api/audit` path redirects here.
 
 Supported formats: `package.json`, `go.mod`.
 
@@ -147,7 +149,8 @@ GET https://isitalive.dev/.well-known/ai-plugin.json
 ## Tips for Agents
 
 1. **Cache results** — scores are cached for 6 hours; avoid redundant checks
-2. **Use the audit endpoint** for batch checks of all dependencies at once
+2. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key)
 3. **Check the `verdict` field** for a quick human-readable assessment
 4. **The `signals` array** gives granular detail if you need to explain the score
 5. **Archived repos** are instantly scored 0 — no need to check signals
+6. **Anonymous check requests** are served from CDN edge cache (24h TTL) at zero Worker cost

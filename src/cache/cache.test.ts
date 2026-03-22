@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cacheControlHeader, TIERS, type Tier } from './index'
+import { cacheControlHeaders, TIERS, type Tier } from './index'
 
 // ── Tier config consistency ────────────────────────────────────────────
 describe('tier config', () => {
@@ -34,45 +34,58 @@ describe('tier config', () => {
   })
 })
 
-// ── cacheControlHeader ─────────────────────────────────────────────────
-describe('cacheControlHeader', () => {
-  it('returns correct header for free tier', () => {
-    const header = cacheControlHeader('free')
-    const free = TIERS.free
-    const swr = free.staleTtl - free.freshTtl
-    expect(header).toBe(
-      `public, max-age=${free.l1Ttl}, s-maxage=${free.l1Ttl}, stale-while-revalidate=${swr}`,
-    )
+// ── cacheControlHeaders ────────────────────────────────────────────────
+describe('cacheControlHeaders', () => {
+  describe('anonymous (unauthenticated)', () => {
+    it('returns CDN s-maxage=86400 for anonymous requests', () => {
+      const headers = cacheControlHeaders('free', false)
+      expect(headers['CDN-Cache-Control']).toBe('public, s-maxage=86400')
+    })
+
+    it('returns browser Cache-Control with tier TTL', () => {
+      const headers = cacheControlHeaders('free', false)
+      const free = TIERS.free
+      const swr = free.staleTtl - free.freshTtl
+      expect(headers['Cache-Control']).toBe(
+        `public, max-age=${free.l1Ttl}, stale-while-revalidate=${swr}`,
+      )
+    })
+
+    it('uses same CDN header for all tiers when anonymous', () => {
+      for (const tier of ['free', 'pro', 'enterprise'] as Tier[]) {
+        const headers = cacheControlHeaders(tier, false)
+        expect(headers['CDN-Cache-Control']).toBe('public, s-maxage=86400')
+      }
+    })
   })
 
-  it('returns correct header for pro tier', () => {
-    const header = cacheControlHeader('pro')
-    const pro = TIERS.pro
-    const swr = pro.staleTtl - pro.freshTtl
-    expect(header).toBe(
-      `public, max-age=${pro.l1Ttl}, s-maxage=${pro.l1Ttl}, stale-while-revalidate=${swr}`,
-    )
-  })
+  describe('authenticated', () => {
+    it('returns CDN private, no-store for authenticated requests', () => {
+      const headers = cacheControlHeaders('pro', true)
+      expect(headers['CDN-Cache-Control']).toBe('private, no-store')
+    })
 
-  it('returns correct header for enterprise tier', () => {
-    const header = cacheControlHeader('enterprise')
-    const ent = TIERS.enterprise
-    const swr = ent.staleTtl - ent.freshTtl
-    expect(header).toBe(
-      `public, max-age=${ent.l1Ttl}, s-maxage=${ent.l1Ttl}, stale-while-revalidate=${swr}`,
-    )
-  })
+    it('returns browser Cache-Control with tier TTL', () => {
+      const headers = cacheControlHeaders('pro', true)
+      const pro = TIERS.pro
+      const swr = pro.staleTtl - pro.freshTtl
+      expect(headers['Cache-Control']).toBe(
+        `public, max-age=${pro.l1Ttl}, stale-while-revalidate=${swr}`,
+      )
+    })
 
-  it('contains public directive for all tiers', () => {
-    for (const tier of ['free', 'pro', 'enterprise'] as Tier[]) {
-      expect(cacheControlHeader(tier)).toContain('public')
-    }
+    it('uses private CDN header for all tiers when authenticated', () => {
+      for (const tier of ['free', 'pro', 'enterprise'] as Tier[]) {
+        const headers = cacheControlHeaders(tier, true)
+        expect(headers['CDN-Cache-Control']).toBe('private, no-store')
+      }
+    })
   })
 
   it('stale-while-revalidate is > 0 for all tiers', () => {
     for (const tier of ['free', 'pro', 'enterprise'] as Tier[]) {
-      const header = cacheControlHeader(tier)
-      const match = header.match(/stale-while-revalidate=(\d+)/)
+      const headers = cacheControlHeaders(tier, false)
+      const match = headers['Cache-Control'].match(/stale-while-revalidate=(\d+)/)
       expect(match).not.toBeNull()
       expect(parseInt(match![1])).toBeGreaterThan(0)
     }

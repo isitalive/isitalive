@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// POST /api/audit — synchronous manifest audit endpoint
+// POST /api/manifest — synchronous manifest audit endpoint
 //
 // Accepts a manifest file (go.mod or package.json) and returns a scored
 // health report for every dependency. Cache-first and idempotent — calling
@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../scoring/types';
+import type { Tier } from '../cache/index';
 import { parseManifest, type ManifestFormat } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
 import { scoreAudit, hashManifest } from '../audit/scorer';
@@ -16,12 +17,21 @@ import { buildManifestEvent } from '../events/manifest';
 import { buildUsageEvent } from '../events/usage';
 import { emitAll } from '../pipeline/emit';
 
-const audit = new Hono<{ Bindings: Env }>();
+type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean } }
+const audit = new Hono<AppEnv>();
 
 const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
 
 audit.post('/', async (c) => {
+  // ── Auth gate — require authentication for API access ──────────────
+  const isAuthenticated = c.get('isAuthenticated') ?? false
+  if (!isAuthenticated) {
+    return c.json({
+      error: 'Authentication required',
+      hint: 'Get an API key at https://isitalive.dev or use the website to audit manifests for free.',
+    }, 401)
+  }
   // ── Parse request ──────────────────────────────────────────────────
   let body: { format?: string; content?: string };
   try {
@@ -61,7 +71,7 @@ audit.post('/', async (c) => {
   // POST can't use Cache API directly, so we use a synthetic URL keyed
   // by the manifest hash. Same pattern as /api/check.
   const cache = caches.default;
-  const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/audit/${contentHash}`);
+  const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/manifest/${contentHash}`);
 
   const l1Hit = await cache.match(syntheticCacheUrl);
   if (l1Hit) {
@@ -194,7 +204,7 @@ audit.post('/', async (c) => {
  * Parse a cached audit result in the background and emit usage events.
  * Called via waitUntil so it doesn't affect response latency.
  */
-async function emitUsageFromCached(cachedJson: string, c: Context<{ Bindings: Env }>): Promise<void> {
+async function emitUsageFromCached(cachedJson: string, c: Context<AppEnv>): Promise<void> {
   try {
     const result = JSON.parse(cachedJson)
     const scoredDeps = (result.dependencies || []).filter(

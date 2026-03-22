@@ -52,7 +52,14 @@ app.use('/api/*', rateLimit);
 
 app.route('/api/check', check);
 app.route('/api/badge', badge);
-app.route('/api/audit', audit);
+app.route('/api/manifest', audit);
+
+// Deprecation redirect: /api/audit → /api/manifest
+app.all('/api/audit', (c) => {
+  const url = new URL(c.req.url)
+  url.pathname = url.pathname.replace('/api/audit', '/api/manifest')
+  return c.redirect(url.toString(), 301)
+});
 app.route('/github', githubWebhook);
 app.route('/admin', admin);
 app.route('/', ui);

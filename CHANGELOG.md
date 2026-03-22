@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0] - 2026-03-22
+
+### Added
+- **Two-track request model** (ADR-002 Phase 1): anonymous traffic served from CDN edge cache at zero Worker cost; authenticated traffic goes through Worker for full analytics
+- `CDN-Cache-Control` headers: `s-maxage=86400` for anonymous requests, `private, no-store` for authenticated API key holders
+- `isAuthenticated` flag in auth middleware for clean anonymous/authenticated branching
+- 401 authentication gate on `POST /api/manifest` — API key now required for manifest audits
+
+### Changed
+- Renamed `/api/audit` → `/api/manifest` with 301 redirect from old path for backward compatibility
+- Trending data source migrated from `usage_events` to `result_events` (avoids data gaps when usage events are skipped for anonymous traffic)
+- Trending page no longer displays raw check counts — shows score instead
+- Badge `CDN-Cache-Control` increased from 1 hour to 24 hours (badges are always anonymous)
+- Usage events now only emitted for authenticated requests — anonymous traffic relies on Cloudflare Web Analytics
+- Cache tests rewritten for new `cacheControlHeaders(tier, isAuthenticated)` signature
+
+### Fixed
+- API docs showing badge cached for 1 hour (now correctly says 24 hours)
+- API docs curl example for manifest audit missing `Authorization` header
+- AGENTS.md referencing old `/api/audit` path and missing auth requirement
+- ADR-002 referencing old `/api/audit` path
+
 ## [0.7.6] - 2026-03-21
 
 ### Added

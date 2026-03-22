@@ -12,21 +12,20 @@ import { TRENDING_KEY } from '../state/keys'
 /** Trending repo entry (cached in KV, consumed by UI) */
 export interface TrendingRepo {
   repo: string
-  checks: number
   avgScore: number
   lastVerdict: string
 }
 
 const TRENDING_SQL = `
 SELECT
-  repo,
+  project as repo,
   COUNT(*) as checks,
   AVG(score) as avg_score,
   MAX(verdict) as last_verdict
-FROM usage_events
+FROM result_events
 WHERE timestamp > NOW() - INTERVAL '24 hours'
-  AND repo != ''
-GROUP BY repo
+  AND project != ''
+GROUP BY project
 ORDER BY checks DESC
 LIMIT 250
 `
@@ -46,7 +45,7 @@ export async function refreshTrending(env: Env): Promise<TrendingRepo[]> {
 
   const trending: TrendingRepo[] = result.rows.map(row => ({
     repo: String(row[0]),
-    checks: Number(row[1]),
+    // row[1] = checks — used for ORDER BY but not exposed in API
     avgScore: Math.round(Number(row[2])),
     lastVerdict: String(row[3]),
   }))
