@@ -14,6 +14,7 @@ mode = "smart"
 [[rules]]
 type = "Text"
 globs = ["**/*.md"]
+fallthrough = true
 
 # Custom domain
 routes = [
@@ -83,9 +84,14 @@ pipeline = "aceb9a448fc6426ca418d233579a5bc9"
 [triggers]
 crons = ["*/10 * * * *", "0 6 * * *"]
 
+# Public tokens — safe to commit (already embedded in HTML source).
+# Available at runtime via env AND parsed by scripts/build-static.ts at build time.
+[vars]
+TURNSTILE_SITE_KEY = ""  # TODO: paste your Turnstile site key here
+CF_ANALYTICS_TOKEN = ""  # TODO: paste your CF Web Analytics token here
+
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
-# - TURNSTILE_SITE_KEY: Cloudflare Turnstile public key
 # - TURNSTILE_SECRET_KEY: Cloudflare Turnstile secret key
 # - CF_ACCOUNT_ID: Cloudflare account ID (for R2 SQL API in Cron)
 # - CF_R2_SQL_TOKEN: Read-only scoped token for R2 SQL queries
