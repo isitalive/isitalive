@@ -35,6 +35,8 @@ export interface AuditDep {
   score: number | null;
   /** Verdict, or "pending"/"unresolved" */
   verdict: string;
+  /** Whether this dep was freshly scored or served from cache */
+  cacheStatus?: 'fresh' | 'cached' | 'pending' | 'unresolved';
   /** If unresolved, why */
   unresolvedReason?: string;
 }
@@ -51,6 +53,8 @@ export interface AuditResult {
   total: number;
   pending: number;
   unresolved: number;
+  /** Deps freshly scored this request (consumed quota) vs served from cache */
+  freshlyScored: number;
   /** If incomplete, suggested wait before retry (ms) */
   retryAfterMs?: number;
   /** Aggregate stats (only over scored deps) */
@@ -115,6 +119,7 @@ export async function scoreAudit(
       github: null,
       score: null,
       verdict: 'unresolved',
+      cacheStatus: 'unresolved' as const,
       unresolvedReason: d.unresolvedReason,
     }));
 
@@ -135,7 +140,7 @@ export async function scoreAudit(
     const { dep, cached } = result.value;
 
     if ((cached.status === 'hit' || cached.status === 'l1-hit' || cached.status === 'stale') && cached.result) {
-      scored.push(depToAudit(dep, cached.result));
+      scored.push(depToAudit(dep, cached.result, 'cached'));
     } else {
       uncached.push(dep);
     }
@@ -161,6 +166,7 @@ export async function scoreAudit(
           github: `${uncached[j].github!.owner}/${uncached[j].github!.repo}`,
           score: null,
           verdict: 'pending',
+          cacheStatus: 'pending',
         });
       }
       break;
@@ -187,7 +193,7 @@ export async function scoreAudit(
       if (r.status === 'rejected') continue;
       const { dep, result, error } = r.value;
       if (result) {
-        scored.push(depToAudit(dep, result));
+        scored.push(depToAudit(dep, result, 'fresh'));
       } else {
         // Scoring failed — treat as unresolved (not pending), it's not recoverable
         unresolvedDeps.push({
@@ -198,6 +204,7 @@ export async function scoreAudit(
           github: `${dep.github!.owner}/${dep.github!.repo}`,
           score: null,
           verdict: 'unresolved',
+          cacheStatus: 'unresolved',
           unresolvedReason: error ?? 'scoring_error',
         });
       }
@@ -222,6 +229,7 @@ export async function scoreAudit(
   const complete = remaining.length === 0;
   const scoredCount = scored.length;
   const pendingCount = remaining.length;
+  const freshCount = scored.filter(d => d.cacheStatus === 'fresh').length;
 
   const summary = buildSummary(scored);
 
@@ -233,6 +241,7 @@ export async function scoreAudit(
     total: deps.length,
     pending: pendingCount,
     unresolved: unresolvedDeps.length,
+    freshlyScored: freshCount,
     summary,
     dependencies: allDeps,
   };
@@ -265,7 +274,7 @@ export async function scoreAudit(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function depToAudit(dep: ResolvedDep, result: ScoringResult): AuditDep {
+function depToAudit(dep: ResolvedDep, result: ScoringResult, cacheStatus: 'fresh' | 'cached'): AuditDep {
   return {
     name: dep.name,
     version: dep.version,
@@ -274,6 +283,7 @@ function depToAudit(dep: ResolvedDep, result: ScoringResult): AuditDep {
     github: `${dep.github!.owner}/${dep.github!.repo}`,
     score: result.score,
     verdict: result.verdict,
+    cacheStatus,
   };
 }
 
