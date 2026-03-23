@@ -676,6 +676,12 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         if (box) box.classList.remove('loading');
         if (bar) { bar.classList.remove('active', 'done'); bar.style.width = '0'; }
         document.getElementById('searchInput').readOnly = false;
+
+        // Re-render Turnstile widget so a fresh token is generated.
+        // The old token was already consumed by the previous form submission.
+        if (typeof turnstile !== 'undefined') {
+          turnstile.reset();
+        }
       }
     });
   </script>
