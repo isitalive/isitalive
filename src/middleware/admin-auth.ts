@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono'
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import type { Env } from '../types/env'
 import { timingSafeEqual } from '../utils/crypto'
 
@@ -83,18 +84,6 @@ export async function validateSession(cookie: string, secret: string): Promise<b
 }
 
 /**
- * Parse cookies from a Cookie header string.
- */
-function parseCookies(header: string): Record<string, string> {
-  const cookies: Record<string, string> = {}
-  for (const pair of header.split(';')) {
-    const [name, ...rest] = pair.trim().split('=')
-    if (name) cookies[name.trim()] = rest.join('=').trim()
-  }
-  return cookies
-}
-
-/**
  * Admin auth guard — checks session cookie on all admin routes.
  * If ADMIN_SECRET is not configured, admin access is disabled entirely.
  */
@@ -106,10 +95,8 @@ export async function adminAuth(c: Context<AdminEnv>, next: Next) {
     return c.json({ error: 'Admin section is not configured' }, 503)
   }
 
-  // Check session cookie
-  const cookieHeader = c.req.header('Cookie') || ''
-  const cookies = parseCookies(cookieHeader)
-  const session = cookies[SESSION_COOKIE]
+  // Check session cookie via Hono cookie helper
+  const session = getCookie(c, SESSION_COOKIE)
 
   if (session && await validateSession(session, secret)) {
     return next()
@@ -125,18 +112,28 @@ export async function adminAuth(c: Context<AdminEnv>, next: Next) {
 }
 
 /**
- * Build a Set-Cookie header for the admin session.
- * Secure attribute is omitted when running over HTTP (local dev).
+ * Set the admin session cookie on the response context.
+ * Uses Hono's setCookie helper for proper Set-Cookie construction.
  */
-export function sessionCookieHeader(cookie: string, maxAge: number, isSecure = true): string {
-  const secure = isSecure ? '; Secure' : ''
-  return `${SESSION_COOKIE}=${cookie}; Path=/admin; HttpOnly${secure}; SameSite=Strict; Max-Age=${maxAge}`
+export function setSessionCookie(c: Context<AdminEnv>, cookie: string, maxAge: number, isSecure = true) {
+  setCookie(c, SESSION_COOKIE, cookie, {
+    path: '/admin',
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: 'Strict',
+    maxAge,
+  })
 }
 
 /**
- * Build a Set-Cookie header that clears the admin session.
+ * Clear the admin session cookie from the response context.
+ * Uses Hono's deleteCookie helper.
  */
-export function clearSessionCookieHeader(isSecure = true): string {
-  const secure = isSecure ? '; Secure' : ''
-  return `${SESSION_COOKIE}=; Path=/admin; HttpOnly${secure}; SameSite=Strict; Max-Age=0`
+export function clearSessionCookie(c: Context<AdminEnv>, isSecure = true) {
+  deleteCookie(c, SESSION_COOKIE, {
+    path: '/admin',
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: 'Strict',
+  })
 }

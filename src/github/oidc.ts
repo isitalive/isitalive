@@ -1,268 +1,182 @@
 // ---------------------------------------------------------------------------
-// GitHub Actions OIDC — JWT verification
+// GitHub Actions OIDC token verification
 //
-// Validates OIDC tokens issued by GitHub Actions for zero-config CI auth.
-// Uses Web Crypto API (no external JWT library) — same pattern as verify.ts.
-//
-// Flow:
-//   1. Decode JWT header → extract `kid`
-//   2. Fetch JWKS from GitHub's OIDC issuer (cached in KV, 1h TTL)
-//   3. If KID not in cache → refetch JWKS once (handles key rotation)
-//   4. Import RSA public key → verify RS256 signature
-//   5. Validate claims (iss, aud, exp, nbf)
-//   6. Extract repository claims for quota tracking
-//
-// Ref: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect
+// Verifies JWT tokens issued by GitHub Actions' OIDC provider using Hono's
+// built-in JWT helpers. Tokens are verified against GitHub's JWKS endpoint
+// with RS256 signature validation and standard claim checks (exp, nbf, iss, aud).
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import { verifyWithJwks } from 'hono/jwt'
+import type { JWTPayload } from 'hono/utils/jwt/types'
+import type { HonoJsonWebKey } from 'hono/utils/jwt/jws'
+import type { Env } from '../types/env'
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
-const JWKS_URL = `${GITHUB_OIDC_ISSUER}/.well-known/jwks`
-const JWKS_CACHE_KEY = 'github:oidc:jwks'
-const JWKS_CACHE_TTL = 3600 // 1 hour
+const GITHUB_JWKS_URI = 'https://token.actions.githubusercontent.com/.well-known/jwks.json'
 const EXPECTED_AUDIENCE = 'https://isitalive.dev'
-const CLOCK_SKEW_SECONDS = 60 // tolerance for clock drift
-const JWKS_REFETCH_COOLDOWN = 60 // min seconds between forced refetches
-const JWKS_LAST_FETCH_KEY = 'github:oidc:jwks:last_fetch'
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
+// KV cache key for JWKS (used as pre-loaded keys to avoid network round-trip)
+const JWKS_CACHE_KEY = 'github:oidc:jwks'
 
-/** Verified claims extracted from a GitHub Actions OIDC token */
+/** Required OIDC claims beyond the standard JWT fields */
+const REQUIRED_CLAIMS = [
+  'repository',
+  'repository_visibility',
+  'repository_owner',
+] as const
+
+/** Typed result of a successfully verified OIDC token */
 export interface OidcClaims {
-  /** Full repository name, e.g. "vercel/next.js" */
   repository: string
-  /** Repository visibility: "public" | "private" | "internal" */
   repository_visibility: string
-  /** Repository owner, e.g. "vercel" */
   repository_owner: string
-  /** Workflow run ID */
-  run_id: string
-  /** Actor who triggered the workflow */
-  actor: string
-  /** Full subject claim */
-  sub: string
+  run_id?: string
+  actor?: string
 }
 
-// ---------------------------------------------------------------------------
-// JWKS types
-// ---------------------------------------------------------------------------
-
-interface JwkKey {
-  kty: string
-  kid: string
-  alg: string
-  n: string
-  e: string
-  use?: string
-}
-
-interface JwksResponse {
-  keys: JwkKey[]
-}
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+/** Verification options shared by both cached and remote JWKS paths */
+const VERIFY_OPTIONS = {
+  allowedAlgorithms: ['RS256'] as const,
+  verification: {
+    iss: GITHUB_OIDC_ISSUER,
+    aud: EXPECTED_AUDIENCE,
+  },
+} as const
 
 /**
- * Verify a GitHub Actions OIDC JWT and return extracted claims.
- *
- * @throws Error if the token is invalid, expired, or has wrong issuer/audience
+ * Extract OIDC-specific claims from the verified JWT payload.
+ * Throws if any required claim is missing.
  */
-export async function verifyOidcToken(jwt: string, env: Env): Promise<OidcClaims> {
-  // ── 1. Decode header and payload (without verification yet) ─────────
-  const parts = jwt.split('.')
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT: expected 3 parts')
-  }
-
-  const header = JSON.parse(base64urlDecode(parts[0]))
-  const payload = JSON.parse(base64urlDecode(parts[1]))
-
-  if (header.alg !== 'RS256') {
-    throw new Error(`Unsupported algorithm: ${header.alg}`)
-  }
-
-  if (!header.kid) {
-    throw new Error('Missing kid in JWT header')
-  }
-
-  // ── 2. Find matching key in JWKS ────────────────────────────────────
-  let jwk = await findJwk(env, header.kid, false)
-
-  // If KID not found, refetch JWKS once (handles key rotation)
-  // Throttled to prevent DoS via random KIDs triggering repeated outbound fetches
-  if (!jwk) {
-    const lastFetch = await env.CACHE_KV.get(JWKS_LAST_FETCH_KEY)
-    const now = Math.floor(Date.now() / 1000)
-    if (!lastFetch || (now - Number(lastFetch)) > JWKS_REFETCH_COOLDOWN) {
-      await env.CACHE_KV.put(JWKS_LAST_FETCH_KEY, String(now), { expirationTtl: JWKS_REFETCH_COOLDOWN * 2 })
-      jwk = await findJwk(env, header.kid, true)
-    }
-  }
-
-  if (!jwk) {
-    throw new Error(`No matching key found for kid: ${header.kid}`)
-  }
-
-  // ── 3. Import public key and verify signature ───────────────────────
-  const publicKey = await crypto.subtle.importKey(
-    'jwk',
-    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256' },
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  )
-
-  const signingInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
-  const signature = base64urlToBuffer(parts[2])
-
-  const valid = await crypto.subtle.verify(
-    'RSASSA-PKCS1-v1_5',
-    publicKey,
-    signature,
-    signingInput,
-  )
-
-  if (!valid) {
-    throw new Error('Invalid JWT signature')
-  }
-
-  // ── 4. Validate standard claims ─────────────────────────────────────
-  validateClaims(payload)
-
-  // ── 5. Extract and return OIDC-specific claims ──────────────────────
-  return extractClaims(payload)
-}
-
-// ---------------------------------------------------------------------------
-// JWKS fetching (with KV cache)
-// ---------------------------------------------------------------------------
-
-/**
- * Find a JWK by key ID, using KV cache. If `forceRefresh` is true,
- * bypasses the cache and fetches fresh JWKS from GitHub.
- */
-async function findJwk(
-  env: Env,
-  kid: string,
-  forceRefresh: boolean,
-): Promise<JwkKey | null> {
-  const jwks = await fetchJwks(env, forceRefresh)
-  return jwks.keys.find((k) => k.kid === kid) ?? null
-}
-
-/**
- * Fetch GitHub's OIDC JWKS, caching in KV for efficiency.
- * Set `forceRefresh` to bypass cache (e.g. on unknown KID).
- */
-export async function fetchJwks(
-  env: Env,
-  forceRefresh = false,
-): Promise<JwksResponse> {
-  // Try cache first (unless forced)
-  if (!forceRefresh) {
-    const cached = await env.CACHE_KV.get(JWKS_CACHE_KEY)
-    if (cached) {
-      return JSON.parse(cached) as JwksResponse
-    }
-  }
-
-  // Fetch fresh JWKS
-  const response = await fetch(JWKS_URL, {
-    headers: { Accept: 'application/json' },
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch JWKS: ${response.status} ${response.statusText}`)
-  }
-
-  const jwks = (await response.json()) as JwksResponse
-
-  if (!jwks.keys || jwks.keys.length === 0) {
-    throw new Error('JWKS response contains no keys')
-  }
-
-  // Cache in KV
-  await env.CACHE_KV.put(JWKS_CACHE_KEY, JSON.stringify(jwks), {
-    expirationTtl: JWKS_CACHE_TTL,
-  })
-
-  return jwks
-}
-
-// ---------------------------------------------------------------------------
-// Claim validation
-// ---------------------------------------------------------------------------
-
-function validateClaims(payload: any): void {
-  const now = Math.floor(Date.now() / 1000)
-
-  // Issuer
-  if (payload.iss !== GITHUB_OIDC_ISSUER) {
-    throw new Error(`Invalid issuer: ${payload.iss}`)
-  }
-
-  // Audience (string or array)
-  const aud = payload.aud
-  if (!(aud === EXPECTED_AUDIENCE || (Array.isArray(aud) && aud.includes(EXPECTED_AUDIENCE)))) {
-    throw new Error(`Invalid audience: ${aud}`)
-  }
-
-  // Expiration
-  if (typeof payload.exp !== 'number' || now > payload.exp + CLOCK_SKEW_SECONDS) {
-    throw new Error('Token has expired')
-  }
-
-  // Not before
-  if (typeof payload.nbf === 'number' && now < payload.nbf - CLOCK_SKEW_SECONDS) {
-    throw new Error('Token is not yet valid')
-  }
-}
-
-function extractClaims(payload: any): OidcClaims {
-  const required = ['repository', 'repository_visibility', 'repository_owner']
-  for (const field of required) {
-    if (!payload[field]) {
-      throw new Error(`Missing required OIDC claim: ${field}`)
+function extractClaims(payload: JWTPayload): OidcClaims {
+  for (const claim of REQUIRED_CLAIMS) {
+    if (!Object.hasOwn(payload, claim) || typeof payload[claim] !== 'string') {
+      throw new Error(`Missing required OIDC claim: ${claim}`)
     }
   }
 
   return {
-    repository: payload.repository,
-    repository_visibility: payload.repository_visibility,
-    repository_owner: payload.repository_owner,
-    run_id: String(payload.run_id ?? ''),
-    actor: payload.actor ?? '',
-    sub: payload.sub ?? '',
+    repository: payload.repository as string,
+    repository_visibility: payload.repository_visibility as string,
+    repository_owner: payload.repository_owner as string,
+    run_id: typeof payload.run_id === 'string' ? payload.run_id : undefined,
+    actor: typeof payload.actor === 'string' ? payload.actor : undefined,
   }
 }
 
-// ---------------------------------------------------------------------------
-// Base64url helpers
-// ---------------------------------------------------------------------------
-
-/** Decode a base64url string to raw bytes */
-function base64urlToBytes(str: string): Uint8Array {
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-  const binary = atob(padded)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
+/**
+ * Try to load cached JWKS keys from KV.
+ * Returns undefined if no cached keys are available.
+ */
+async function getCachedJwks(env: Env): Promise<HonoJsonWebKey[] | undefined> {
+  try {
+    const raw = await env.CACHE_KV.get(JWKS_CACHE_KEY)
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw)
+    if (parsed?.keys && Array.isArray(parsed.keys)) {
+      return parsed.keys as HonoJsonWebKey[]
+    }
+    return undefined
+  } catch {
+    return undefined
   }
-  return bytes
 }
 
-/** Decode a base64url string to a UTF-8 string (per JWT spec) */
-function base64urlDecode(str: string): string {
-  return new TextDecoder('utf-8').decode(base64urlToBytes(str))
+/**
+ * Map Hono JWT error messages to our domain errors for backward compat.
+ */
+function mapError(err: any): Error {
+  const message = err.message || String(err)
+
+  if (message.includes('expired') || err.name === 'JwtTokenExpired') {
+    return new Error('Token expired')
+  }
+  if (message.includes('not before') || err.name === 'JwtTokenNotBefore') {
+    return new Error('Token not yet valid (nbf)')
+  }
+  if (message.includes('issuer') || err.name === 'JwtTokenIssuer') {
+    return new Error('Invalid issuer')
+  }
+  if (message.includes('audience')) {
+    return new Error('Invalid audience')
+  }
+  if (message.includes('signature') || err.name === 'JwtTokenSignatureMismatched') {
+    return new Error('Invalid signature')
+  }
+  if (message.includes('kid') && !message.includes('key')) {
+    return new Error('No matching key found in JWKS')
+  }
+
+  return err
 }
 
-/** Decode a base64url string to an ArrayBuffer (for signature verification) */
-function base64urlToBuffer(str: string): ArrayBuffer {
-  return base64urlToBytes(str).buffer as ArrayBuffer
+/**
+ * Verify a GitHub Actions OIDC token and extract claims.
+ *
+ * Two-pass verification strategy:
+ * 1. Try with cached JWKS keys from KV (fast path, no network)
+ * 2. If kid not found in cache, fetch from GitHub's JWKS endpoint
+ *
+ * Hono's verifyWithJwks() handles:
+ * - Key selection by kid
+ * - RS256 signature verification
+ * - Standard claim validation (exp, nbf, iat, iss, aud)
+ */
+export async function verifyOidcToken(token: string, env: Env): Promise<OidcClaims> {
+  const cachedKeys = await getCachedJwks(env)
+
+  let payload: JWTPayload | undefined
+
+  // ── Pass 1: Try cached keys (no network) ──────────────────────────
+  if (cachedKeys && cachedKeys.length > 0) {
+    try {
+      payload = await verifyWithJwks(token, {
+        keys: cachedKeys,
+        ...VERIFY_OPTIONS,
+      })
+    } catch (err: any) {
+      // If the error is "kid not found" or "invalid token" (no matching key),
+      // fall through to pass 2. All other errors (expired, bad sig) are real.
+      const message = err.message || String(err)
+      const isKeyMissing = err.name === 'JwtTokenInvalid'
+        && !message.includes('expired')
+        && !message.includes('signature')
+        && !message.includes('issuer')
+        && !message.includes('audience')
+        && !message.includes('not before')
+
+      if (!isKeyMissing) {
+        throw mapError(err)
+      }
+      // Fall through to pass 2 for JWKS refetch
+    }
+  }
+
+  // ── Pass 2: Fetch JWKS from GitHub (network) ─────────────────────
+  if (!payload) {
+    try {
+      payload = await verifyWithJwks(token, {
+        jwks_uri: GITHUB_JWKS_URI,
+        ...VERIFY_OPTIONS,
+      })
+
+      // Cache the freshly-fetched JWKS keys (best-effort)
+      try {
+        const res = await fetch(GITHUB_JWKS_URI)
+        if (res.ok) {
+          await env.CACHE_KV.put(JWKS_CACHE_KEY, await res.text())
+        }
+      } catch {
+        // Caching is best-effort
+      }
+    } catch (err: any) {
+      const message = err.message || String(err)
+
+      if (message.includes('key') || message.includes('kid') || err.name === 'JwtTokenInvalid') {
+        throw new Error('No matching key found in JWKS')
+      }
+      throw mapError(err)
+    }
+  }
+
+  return extractClaims(payload)
 }
