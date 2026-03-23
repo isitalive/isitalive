@@ -31,6 +31,11 @@ id = "660634f39fe641c5b186ac3cb7259ead"
 binding = "KEYS_KV"
 id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 
+# Workers KV — waitlist email signups (tier interest tracking)
+[[kv_namespaces]]
+binding = "WAITLIST_KV"
+id = "69924ff9b17b4b7b90249fc9567426c3"
+
 # Native Rate Limiting — two-level infra protection (not billing)
 # Note: CDN-Cache-Control does NOT prevent Worker invocations (ADR-006).
 # Every request — anonymous or authenticated — wakes the Worker (~$0.30/M).

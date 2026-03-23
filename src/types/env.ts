@@ -15,6 +15,7 @@ export interface Pipeline {
 export interface Env {
   CACHE_KV: KVNamespace;
   KEYS_KV: KVNamespace;          // API key store — managed via CF dashboard
+  WAITLIST_KV: KVNamespace;      // Waitlist email signups — tier interest tracking
   RATE_LIMITER_ANON: RateLimit;   // 10 req/min — infra protection for anonymous
   RATE_LIMITER_AUTH: RateLimit;   // 1000 req/min — infra protection for authenticated
   DATA_BUCKET: R2Bucket;         // R2 bucket for Iceberg tables (R2 Data Catalog)
