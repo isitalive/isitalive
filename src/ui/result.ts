@@ -535,6 +535,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
 
+    <!-- Score History Chart — hydrated client-side -->
+    <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}"></div>
+
     ${result.signals.length > 0 ? `
     <section class="signals">
       <h2>Signal Breakdown</h2>
@@ -618,6 +621,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       }));
     } catch(e) {}
   </script>
+  <script src="/js/history.js" defer></script>
   <script src="/js/deps.js" defer></script>
   ${themeScript}
   ${analyticsScript(analyticsToken)}
