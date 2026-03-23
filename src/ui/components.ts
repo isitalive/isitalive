@@ -1,16 +1,158 @@
 // ---------------------------------------------------------------------------
-// Shared UI components — navbar + footer with class-based CSS
+// Shared UI components — navbar + footer + theme system
 //
 // Every page template should:
-// 1. Include ${componentCss} inside their <style> block
-// 2. Include ${navbarHtml} at the top of their container
-// 3. Include ${footerHtml} at the bottom of their container
+// 1. Include ${themeCss} inside their <style> block (before componentCss)
+// 2. Include ${componentCss} inside their <style> block
+// 3. Include ${navbarHtml} at the top of their container
+// 4. Include ${footerHtml} at the bottom of their container
+// 5. Include ${themeScript} before </body>
+// 6. Add data-theme="system" to <html> tag
 // ---------------------------------------------------------------------------
+
+// ── Theme CSS ───────────────────────────────────────────────────────────────
+// Dark is the default. Light is applied via [data-theme="light"] or
+// @media (prefers-color-scheme: light) when [data-theme="system"].
+// ---------------------------------------------------------------------------
+
+export const themeCss = `
+    /* ── Dark theme (default) ── */
+    :root {
+      --bg-primary: #09090b;
+      --bg-secondary: #111113;
+      --surface: #141416;
+      --surface-hover: #1c1c1f;
+      --border: #27272a;
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #ffffff;
+      --accent-hover: #e4e4e7;
+      --accent-glow: rgba(255,255,255,0.08);
+      --accent-text: #000000;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --orange: #f97316;
+      --red: #ef4444;
+      --gray: #6b7280;
+      --code-bg: #111113;
+      color-scheme: dark;
+    }
+
+    /* ── Light theme (explicit) ── */
+    [data-theme="light"] {
+      --bg-primary: #fafafa;
+      --bg-secondary: #ffffff;
+      --surface: #ffffff;
+      --surface-hover: #f4f4f5;
+      --border: #e4e4e7;
+      --text-primary: #09090b;
+      --text-secondary: #52525b;
+      --text-muted: #a1a1aa;
+      --accent: #000000;
+      --accent-hover: #18181b;
+      --accent-glow: rgba(0,0,0,0.06);
+      --accent-text: #ffffff;
+      --green: #16a34a;
+      --yellow: #ca8a04;
+      --orange: #ea580c;
+      --red: #dc2626;
+      --gray: #6b7280;
+      --code-bg: #f4f4f5;
+      color-scheme: light;
+    }
+
+    /* ── System theme: follow OS preference ── */
+    @media (prefers-color-scheme: light) {
+      [data-theme="system"] {
+        --bg-primary: #fafafa;
+        --bg-secondary: #ffffff;
+        --surface: #ffffff;
+        --surface-hover: #f4f4f5;
+        --border: #e4e4e7;
+        --text-primary: #09090b;
+        --text-secondary: #52525b;
+        --text-muted: #a1a1aa;
+        --accent: #000000;
+        --accent-hover: #18181b;
+        --accent-glow: rgba(0,0,0,0.06);
+        --accent-text: #ffffff;
+        --green: #16a34a;
+        --yellow: #ca8a04;
+        --orange: #ea580c;
+        --red: #dc2626;
+        --gray: #6b7280;
+        --code-bg: #f4f4f5;
+        color-scheme: light;
+      }
+    }
+`;
+
+// ── Theme toggle script ─────────────────────────────────────────────────────
+// Inline before </body>. Prevents FOUC by reading localStorage early.
+// Cycles: system → dark → light → system
+// ---------------------------------------------------------------------------
+
+export const themeScript = `
+  <script>
+    (function() {
+      var MODES = ['system', 'dark', 'light'];
+      var ICONS = { system: '◐', dark: '☾', light: '☀' };
+      var LABELS = { system: 'System', dark: 'Dark', light: 'Light' };
+
+      function getStored() {
+        try { return localStorage.getItem('theme') || 'system'; } catch(e) { return 'system'; }
+      }
+
+      function apply(mode) {
+        document.documentElement.setAttribute('data-theme', mode);
+        var btn = document.getElementById('themeToggle');
+        if (btn) {
+          btn.querySelector('.theme-icon').textContent = ICONS[mode];
+          btn.querySelector('.theme-label').textContent = LABELS[mode];
+        }
+      }
+
+      function cycle() {
+        var current = getStored();
+        var next = MODES[(MODES.indexOf(current) + 1) % MODES.length];
+        try { localStorage.setItem('theme', next); } catch(e) {}
+        apply(next);
+      }
+
+      // Apply immediately
+      apply(getStored());
+
+      // Bind toggle
+      document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('themeToggle');
+        if (btn) btn.addEventListener('click', cycle);
+      });
+    })();
+  </script>
+`;
+
+// ── FOUC prevention script ──────────────────────────────────────────────────
+// Inline in <head> to set data-theme before first paint
+// ---------------------------------------------------------------------------
+
+export const themeHeadScript = `
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('theme') || 'system';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch(e) {
+        document.documentElement.setAttribute('data-theme', 'system');
+      }
+    })();
+  </script>
+`;
 
 /** Shared CSS for nav + footer — include inside each page's <style> tag */
 export const componentCss = `
-    /* ── Prevent horizontal scroll from decorative orbs ── */
-    html, body { overflow-x: hidden; }
+    /* ── Prevent horizontal scroll (clip preserves sticky) ── */
+    html, body { overflow-x: clip; }
 
     /* ── iOS safe-area insets (notch, home indicator) ── */
     body {
@@ -18,7 +160,13 @@ export const componentCss = `
       padding-right: env(safe-area-inset-right);
       padding-bottom: env(safe-area-inset-bottom);
       padding-left: env(safe-area-inset-left);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
+
+    /* ── Sticky footer: main content fills available space ── */
+    .container { flex: 1; width: 100%; }
 
     /* ── Nav / Footer Wrapper ──────────────── */
     .site-chrome-wrapper {
@@ -33,9 +181,14 @@ export const componentCss = `
     .site-nav-outer {
       display: flex;
       justify-content: center;
-      padding: 20px 24px 0;
-      position: relative;
-      z-index: 10;
+      padding: 16px 24px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+      mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
     }
 
     .site-nav {
@@ -44,12 +197,31 @@ export const componentCss = `
       gap: 10px;
       width: 100%;
       max-width: 1000px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
       padding: 12px 20px;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      box-shadow:
+        inset 1px 1px 0 0 rgba(255,255,255,0.1),
+        0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    [data-theme="light"] .site-nav,
+    [data-theme="system"] .site-nav {
+      background: rgba(0,0,0,0.04);
+      border-color: rgba(0,0,0,0.06);
+      box-shadow:
+        inset 1px 1px 0 0 rgba(255,255,255,0.6),
+        0 2px 8px rgba(0,0,0,0.03);
+    }
+    @media (prefers-color-scheme: dark) {
+      [data-theme="system"] .site-nav {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.1);
+        box-shadow:
+          inset 1px 1px 0 0 rgba(255,255,255,0.1),
+          0 2px 8px rgba(0,0,0,0.06);
+      }
     }
 
     .site-nav-brand {
@@ -57,7 +229,7 @@ export const componentCss = `
       font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      color: var(--text-primary, #f0f0f5);
+      color: var(--text-primary);
       text-decoration: none;
       transition: opacity 0.2s;
       display: inline-flex;
@@ -65,21 +237,20 @@ export const componentCss = `
       gap: 8px;
       margin-right: 8px;
     }
-    .site-nav-brand:hover { opacity: 0.8; }
+    .site-nav-brand:hover { opacity: 0.7; }
 
     .brand-dot {
       width: 7px;
       height: 7px;
-      background: #22c55e;
+      background: var(--green);
       border-radius: 50%;
-      box-shadow: 0 0 6px rgba(34,197,94,0.5);
       flex-shrink: 0;
     }
 
     .site-nav-divider {
       width: 1px;
       height: 18px;
-      background: rgba(255,255,255,0.1);
+      background: var(--border);
       margin: 0 4px;
       flex-shrink: 0;
     }
@@ -93,20 +264,21 @@ export const componentCss = `
       display: flex;
       gap: 2px;
       margin-left: auto;
+      align-items: center;
     }
 
     .site-nav-link {
-      color: var(--text-secondary, #9d9db5);
+      color: var(--text-secondary);
       text-decoration: none;
       font-size: 0.82rem;
       font-weight: 500;
       padding: 6px 16px;
-      border-radius: 99px;
+      border-radius: 4px;
       transition: color 0.2s, background 0.2s;
     }
     .site-nav-link:hover {
-      color: var(--text-primary, #f0f0f5);
-      background: rgba(255,255,255,0.06);
+      color: var(--text-primary);
+      background: var(--surface-hover);
     }
 
     .site-nav-github {
@@ -116,21 +288,46 @@ export const componentCss = `
       width: 34px;
       height: 34px;
       border-radius: 50%;
-      color: var(--text-secondary, #9d9db5);
-      background: rgba(255,255,255,0.04);
+      color: var(--text-secondary);
+      background: transparent;
       transition: color 0.2s, background 0.2s;
       margin-left: 4px;
       flex-shrink: 0;
     }
     .site-nav-github:hover {
-      color: var(--text-primary, #f0f0f5);
-      background: rgba(255,255,255,0.1);
+      color: var(--text-primary);
+      background: var(--surface-hover);
     }
     .site-nav-github svg {
       width: 18px;
       height: 18px;
       fill: currentColor;
     }
+
+    /* ── Theme toggle ──────────────────────── */
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      margin-left: 4px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .theme-toggle:hover {
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+    }
+    .theme-icon { font-size: 0.85rem; }
 
     @media (max-width: 768px) {
       .site-nav {
@@ -141,20 +338,30 @@ export const componentCss = `
       .site-nav-link { font-size: 0.75rem; padding: 5px 8px; }
       .site-nav-github { width: 30px; height: 30px; }
       .site-nav-github svg { width: 15px; height: 15px; }
+      .theme-label { display: none; }
+      .theme-toggle { padding: 5px 8px; }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 640px) {
       .site-nav-outer { padding: 12px 16px 0; }
       .site-nav {
         flex-wrap: wrap;
-        justify-content: center;
-        border-radius: 20px;
+        border-radius: 6px;
         padding: 10px 14px;
-        gap: 2px;
+        gap: 4px;
       }
-      .site-nav-brand { width: 100%; justify-content: center; margin-right: 0; margin-bottom: 4px; }
+      .site-nav-brand { margin-right: auto; font-size: 0.72rem; }
       .site-nav-divider { display: none; }
-      .site-nav-links-left, .site-nav-links-right { justify-content: center; flex-wrap: wrap; }
+      .site-nav-links-left {
+        order: 3;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 0;
+        border-top: 1px solid var(--border);
+        padding-top: 8px;
+        margin-top: 4px;
+      }
+      .site-nav-links-right { gap: 0; }
       .site-nav-link { font-size: 0.72rem; padding: 4px 8px; }
     }
 
@@ -162,9 +369,13 @@ export const componentCss = `
     .site-footer {
       position: relative;
       z-index: 10;
-      max-width: 1000px;
-      margin: 0 auto;
+      border-top: 1px solid var(--border);
       padding: 60px 24px 40px;
+    }
+    .site-footer > * {
+      max-width: 1000px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .footer-top {
@@ -173,7 +384,7 @@ export const componentCss = `
       align-items: flex-start;
       gap: 48px;
       padding-bottom: 32px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid var(--border);
     }
 
     .footer-brand {
@@ -185,14 +396,14 @@ export const componentCss = `
       font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      color: var(--text-primary, #f0f0f5);
+      color: var(--text-primary);
       text-decoration: none;
       display: inline-flex;
       align-items: center;
       gap: 8px;
       transition: opacity 0.2s;
     }
-    .footer-logo:hover { opacity: 0.8; }
+    .footer-logo:hover { opacity: 0.7; }
 
     .footer-logo .brand-dot {
       width: 6px;
@@ -202,7 +413,7 @@ export const componentCss = `
     .footer-tagline {
       margin-top: 8px;
       font-size: 0.8rem;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       max-width: 240px;
       line-height: 1.5;
     }
@@ -223,17 +434,17 @@ export const componentCss = `
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: var(--text-secondary, #9d9db5);
+      color: var(--text-secondary);
       margin-bottom: 4px;
     }
 
     .footer-col a {
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       text-decoration: none;
       font-size: 0.82rem;
       transition: color 0.2s;
     }
-    .footer-col a:hover { color: var(--text-primary, #f0f0f5); }
+    .footer-col a:hover { color: var(--text-primary); }
 
     .footer-bottom {
       display: flex;
@@ -241,7 +452,7 @@ export const componentCss = `
       align-items: center;
       padding-top: 20px;
       font-size: 0.72rem;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       opacity: 0.7;
     }
 
@@ -265,15 +476,15 @@ export const componentCss = `
     }
 
     .deps-summary-card {
-      background: var(--surface, rgba(255,255,255,0.06));
-      border: 1px solid var(--border, rgba(255,255,255,0.10));
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 14px;
       padding: 16px;
       text-align: center;
       transition: border-color 0.2s;
     }
 
-    .deps-summary-card:hover { border-color: rgba(255,255,255,0.18); }
+    .deps-summary-card:hover { border-color: var(--text-muted); }
 
     .deps-summary-card-value {
       font-size: 1.5rem;
@@ -284,16 +495,16 @@ export const componentCss = `
 
     .deps-summary-card-label {
       font-size: 0.72rem;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     /* ── Shared: Deps Table ─────────────────── */
     .deps-section-card {
-      background: var(--surface, rgba(255,255,255,0.06));
-      border: 1px solid var(--border, rgba(255,255,255,0.10));
-      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
       padding: 24px;
       margin-bottom: 24px;
     }
@@ -308,7 +519,7 @@ export const componentCss = `
     .deps-section-header h2 {
       font-size: 1rem;
       font-weight: 600;
-      color: var(--text-secondary, #9d9db5);
+      color: var(--text-secondary);
     }
 
     .deps-table {
@@ -322,20 +533,20 @@ export const componentCss = `
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       padding: 8px 0;
-      border-bottom: 1px solid var(--border, rgba(255,255,255,0.10));
+      border-bottom: 1px solid var(--border);
     }
 
     .deps-table th:nth-child(2),
     .deps-table th:nth-child(4) { text-align: center; }
 
     .dep-row { transition: background 0.15s; }
-    .dep-row:hover { background: var(--surface-hover, rgba(255,255,255,0.12)); }
+    .dep-row:hover { background: var(--surface-hover); }
 
     .dep-row td {
       padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid var(--border);
       font-size: 0.85rem;
     }
 
@@ -350,14 +561,14 @@ export const componentCss = `
 
     .dep-version {
       font-size: 0.72rem;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       font-family: 'SF Mono', 'Fira Code', monospace;
     }
 
     .dev-badge {
       font-size: 0.65rem;
-      background: rgba(139,139,158,0.15);
-      color: var(--text-muted, #64648a);
+      background: var(--surface-hover);
+      color: var(--text-muted);
       padding: 1px 6px;
       border-radius: 4px;
       font-weight: 600;
@@ -388,7 +599,7 @@ export const componentCss = `
     .dep-action { text-align: center; }
 
     .dep-link {
-      color: var(--accent, #6366f1);
+      color: var(--accent);
       text-decoration: none;
       font-weight: 600;
       font-size: 1rem;
@@ -398,7 +609,7 @@ export const componentCss = `
     .dep-link:hover { opacity: 0.7; }
 
     .unresolved-hint {
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       cursor: help;
       font-size: 0.85rem;
     }
@@ -411,8 +622,8 @@ export const componentCss = `
 
     .sort-btn {
       background: none;
-      border: 1px solid var(--border, rgba(255,255,255,0.10));
-      color: var(--text-muted, #64648a);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
       padding: 4px 12px;
       border-radius: 8px;
       font-size: 0.72rem;
@@ -421,16 +632,16 @@ export const componentCss = `
       transition: all 0.2s;
     }
 
-    .sort-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text-secondary, #9d9db5); }
-    .sort-btn.active { border-color: var(--accent, #6366f1); color: var(--accent, #6366f1); }
+    .sort-btn:hover { border-color: var(--text-muted); color: var(--text-secondary); }
+    .sort-btn.active { border-color: var(--accent); color: var(--accent); }
 
     /* ── Shared: Dev Deps Toggle ────────────── */
     .dev-toggle {
       background: none;
-      border: 1px solid var(--border, rgba(255,255,255,0.10));
-      color: var(--text-secondary, #9d9db5);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
       padding: 8px 16px;
-      border-radius: 10px;
+      border-radius: 4px;
       font-family: 'Inter', sans-serif;
       font-size: 0.82rem;
       cursor: pointer;
@@ -443,7 +654,7 @@ export const componentCss = `
       justify-content: center;
     }
 
-    .dev-toggle:hover { border-color: rgba(255,255,255,0.2); }
+    .dev-toggle:hover { border-color: var(--text-muted); }
     .dev-deps-content { display: none; margin-top: 12px; }
     .dev-deps-content.visible { display: block; }
     .dev-toggle .arrow { transition: transform 0.2s; display: inline-block; }
@@ -451,9 +662,9 @@ export const componentCss = `
 
     /* ── Shared: CTA Section ────────────────── */
     .cta-section {
-      background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%);
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
       padding: 32px;
       text-align: center;
       margin-bottom: 24px;
@@ -462,7 +673,7 @@ export const componentCss = `
     .cta-section h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
 
     .cta-section p {
-      color: var(--text-secondary, #9d9db5);
+      color: var(--text-secondary);
       font-size: 0.9rem;
       margin-bottom: 20px;
       max-width: 460px;
@@ -475,22 +686,22 @@ export const componentCss = `
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--accent, #6366f1);
-      color: #fff;
+      background: var(--accent);
+      color: var(--accent-text);
       text-decoration: none;
       padding: 12px 28px;
-      border-radius: 12px;
+      border-radius: 6px;
       font-weight: 600;
       font-size: 0.9rem;
       transition: all 0.2s;
     }
 
-    .cta-btn:hover { background: #5558e6; transform: translateY(-1px); }
+    .cta-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
 
     .cta-sub {
       margin-top: 12px;
       font-size: 0.75rem;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
     }
 
     /* ── Shared: Shimmer Animation ──────────── */
@@ -500,19 +711,19 @@ export const componentCss = `
     }
 
     .deps-shimmer {
-      background: linear-gradient(90deg, var(--surface, rgba(255,255,255,0.06)) 25%, rgba(255,255,255,0.1) 50%, var(--surface, rgba(255,255,255,0.06)) 75%);
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
       background-size: 200% 100%;
       animation: shimmer 1.5s ease-in-out infinite;
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 24px;
       text-align: center;
-      color: var(--text-muted, #64648a);
+      color: var(--text-muted);
       font-size: 0.85rem;
       min-height: 100px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid var(--border, rgba(255,255,255,0.10));
+      border: 1px solid var(--border);
       margin-bottom: 24px;
     }
 
@@ -522,7 +733,7 @@ export const componentCss = `
       border: 1px solid rgba(234,179,8,0.2);
       color: #fbbf24;
       padding: 12px 20px;
-      border-radius: 12px;
+      border-radius: 6px;
       font-size: 0.85rem;
       margin-bottom: 24px;
       text-align: center;
@@ -542,7 +753,7 @@ export const componentCss = `
 /** GitHub SVG icon (16px Octicon) */
 const githubSvg = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>`;
 
-/** Navbar HTML — floating glassmorphism bar */
+/** Navbar HTML — clean minimal bar with theme toggle */
 export const navbarHtml = `
   <div class="site-nav-outer">
     <nav class="site-nav">
@@ -556,6 +767,10 @@ export const navbarHtml = `
         <a href="/api" class="site-nav-link">API</a>
         <a href="/changelog" class="site-nav-link">Changelog</a>
         <a href="https://github.com/isitalive/isitalive" class="site-nav-github" aria-label="GitHub" target="_blank" rel="noopener">${githubSvg}</a>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+          <span class="theme-icon">◐</span>
+          <span class="theme-label">System</span>
+        </button>
       </div>
     </nav>
   </div>

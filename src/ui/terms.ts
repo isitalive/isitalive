@@ -2,7 +2,7 @@
 // Terms of Service page — renders TERMS.md into styled HTML at build time
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml, componentCss } from './components'
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components'
 import { escapeHtml } from './error'
 import { analyticsScript } from './analytics'
 import termsMd from '../../TERMS.md'
@@ -101,7 +101,7 @@ export function termsPage(analyticsToken?: string): string {
   const rendered = renderedTerms
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -111,20 +111,12 @@ export function termsPage(analyticsToken?: string): string {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    ${themeCss}
     ${componentCss}
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --surface: rgba(255,255,255,0.06);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #f0f0f5;
-      --text-secondary: #9d9db5;
-      --text-muted: #64648a;
-      --accent: #6366f1;
-    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -132,23 +124,15 @@ export function termsPage(analyticsToken?: string): string {
       color: var(--text-primary);
       min-height: 100vh;
       line-height: 1.6;
+      transition: background 0.3s, color 0.3s;
     }
-
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%); top: -150px; right: -100px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
       position: relative;
       z-index: 1;
       max-width: 800px;
       margin: 0 auto;
-      padding: 0 24px;
+      padding: 40px 24px 0;
     }
 
     .last-updated {
@@ -182,12 +166,12 @@ export function termsPage(analyticsToken?: string): string {
     .section-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 24px 28px;
       margin-bottom: 16px;
       transition: border-color 0.3s;
     }
-    .section-card:hover { border-color: rgba(255,255,255,0.15); }
+    .section-card:hover { border-color: var(--text-muted); }
 
     .section-card ul {
       padding-left: 20px;
@@ -202,9 +186,10 @@ export function termsPage(analyticsToken?: string): string {
     }
 
     .note-box {
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
       padding: 16px 20px;
       margin: 24px 0;
       font-size: 0.85rem;
@@ -226,8 +211,6 @@ export function termsPage(analyticsToken?: string): string {
   </style>
 </head>
 <body>
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
 
   ${navbarHtml}
 
@@ -237,6 +220,7 @@ export function termsPage(analyticsToken?: string): string {
   </div>
 
   ${footerHtml}
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`
