@@ -244,9 +244,9 @@ The hybrid model sells **private repos** as the visible product (predictable, an
 | Free (web) | — | — | — | Unlimited (Turnstile) | 24h | N/A | $0 |
 | Free (OIDC) | Public only | Unlimited | 500/mo per repo | — | 24h | 60/min | $0 |
 | Free (API key) | — | — | — | 1,000/mo | 24h | 60/min | $0 |
-| Starter | 5 | Unlimited | 10,000/mo | 10,000/mo | 1h | 60/min | $19/mo |
-| Pro | 25 | Unlimited | 50,000/mo | 50,000/mo | 1h | 300/min | $49/mo |
-| Business | Unlimited | Unlimited | 250,000/mo | 250,000/mo | 15min | 1,000/min | $99/mo |
+| Starter | 5 | Unlimited | 10,000/mo | 10,000/mo | 4h | 60/min | $19/mo |
+| Pro | 25 | Unlimited + lock file checks | 50,000/mo | 50,000/mo | 1h | 300/min | $49/mo |
+| Business | Unlimited | Unlimited + in-depth scans | 250,000/mo | 250,000/mo | 15min | 1,000/min | $99/mo |
 
 **†** Scored-dep budget = invisible safety net. Cache hits don't count. Quota exhaustion in CI triggers "Fail Open" — yellow warning, build stays green (see ADR-007 § 3).
 

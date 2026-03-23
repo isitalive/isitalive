@@ -265,7 +265,59 @@ ui.get('/_data/history/:provider/:owner/:repo', async (c) => {
 ui.get('/pricing', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-  return c.html(pricingPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
+  const local = isLocalDev(c)
+  return c.html(pricingPage(
+    local ? undefined : c.env.TURNSTILE_SITE_KEY,
+    local ? undefined : c.env.CF_ANALYTICS_TOKEN,
+  ))
+})
+
+// Waitlist email collection — Turnstile-protected, KV-backed
+// Security invariant: always returns identical 200 regardless of duplicate
+ui.post('/_data/waitlist', async (c) => {
+  const body = await c.req.json<{ email?: string; tier?: string; 'cf-turnstile-response'?: string }>()
+    .catch(() => ({} as { email?: string; tier?: string; 'cf-turnstile-response'?: string }))
+  const email = (body.email ?? '').trim().toLowerCase()
+  const tier = body.tier ?? ''
+  const turnstileToken = body['cf-turnstile-response'] ?? ''
+
+  // Constant response — never reveal validation details
+  const ok = { ok: true, message: "Thanks! We'll notify you when this tier is available." }
+
+  // Basic validation — reject silently with same response
+  if (!email || !email.includes('@') || !['starter', 'pro', 'business'].includes(tier)) {
+    return c.json(ok)
+  }
+
+  // Verify Turnstile token (skip in local dev)
+  const secretKey = c.env.TURNSTILE_SECRET_KEY
+  if (secretKey && turnstileToken) {
+    const verify = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret: secretKey,
+        response: turnstileToken,
+        remoteip: c.req.header('cf-connecting-ip') ?? '',
+      }),
+    })
+    const outcome = await verify.json() as { success: boolean }
+    if (!outcome.success) return c.json(ok) // Silent rejection
+  }
+
+  // Hash email for KV key — no enumeration of raw emails
+  const encoder = new TextEncoder()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(email))
+  const hashHex = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('')
+
+  // Always upsert — no timing difference between new and existing
+  await c.env.WAITLIST_KV.put(`waitlist:${hashHex}`, JSON.stringify({
+    email,
+    tier,
+    timestamp: new Date().toISOString(),
+  }))
+
+  return c.json(ok)
 })
 
 // Dependency health data — JSON for client-side hydration on result pages

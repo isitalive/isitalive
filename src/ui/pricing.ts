@@ -1,12 +1,87 @@
 // ---------------------------------------------------------------------------
-// Pricing page — Free + Coming Soon teaser
+// Pricing page — Free tier + three paid tier waitlist cards
 // ---------------------------------------------------------------------------
 
 import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components'
 import { ogTags } from './og'
 import { analyticsScript } from './analytics'
 
-export function pricingPage(analyticsToken?: string): string {
+interface PaidTier {
+  id: string
+  emoji: string
+  name: string
+  price: string
+  annual: string
+  features: string[]
+}
+
+const paidTiers: PaidTier[] = [
+  {
+    id: 'starter',
+    emoji: '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    name: 'Starter',
+    price: '$19/mo',
+    annual: '$190/yr — 2 months free',
+    features: [
+      '5 private repos',
+      'CI audits for private repos',
+      '4h data freshness',
+    ],
+  },
+  {
+    id: 'pro',
+    emoji: '<svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+    name: 'Pro',
+    price: '$49/mo',
+    annual: '$490/yr — 2 months free',
+    features: [
+      '25 private repos',
+      'Lock file checks (transitive deps)',
+      '1h data freshness',
+    ],
+  },
+  {
+    id: 'business',
+    emoji: '<svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>',
+    name: 'Business',
+    price: '$99/mo',
+    annual: '$990/yr — 2 months free',
+    features: [
+      'Unlimited private repos',
+      'In-depth security scans',
+      '15min data freshness',
+    ],
+  },
+]
+
+function tierCardHtml(tier: PaidTier): string {
+  const features = tier.features.map(f => `<li>${f}</li>`).join('\n        ')
+  return `
+    <div class="tier-card paid-tier" id="tier-${tier.id}">
+      <div class="tier-header">
+        <span class="tier-emoji">${tier.emoji}</span>
+        <div>
+          <div class="tier-name">${tier.name} <span class="tier-price">${tier.price}</span></div>
+          <div class="tier-subtitle">${tier.annual}</div>
+        </div>
+      </div>
+      <ul class="tier-features">
+        ${features}
+      </ul>
+      <form class="waitlist-form" data-tier="${tier.id}">
+        <div class="waitlist-input-row">
+          <input type="email" placeholder="you@company.com" required autocomplete="email" class="waitlist-email" />
+          <button type="submit" class="tier-btn tier-btn-primary waitlist-btn">🔔 Join Waitlist</button>
+        </div>
+        <div class="cf-turnstile-slot"></div>
+        <div class="waitlist-status"></div>
+      </form>
+    </div>`
+}
+
+export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string): string {
+  const paidCards = paidTiers.map(t => tierCardHtml(t)).join('\n')
+
   return `<!DOCTYPE html>
 <html lang="en" data-theme="system">
 <head>
@@ -41,7 +116,7 @@ export function pricingPage(analyticsToken?: string): string {
     .container {
       position: relative;
       z-index: 1;
-      max-width: 800px;
+      max-width: 1100px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -68,7 +143,7 @@ export function pricingPage(analyticsToken?: string): string {
       margin: 0 auto;
     }
 
-    /* ── Tier Cards ──────────────────────── */
+    /* ── Free Tier Card ──────────────────── */
     .tier-card {
       background: transparent;
       border: 1px solid var(--border);
@@ -93,19 +168,23 @@ export function pricingPage(analyticsToken?: string): string {
     }
 
     .tier-emoji {
-      font-size: 1.6rem;
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
     }
-
-    .tier-name {
-      font-size: 1.2rem;
-      font-weight: 700;
+    .tier-emoji svg {
+      width: 100%;
+      height: 100%;
+      stroke: var(--green);
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
-
-    .tier-subtitle {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      font-weight: 400;
-    }
+    .paid-tier .tier-emoji svg { stroke: var(--accent); }
+    .tier-name { font-size: 1.2rem; font-weight: 700; }
+    .tier-price { font-weight: 400; color: var(--text-secondary); font-size: 1rem; }
+    .tier-subtitle { font-size: 0.8rem; color: var(--text-muted); font-weight: 400; }
 
     .tier-features {
       list-style: none;
@@ -144,6 +223,8 @@ export function pricingPage(analyticsToken?: string): string {
       font-size: 0.85rem;
       text-decoration: none;
       transition: all 0.2s;
+      border: none;
+      cursor: pointer;
     }
 
     .tier-btn-primary {
@@ -151,6 +232,7 @@ export function pricingPage(analyticsToken?: string): string {
       color: var(--accent-text);
     }
     .tier-btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .tier-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
     .tier-btn-secondary {
       background: transparent;
@@ -159,60 +241,61 @@ export function pricingPage(analyticsToken?: string): string {
     }
     .tier-btn-secondary:hover { border-color: var(--text-muted); color: var(--text-primary); }
 
-    /* ── Coming Soon Card ────────────────── */
-    .coming-soon-card {
-      background: transparent;
-      border: 1px dashed var(--border);
-      border-radius: 12px;
-      padding: 36px;
+    /* ── Paid Tier Cards ──────────────────── */
+    .paid-tiers-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
       margin-bottom: 24px;
     }
 
-    .coming-soon-header {
+    .paid-tier {
+      border-style: dashed;
+      margin-bottom: 0;
+    }
+
+    /* Free tier features inline */
+    .tier-card.featured .tier-features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0 24px;
+    }
+
+    /* ── Waitlist Form ────────────────────── */
+    .waitlist-input-row {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 10px;
     }
 
-    .coming-soon-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-    }
-
-    .coming-soon-badge {
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      background: var(--surface-hover);
-      color: var(--text-muted);
-      padding: 3px 10px;
-      border-radius: 4px;
-    }
-
-    .coming-soon-features {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.8;
-      margin-bottom: 20px;
-    }
-
-    .notify-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      padding: 10px 24px;
+    .waitlist-email {
+      flex: 1;
+      padding: 10px 14px;
       border-radius: 6px;
-      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
       font-size: 0.85rem;
-      text-decoration: none;
-      transition: all 0.2s;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
     }
-    .notify-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+    .waitlist-email:focus { border-color: var(--accent); }
+    .waitlist-email::placeholder { color: var(--text-muted); }
+
+    .cf-turnstile-slot {
+      margin-top: 12px;
+      min-height: 0;
+      transition: min-height 0.3s;
+    }
+    .cf-turnstile-slot:not(:empty) { min-height: 65px; }
+
+    .waitlist-status {
+      font-size: 0.8rem;
+      margin-top: 8px;
+      min-height: 1.2em;
+    }
+    .waitlist-status.success { color: var(--green); }
+    .waitlist-status.error { color: #ef4444; }
 
     /* ── Sponsors ─────────────────────────── */
     .sponsors-section {
@@ -231,13 +314,19 @@ export function pricingPage(analyticsToken?: string): string {
     .sponsors-section a:hover { color: var(--text-primary); }
 
     /* ── Responsive ──────────────────────── */
+    @media (max-width: 900px) {
+      .paid-tiers-grid { grid-template-columns: 1fr; }
+      .tier-card.featured .tier-features { grid-template-columns: repeat(2, 1fr); }
+    }
     @media (max-width: 640px) {
       .container { padding: 0 16px; }
       .pricing-hero { padding: 32px 0 28px; }
       .pricing-hero h1 { font-size: 1.6rem; }
-      .tier-card, .coming-soon-card { padding: 24px; }
+      .tier-card { padding: 24px; }
       .tier-actions { flex-direction: column; }
       .tier-btn { width: 100%; justify-content: center; }
+      .waitlist-input-row { flex-direction: column; }
+      .tier-card.featured .tier-features { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -254,19 +343,19 @@ export function pricingPage(analyticsToken?: string): string {
 
     <div class="tier-card featured">
       <div class="tier-header">
-        <span class="tier-emoji">🆓</span>
+        <span class="tier-emoji"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span>
         <div>
           <div class="tier-name">Free</div>
           <div class="tier-subtitle">Open source, forever.</div>
         </div>
       </div>
       <ul class="tier-features">
-        <li>Single repo health checks</li>
-        <li>Manifest audit for public repos</li>
-        <li>GitHub Action — zero config, OIDC</li>
-        <li>README badge for any repo</li>
-        <li>REST API (5 req/min, unauthenticated)</li>
-        <li>Score history & trend tracking</li>
+        <li>Health scores for any public repo</li>
+        <li>Dependency audit on every PR</li>
+        <li>GitHub Action — zero setup</li>
+        <li>Embeddable README badges</li>
+        <li>Public REST API</li>
+        <li>30-day score history</li>
       </ul>
       <div class="tier-actions">
         <a href="/" class="tier-btn tier-btn-primary">Check a Repo</a>
@@ -274,32 +363,90 @@ export function pricingPage(analyticsToken?: string): string {
       </div>
     </div>
 
-    <div class="coming-soon-card">
-      <div class="coming-soon-header">
-        <span class="tier-emoji">💼</span>
-        <span class="coming-soon-title">Paid Tiers</span>
-        <span class="coming-soon-badge">Coming Soon</span>
-      </div>
-      <div class="coming-soon-features">
-        Private repo monitoring · Manifest audits for private dependencies ·
-        Faster cache freshness · Higher API rate limits ·
-        Priority scoring · Team dashboards
-      </div>
-      <a href="mailto:hello@isitalive.dev?subject=Interested%20in%20paid%20tiers" class="notify-btn">
-        📬 Notify me when available
-      </a>
+    <div class="paid-tiers-grid">
+    ${paidCards}
     </div>
 
     <div class="sponsors-section">
-      <p>💛 Love this project?</p>
-      <a href="https://github.com/sponsors/isitalive" target="_blank" rel="noopener">
-        Support via GitHub Sponsors →
+      <p>⭐ Like what we're building?</p>
+      <a href="https://github.com/isitalive/isitalive" target="_blank" rel="noopener">
+        Star us on GitHub →
       </a>
     </div>
 
   </div>
 
   ${footerHtml}
+
+  ${turnstileSiteKey ? `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>` : ''}
+  <script>
+  (function() {
+    var siteKey = ${turnstileSiteKey ? JSON.stringify(turnstileSiteKey) : 'null'};
+
+    document.querySelectorAll('.waitlist-form').forEach(function(form) {
+      var tier = form.getAttribute('data-tier');
+      var emailInput = form.querySelector('.waitlist-email');
+      var btn = form.querySelector('.waitlist-btn');
+      var status = form.querySelector('.waitlist-status');
+      var turnstileSlot = form.querySelector('.cf-turnstile-slot');
+      var widgetId = null;
+      var submitted = false;
+
+      // Render Turnstile widget on email focus (lazy)
+      if (siteKey && window.turnstile) {
+        emailInput.addEventListener('focus', function renderWidget() {
+          if (widgetId !== null) return;
+          widgetId = turnstile.render(turnstileSlot, { sitekey: siteKey, size: 'normal' });
+          emailInput.removeEventListener('focus', renderWidget);
+        }, { once: true });
+      }
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (submitted) return;
+
+        var email = emailInput.value.trim();
+        if (!email) return;
+
+        var turnstileToken = '';
+        if (siteKey && window.turnstile && widgetId !== null) {
+          turnstileToken = turnstile.getResponse(widgetId) || '';
+          if (!turnstileToken) {
+            status.textContent = 'Please complete the verification.';
+            status.className = 'waitlist-status error';
+            return;
+          }
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Joining…';
+        status.textContent = '';
+
+        fetch('/_data/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, tier: tier, 'cf-turnstile-response': turnstileToken })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function() {
+          submitted = true;
+          status.textContent = '🎉 Thanks! We\\'ll notify you when ' + tier.charAt(0).toUpperCase() + tier.slice(1) + ' is available.';
+          status.className = 'waitlist-status success';
+          btn.textContent = '✓ Joined';
+          emailInput.disabled = true;
+          if (turnstileSlot) turnstileSlot.style.display = 'none';
+        })
+        .catch(function() {
+          status.textContent = 'Something went wrong. Please try again.';
+          status.className = 'waitlist-status error';
+          btn.disabled = false;
+          btn.textContent = '🔔 Join Waitlist';
+          if (siteKey && window.turnstile && widgetId !== null) turnstile.reset(widgetId);
+        });
+      });
+    });
+  })();
+  </script>
 
   ${themeScript}
   ${analyticsScript(analyticsToken)}

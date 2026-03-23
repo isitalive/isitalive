@@ -102,7 +102,7 @@ write('terms/index.html', termsPage(CF_ANALYTICS_TOKEN));
 write('changelog/index.html', changelogPage(CF_ANALYTICS_TOKEN));
 write('trending/index.html', trendingPage(CF_ANALYTICS_TOKEN));
 write('api/index.html', apiDocsPage(CF_ANALYTICS_TOKEN));
-write('pricing/index.html', pricingPage(CF_ANALYTICS_TOKEN));
+write('pricing/index.html', pricingPage(TURNSTILE_SITE_KEY, CF_ANALYTICS_TOKEN));
 
 // JSON / text files
 write('openapi.json', JSON.stringify(openApiSpec, null, 2));
