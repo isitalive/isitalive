@@ -329,22 +329,16 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
     ` : ''}
 
-    /* ── Dashboard Grid ─────────────────── */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    .dash-card {
+    /* ── Section Card (reused for signals, etc) ── */
+    .section-card {
       background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px;
+      margin-bottom: 20px;
     }
 
-    .dash-card h2 {
+    .section-card h2 {
       font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-muted);
@@ -353,10 +347,58 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       margin-bottom: 16px;
     }
 
-    /* ── Signals (compact) ───────────────── */
+    /* ── Dep Counts Row (horizontal) ───── */
+    .dep-counts-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .dep-count-chip {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 8px;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+    .dep-count-chip:hover { border-color: var(--text-muted); }
+    .dep-count-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+    .dep-count-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+
+    /* ── History Bar (slim sparkline) ──── */
+    .history-bar {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px 8px;
+      margin-bottom: 20px;
+    }
+    .history-bar svg {
+      width: 100%;
+      height: 40px;
+      display: block;
+    }
+    .history-bar .history-dates {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Signals ─────────────────────────── */
     .signals-grid {
       display: grid;
-      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 24px;
     }
 
     .signal-row { margin-bottom: 0; }
@@ -365,46 +407,17 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .signal-name {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 500;
     }
 
     .signal-score {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
-    }
-
-    /* ── Dep Summary (2x2 mini-grid) ─────── */
-    .dep-summary-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .dep-summary-box {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-    .dep-summary-box:hover { border-color: var(--text-muted); }
-    .dep-summary-box-value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-    .dep-summary-box-label {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
     }
 
     /* ── Get Started (compact embed) ─────── */
@@ -522,13 +535,11 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     /* ── Responsive ──────────────────────── */
     @media (max-width: 768px) {
-      .dashboard-grid {
-        grid-template-columns: 1fr;
-      }
+      .signals-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 640px) {
       .hero { padding: 24px 0 20px; }
-      .dash-card { padding: 18px; }
+      .section-card { padding: 18px; }
       .gauge-container { width: 130px; height: 130px; }
       .gauge-score { font-size: 2.2rem; }
       .project-name { word-break: break-all; }
@@ -536,6 +547,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       .meta-pills { gap: 6px; }
       .meta-pill { font-size: 0.72rem; padding: 4px 10px; }
       .meta-card { padding: 16px 18px; }
+      .dep-counts-row { gap: 6px; }
+      .dep-count-chip { padding: 10px 6px; }
+      .dep-count-value { font-size: 1.1rem; }
       .install-cta { flex-direction: column; text-align: center; padding: 20px 18px; }
       .install-cta-btn { width: 100%; justify-content: center; }
     }
@@ -574,34 +588,22 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
 
-    <!-- ─── Dashboard Grid (2-column) ──── -->
-    <div class="dashboard-grid">
+    <!-- Dep counts — hydrated by deps.js -->
+    <div id="depSummaryContainer" style="display: none;">
+      <div class="dep-counts-row" id="depSummaryGrid"></div>
+    </div>
 
-      <!-- Left column: History + Dep Summary -->
-      <div style="display: flex; flex-direction: column; gap: 16px;">
+    <!-- Score History — slim sparkline bar, hydrated client-side -->
+    <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}"></div>
 
-        <!-- Score History Chart — hydrated client-side -->
-        <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}" class="dash-card" style="padding: 0; border: none;"></div>
-
-        <!-- Dependency Summary — hydrated by deps.js -->
-        <div id="depSummaryContainer" class="dash-card" style="display: none;">
-          <h2>Dependencies</h2>
-          <div class="dep-summary-grid" id="depSummaryGrid"></div>
-        </div>
-      </div>
-
-      <!-- Right column: Signals -->
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        ${result.signals.length > 0 ? `
-        <div class="dash-card">
-          <h2>Signals</h2>
-          <div class="signals-grid">
-            ${signalsHtml}
-          </div>
-        </div>
-        ` : ''}
+    ${result.signals.length > 0 ? `
+    <div class="section-card">
+      <h2>Signals</h2>
+      <div class="signals-grid">
+        ${signalsHtml}
       </div>
     </div>
+    ` : ''}
 
     <!-- Full-width CTA -->
     <div class="install-cta">

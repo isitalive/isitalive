@@ -91,10 +91,10 @@
     var summaryContainer = document.getElementById('depSummaryContainer');
     if (summaryGrid && summaryContainer) {
       summaryGrid.innerHTML = ''
-        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#22c55e">' + (s.healthy || 0) + '</div><div class="dep-summary-box-label">✅ Healthy</div></div>'
-        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="dep-summary-box-label">🟡 Stable</div></div>'
-        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="dep-summary-box-label">⚠️ Degraded</div></div>'
-        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-summary-box-label">🔴 At Risk</div></div>';
+        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#22c55e">' + (s.healthy || 0) + '</div><div class="dep-count-label">✅ Healthy</div></div>'
+        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="dep-count-label">🟡 Stable</div></div>'
+        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="dep-count-label">⚠️ Degraded</div></div>'
+        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-count-label">🔴 At Risk</div></div>';
       summaryContainer.style.display = '';
     }
 
