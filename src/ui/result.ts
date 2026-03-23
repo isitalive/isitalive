@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
 // Result page HTML — shows score gauge, verdict, signal breakdown
+// Dashboard grid layout: Hero → 2-col (History+DepSummary | Signals+Actions) → CTA → Deps
 // ---------------------------------------------------------------------------
 
 import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
@@ -50,15 +51,15 @@ function normalizeVerdict(v: string): Verdict {
 function signalBar(score: number, color: string): string {
   return `<div style="
     width: 100%;
-    height: 6px;
+    height: 4px;
     background: transparent;
-    border-radius: 3px;
+    border-radius: 2px;
     overflow: hidden;
   "><div style="
     width: ${score}%;
     height: 100%;
     background: ${color};
-    border-radius: 3px;
+    border-radius: 2px;
     transition: width 0.8s ease;
   "></div></div>`;
 }
@@ -123,6 +124,26 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
     </section>`;
 }
 
+/** Build the Install Action CTA URL */
+function installActionUrl(owner: string, repo: string): string {
+  const yaml = `name: Dependency Health Audit
+on:
+  pull_request:
+    paths: ['package.json', 'go.mod']
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: isitalive/audit-action@v1
+`;
+  return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/new/main?filename=.github/workflows/isitalive.yml&value=${encodeURIComponent(yaml)}`;
+}
+
 export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
   const owner = escapeHtml(rawOwner);
   const repo = escapeHtml(rawRepo);
@@ -150,15 +171,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
   }
 
+  // Compact signal rows for grid (2 columns of signal pairs)
   const signalsHtml = result.signals.map(s => `
     <div class="signal-row">
       <div class="signal-header">
         <span class="signal-name">${escapeHtml(s.label)}</span>
         <span class="signal-score" style="color: ${scoreColor(s.score)}">${s.score}</span>
-      </div>
-      <div class="signal-meta">
-        <span class="signal-value">${escapeHtml(String(s.value))}</span>
-        <span class="signal-weight">${Math.round(s.weight * 100)}% weight</span>
       </div>
       ${signalBar(s.score, scoreColor(s.score))}
     </div>
@@ -169,6 +187,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   const badgeUrl = `https://isitalive.dev/api/badge/github/${encodedOwner}/${encodedRepo}`;
   const apiUrl = `https://isitalive.dev/api/check/github/${owner}/${repo}`;
   const githubUrl = `https://github.com/${owner}/${repo}`;
+  const ctaUrl = installActionUrl(rawOwner, rawRepo);
 
   return `<!DOCTYPE html>
 <html lang="en" data-theme="system">
@@ -205,7 +224,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .container {
       position: relative;
       z-index: 1;
-      max-width: 900px;
+      max-width: 960px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -213,7 +232,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     /* ── Score Hero ───────────────────────── */
     .hero {
       text-align: center;
-      padding: 40px 0 48px;
+      padding: 40px 0 24px;
     }
 
     .project-name {
@@ -234,9 +253,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .gauge-container {
       position: relative;
       display: inline-block;
-      width: 180px;
-      height: 180px;
-      margin: 24px 0 20px;
+      width: 160px;
+      height: 160px;
+      margin: 20px 0 16px;
     }
 
     .gauge-container svg {
@@ -264,7 +283,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
 
     .gauge-score {
-      font-size: 2.8rem;
+      font-size: 2.6rem;
       font-weight: 800;
       letter-spacing: -0.03em;
       color: ${color};
@@ -310,27 +329,37 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
     ` : ''}
 
-    /* ── Signals ─────────────────────────── */
-    .signals {
+    /* ── Dashboard Grid ─────────────────── */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .dash-card {
       background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 28px;
-      margin-bottom: 28px;
+      padding: 24px;
     }
 
-    .signals h2 {
-      font-size: 1rem;
+    .dash-card h2 {
+      font-size: 0.85rem;
       font-weight: 600;
-      margin-bottom: 20px;
-      color: var(--text-secondary);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
     }
 
-    .signal-row {
-      margin-bottom: 20px;
+    /* ── Signals (compact) ───────────────── */
+    .signals-grid {
+      display: grid;
+      gap: 12px;
     }
 
-    .signal-row:last-child { margin-bottom: 0; }
+    .signal-row { margin-bottom: 0; }
 
     .signal-header {
       display: flex;
@@ -340,49 +369,52 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
 
     .signal-name {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 500;
     }
 
     .signal-score {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 700;
     }
 
-    .signal-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      margin-bottom: 8px;
+    /* ── Dep Summary (2x2 mini-grid) ─────── */
+    .dep-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
 
-    /* ── Embed / API ─────────────────────── */
-    .embed-section {
-      background: transparent;
+    .dep-summary-box {
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 28px;
-      margin-bottom: 28px;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .dep-summary-box:hover { border-color: var(--text-muted); }
+    .dep-summary-box-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .dep-summary-box-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
 
-    .embed-section h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 16px;
-      color: var(--text-secondary);
-    }
-
-    .embed-row {
-      margin-bottom: 16px;
-    }
-
+    /* ── Get Started (compact embed) ─────── */
+    .embed-row { margin-bottom: 12px; }
     .embed-row:last-child { margin-bottom: 0; }
 
     .embed-label {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -392,9 +424,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       background: transparent;
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.78rem;
+      font-size: 0.7rem;
       color: var(--text-secondary);
       word-break: break-all;
       cursor: pointer;
@@ -402,16 +434,14 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       position: relative;
     }
 
-    .embed-code:hover {
-      border-color: var(--accent);
-    }
+    .embed-code:hover { border-color: var(--accent); }
 
     .embed-code .copy-hint {
       position: absolute;
-      right: 12px;
+      right: 10px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--text-muted);
       opacity: 0;
       transition: opacity 0.2s;
@@ -424,15 +454,15 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 24px 28px;
-      margin-bottom: 28px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
     }
 
     .meta-description {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--text-secondary);
       line-height: 1.5;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .meta-pills {
@@ -490,15 +520,24 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       font-weight: 400;
     }
 
+    /* ── Responsive ──────────────────────── */
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     @media (max-width: 640px) {
-      .hero { padding: 24px 0 36px; }
-      .signals, .embed-section, .meta-card { padding: 20px; }
-      .gauge-container { width: 140px; height: 140px; }
+      .hero { padding: 24px 0 20px; }
+      .dash-card { padding: 18px; }
+      .gauge-container { width: 130px; height: 130px; }
       .gauge-score { font-size: 2.2rem; }
       .project-name { word-break: break-all; }
-      .embed-code { font-size: 0.65rem; padding: 10px 12px; }
+      .embed-code { font-size: 0.65rem; padding: 8px 10px; }
       .meta-pills { gap: 6px; }
       .meta-pill { font-size: 0.72rem; padding: 4px 10px; }
+      .meta-card { padding: 16px 18px; }
+      .install-cta { flex-direction: column; text-align: center; padding: 20px 18px; }
+      .install-cta-btn { width: 100%; justify-content: center; }
     }
   </style>
 </head>
@@ -535,45 +574,77 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
 
-    <!-- Score History Chart — hydrated client-side -->
-    <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}"></div>
+    <!-- ─── Dashboard Grid (2-column) ──── -->
+    <div class="dashboard-grid">
 
-    ${result.signals.length > 0 ? `
-    <section class="signals">
-      <h2>Signal Breakdown</h2>
-      ${signalsHtml}
-    </section>
-    ` : ''}
+      <!-- Left column: History + Dep Summary -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
 
-    <section class="embed-section">
-      <h2>Use It</h2>
+        <!-- Score History Chart — hydrated client-side -->
+        <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}" class="dash-card" style="padding: 0; border: none;"></div>
 
-      <div class="embed-row">
-        <div class="embed-label">Badge (Markdown)</div>
-        <div class="embed-code" onclick="copyText(this)" data-text="![Is It Alive?](${badgeUrl})">
-          ![Is It Alive?](${badgeUrl})
-          <span class="copy-hint">click to copy</span>
+        <!-- Dependency Summary — hydrated by deps.js -->
+        <div id="depSummaryContainer" class="dash-card" style="display: none;">
+          <h2>Dependencies</h2>
+          <div class="dep-summary-grid" id="depSummaryGrid"></div>
         </div>
       </div>
 
-      <div class="embed-row">
-        <div class="embed-label">API Endpoint</div>
-        <div class="embed-code" onclick="copyText(this)" data-text="${apiUrl}">
-          GET ${apiUrl}
-          <span class="copy-hint">click to copy</span>
+      <!-- Right column: Signals + Get Started -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+
+        ${result.signals.length > 0 ? `
+        <div class="dash-card">
+          <h2>Signals</h2>
+          <div class="signals-grid">
+            ${signalsHtml}
+          </div>
+        </div>
+        ` : ''}
+
+        <div class="dash-card">
+          <h2>Use It</h2>
+
+          <div class="embed-row">
+            <div class="embed-label">Badge</div>
+            <div class="embed-code" onclick="copyText(this)" data-text="![Is It Alive?](${badgeUrl})">
+              ![Is It Alive?](${badgeUrl})
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
+
+          <div class="embed-row">
+            <div class="embed-label">API</div>
+            <div class="embed-code" onclick="copyText(this)" data-text="${apiUrl}">
+              GET ${apiUrl}
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
+
+          <div class="embed-row">
+            <div class="embed-label">cURL</div>
+            <div class="embed-code" onclick="copyText(this)" data-text="curl -s ${apiUrl} | jq">
+              curl -s ${apiUrl} | jq
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="embed-row">
-        <div class="embed-label">cURL</div>
-        <div class="embed-code" onclick="copyText(this)" data-text="curl -s ${apiUrl} | jq">
-          curl -s ${apiUrl} | jq
-          <span class="copy-hint">click to copy</span>
-        </div>
+    <!-- Full-width CTA -->
+    <div class="install-cta">
+      <div class="install-cta-text">
+        <h2>🚀 Automate this in CI</h2>
+        <p>Add dependency health checks to every pull request. Zero config for public repos.</p>
+        <div class="install-cta-sub">Free for public repos · No API key needed · Powered by OIDC</div>
       </div>
-    </section>
+      <a href="${escapeHtml(ctaUrl)}" class="install-cta-btn" target="_blank" rel="noopener">
+        Install Action →
+      </a>
+    </div>
 
-    <!-- Dependency Health Section — hydrated client-side -->
+    <!-- Dependency Health Drilldown — hydrated client-side -->
     <div id="depsContainer" data-owner="${rawOwner}" data-repo="${rawRepo}">
       <div class="deps-shimmer" id="depsShimmer">
         📦 Discovering dependencies…

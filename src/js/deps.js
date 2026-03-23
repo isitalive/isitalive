@@ -2,7 +2,9 @@
 // Dependency Health Hydration — client-side script for result pages
 //
 // Fetches dependency health data from /_data/deps/github/:owner/:repo
-// and renders summary cards, collapsible dep groups, search, and CTA.
+// and renders:
+//   1. Dep summary grid (in the dashboard grid card — #depSummaryGrid)
+//   2. Full dep drilldown (in #depsContainer — collapsible groups)
 //
 // Reads owner/repo from data attributes on the #depsContainer element:
 //   <div id="depsContainer" data-owner="vercel" data-repo="next.js">
@@ -66,17 +68,9 @@
     return html;
   }
 
-  function buildInstallUrl(owner, repo) {
-    var yaml = 'name: Dependency Health Audit\non:\n  pull_request:\n    paths: [\'package.json\', \'go.mod\']\npermissions:\n  contents: read\n  pull-requests: write\n  id-token: write\njobs:\n  audit:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: isitalive/audit-action@v1\n';
-    return 'https://github.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/new/main?filename=.github/workflows/isitalive.yml&value=' + encodeURIComponent(yaml);
-  }
-
   function renderDeps(data) {
     var container = document.getElementById('depsContainer');
     if (!container) return;
-
-    var owner = container.getAttribute('data-owner');
-    var repo = container.getAttribute('data-repo');
 
     // No manifests found — hide entirely
     if (!data.manifests || data.manifests.length === 0) {
@@ -90,11 +84,24 @@
       return;
     }
 
-    var prodDeps = data.dependencies.filter(function (d) { return !d.dev; });
-    var devDeps = data.dependencies.filter(function (d) { return d.dev; });
     var s = data.summary || {};
 
-    // Split prod deps into groups
+    // ── Populate the dashboard grid summary (2x2 mini-grid) ──
+    var summaryGrid = document.getElementById('depSummaryGrid');
+    var summaryContainer = document.getElementById('depSummaryContainer');
+    if (summaryGrid && summaryContainer) {
+      summaryGrid.innerHTML = ''
+        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#22c55e">' + (s.healthy || 0) + '</div><div class="dep-summary-box-label">✅ Healthy</div></div>'
+        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="dep-summary-box-label">🟡 Stable</div></div>'
+        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="dep-summary-box-label">⚠️ Degraded</div></div>'
+        + '<div class="dep-summary-box"><div class="dep-summary-box-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-summary-box-label">🔴 At Risk</div></div>';
+      summaryContainer.style.display = '';
+    }
+
+    // ── Render the drilldown section (collapsible groups only) ──
+    var prodDeps = data.dependencies.filter(function (d) { return !d.dev; });
+    var devDeps = data.dependencies.filter(function (d) { return d.dev; });
+
     var needsAttention = prodDeps.filter(function (d) {
       return d.verdict === 'degraded' || d.verdict === 'critical' || d.verdict === 'unmaintained';
     });
@@ -107,14 +114,6 @@
 
     var html = '';
 
-    // Summary cards (clickable)
-    html += '<div class="deps-summary-cards" id="depsSummaryCards">';
-    html += '<div class="deps-summary-card" data-filter="healthy" role="button" tabindex="0"><div class="deps-summary-card-value" style="color:#22c55e">' + (s.healthy || 0) + '</div><div class="deps-summary-card-label">✅ Healthy</div></div>';
-    html += '<div class="deps-summary-card" data-filter="stable" role="button" tabindex="0"><div class="deps-summary-card-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="deps-summary-card-label">🟡 Stable</div></div>';
-    html += '<div class="deps-summary-card" data-filter="degraded" role="button" tabindex="0"><div class="deps-summary-card-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="deps-summary-card-label">⚠️ Degraded</div></div>';
-    html += '<div class="deps-summary-card" data-filter="at-risk" role="button" tabindex="0"><div class="deps-summary-card-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="deps-summary-card-label">🔴 At Risk</div></div>';
-    html += '</div>';
-
     // Incomplete notice
     if (!data.complete && data.pending > 0) {
       html += '<div class="deps-incomplete-notice">⏳ ' + data.pending + ' dependencies are still being scored. Auto-refreshing…</div>';
@@ -122,26 +121,14 @@
 
     // Deps groups inside section card
     html += '<div class="deps-section-card">';
-    html += '<input type="text" class="deps-search" id="depsSearch" placeholder="Search dependencies…" autocomplete="off" />';
+    html += '<input type="text" class="deps-search" id="depsSearch" placeholder="Search ' + data.dependencies.length + ' dependencies…" autocomplete="off" />';
 
-    html += renderGroup('Attention', '⚠️', 'Needs Attention', needsAttention, true);
+    html += renderGroup('Attention', '⚠️', 'Needs Attention', needsAttention, needsAttention.length > 0);
     html += renderGroup('Ok', '✅', 'Healthy & Stable', okDeps, false);
     html += renderGroup('Pending', '⏳', 'Pending / Unresolved', pendingDeps, false);
     html += renderGroup('Dev', '🔧', 'Dev Dependencies', devDeps, false);
 
     html += '</div>';
-
-    // Install CTA
-    if (owner && repo) {
-      html += '<div class="install-cta">';
-      html += '<div class="install-cta-text">';
-      html += '<h2>🚀 Automate this in CI</h2>';
-      html += '<p>Add dependency health checks to every pull request. Zero config for public repos.</p>';
-      html += '<div class="install-cta-sub">Free for public repos · No API key needed · Powered by OIDC</div>';
-      html += '</div>';
-      html += '<a href="' + esc(buildInstallUrl(owner, repo)) + '" class="install-cta-btn" target="_blank" rel="noopener">Install Action →</a>';
-      html += '</div>';
-    }
 
     container.innerHTML = html;
 
@@ -176,47 +163,6 @@
         }
       });
     }
-
-    // Bind clickable summary cards
-    var activeFilter = null;
-    container.querySelectorAll('.deps-summary-card[data-filter]').forEach(function (card) {
-      card.addEventListener('click', function () {
-        var filter = card.getAttribute('data-filter');
-
-        if (activeFilter === filter) {
-          activeFilter = null;
-          container.querySelectorAll('.deps-summary-card').forEach(function (c) { c.classList.remove('active'); });
-          container.querySelectorAll('.dep-row').forEach(function (r) { r.style.display = ''; });
-          return;
-        }
-
-        activeFilter = filter;
-        container.querySelectorAll('.deps-summary-card').forEach(function (c) { c.classList.remove('active'); });
-        card.classList.add('active');
-
-        var verdicts = [];
-        if (filter === 'healthy') verdicts = ['healthy'];
-        else if (filter === 'stable') verdicts = ['stable'];
-        else if (filter === 'degraded') verdicts = ['degraded'];
-        else if (filter === 'at-risk') verdicts = ['critical', 'unmaintained'];
-
-        container.querySelectorAll('.dep-row').forEach(function (row) {
-          var verdict = row.getAttribute('data-verdict');
-          row.style.display = verdicts.indexOf(verdict) !== -1 ? '' : 'none';
-        });
-
-        container.querySelectorAll('.deps-group').forEach(function (group) {
-          var hasVisible = group.querySelector('.dep-row:not([style*="display: none"])');
-          var content = group.querySelector('.deps-group-content');
-          var toggle = group.querySelector('.deps-group-toggle');
-          if (hasVisible && content && toggle) {
-            content.classList.add('visible');
-            toggle.classList.add('expanded');
-            toggle.setAttribute('aria-expanded', 'true');
-          }
-        });
-      });
-    });
 
     // Auto-retry if incomplete
     if (!data.complete && data.pending > 0) {
