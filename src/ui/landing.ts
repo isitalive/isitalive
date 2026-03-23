@@ -538,7 +538,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               <span class="btn-spinner"></span>
             </button>
           </div>
-          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible"></div>` : ''}
+          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
         </form>
         <p class="search-hint">Try <code>vercel/next.js</code> or paste a link to a <code>package.json</code> or <code>go.mod</code></p>
       </div>
@@ -610,6 +610,11 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
   ${hasTurnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}
   <script>
+    // Track whether Turnstile token is ready (set by data-callback / data-expired-callback)
+    var turnstileReady = ${hasTurnstile ? 'false' : 'true'};
+    function onTurnstileSuccess() { turnstileReady = true; }
+    function onTurnstileExpired() { turnstileReady = false; if (typeof turnstile !== 'undefined') turnstile.reset(); }
+
     document.getElementById('searchForm').addEventListener('submit', function(e) {
       const input = document.getElementById('searchInput').value.trim();
       if (!input) { e.preventDefault(); return; }
@@ -623,7 +628,23 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       bar.classList.add('active');
       document.getElementById('searchInput').readOnly = true;
 
-      ${hasTurnstile ? `// Let the form POST with Turnstile token — server handles redirect and manifest detection` : `
+      ${hasTurnstile ? `
+      // If Turnstile token is not ready (e.g. after back-nav reset), wait for it
+      if (!turnstileReady) {
+        e.preventDefault();
+        var form = this;
+        var attempts = 0;
+        var waitForToken = setInterval(function() {
+          attempts++;
+          if (turnstileReady || attempts > 50) {
+            clearInterval(waitForToken);
+            if (turnstileReady) { form.submit(); }
+            else { btn.classList.remove('loading'); box.classList.remove('loading'); bar.classList.remove('active'); document.getElementById('searchInput').readOnly = false; }
+          }
+        }, 100);
+        return;
+      }
+      // Let the form POST with Turnstile token — server handles redirect and manifest detection` : `
       // No Turnstile (local dev) — do client-side redirect
       e.preventDefault();
 
@@ -680,6 +701,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
         // Re-render Turnstile widget so a fresh token is generated.
         // The old token was already consumed by the previous form submission.
+        turnstileReady = false;
         if (typeof turnstile !== 'undefined') {
           turnstile.reset();
         }
