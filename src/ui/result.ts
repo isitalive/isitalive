@@ -376,6 +376,29 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       color: var(--text-muted);
     }
 
+    /* ── Skeleton Shimmer ──────────────── */
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+    .skeleton-chip {
+      height: 52px;
+      flex: 1;
+      border-radius: 6px;
+    }
+    .skeleton-bar {
+      height: 44px;
+      width: 100%;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
     /* ── History Bar (slim sparkline) ──── */
     .history-bar {
       border: 1px solid var(--border);
@@ -590,13 +613,20 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     ${renderMetadataCard(result.metadata, owner, repo, firstIndexed)}
 
-    <!-- Dep counts — hydrated by deps.js -->
-    <div id="depSummaryContainer" style="display: none;">
-      <div class="dep-counts-row" id="depSummaryGrid"></div>
+    <!-- Dep counts — skeleton then hydrated by deps.js -->
+    <div id="depSummaryContainer">
+      <div class="dep-counts-row" id="depSummaryGrid">
+        <div class="skeleton skeleton-chip"></div>
+        <div class="skeleton skeleton-chip"></div>
+        <div class="skeleton skeleton-chip"></div>
+        <div class="skeleton skeleton-chip"></div>
+      </div>
     </div>
 
-    <!-- Score History — slim sparkline bar, hydrated client-side -->
-    <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}"></div>
+    <!-- Score History — skeleton then hydrated by history.js -->
+    <div id="historyContainer" data-owner="${rawOwner}" data-repo="${rawRepo}">
+      <div class="skeleton skeleton-bar"></div>
+    </div>
 
     ${result.signals.length > 0 ? `
     <div class="section-card">
