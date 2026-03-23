@@ -5,7 +5,6 @@
 // known manifest filenames. Results are cached in KV for 6 hours.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
 import type { ManifestFormat } from './parsers'
 
 export interface DiscoveredManifest {
@@ -24,6 +23,7 @@ const MANIFEST_FILENAMES: Record<string, ManifestFormat> = {
 
 const DISCOVERY_CACHE_PREFIX = 'discover:'
 const DISCOVERY_CACHE_TTL = 6 * 60 * 60 // 6 hours
+const DISCOVERY_ERROR_TTL = 5 * 60       // 5 min on error
 
 /**
  * Discover manifest files at the root of a GitHub repository.
@@ -39,11 +39,19 @@ export async function discoverManifests(
   token: string,
   kv: KVNamespace,
 ): Promise<DiscoveredManifest[]> {
-  // Check cache first
-  const cacheKey = `${DISCOVERY_CACHE_PREFIX}${owner}/${repo}`
+  // Normalize to lowercase to avoid case-sensitive cache duplicates
+  const normalizedOwner = owner.toLowerCase()
+  const normalizedRepo = repo.toLowerCase()
+  const cacheKey = `${DISCOVERY_CACHE_PREFIX}${normalizedOwner}/${normalizedRepo}`
+
   const cached = await kv.get(cacheKey)
   if (cached !== null) {
-    return JSON.parse(cached) as DiscoveredManifest[]
+    try {
+      return JSON.parse(cached) as DiscoveredManifest[]
+    } catch {
+      // Corrupted cache entry — evict and recompute
+      await kv.delete(cacheKey)
+    }
   }
 
   // Fetch root directory listing from GitHub Contents API
@@ -53,7 +61,7 @@ export async function discoverManifests(
       `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/`,
       {
         headers: {
-          Authorization: `bearer ${token}`,
+          Authorization: `token ${token}`,
           Accept: 'application/vnd.github+json',
           'User-Agent': 'isitalive/1.0',
           'X-GitHub-Api-Version': '2022-11-28',
@@ -63,8 +71,8 @@ export async function discoverManifests(
     )
 
     if (!res.ok) {
-      // Non-critical — return empty (no manifests found)
-      await kv.put(cacheKey, '[]', { expirationTtl: DISCOVERY_CACHE_TTL })
+      // Non-critical — cache briefly to avoid hammering the API on repeated failures
+      await kv.put(cacheKey, '[]', { expirationTtl: DISCOVERY_ERROR_TTL })
       return []
     }
 
@@ -88,12 +96,12 @@ export async function discoverManifests(
         format: MANIFEST_FILENAMES[item.name],
       }))
   } catch {
-    // Network/timeout error — cache empty result briefly (5 min) to avoid hammering
-    await kv.put(cacheKey, '[]', { expirationTtl: 5 * 60 })
+    // Network/timeout error — cache empty result briefly to avoid hammering
+    await kv.put(cacheKey, '[]', { expirationTtl: DISCOVERY_ERROR_TTL })
     return []
   }
 
-  // Cache the result
+  // Cache the result (full TTL for successful responses)
   await kv.put(cacheKey, JSON.stringify(manifests), {
     expirationTtl: DISCOVERY_CACHE_TTL,
   })
