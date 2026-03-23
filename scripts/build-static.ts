@@ -108,6 +108,33 @@ write('llms.txt', llmsTxt);
 write('llms-full.txt', llmsFullTxt);
 write('.well-known/ai-plugin.json', JSON.stringify(aiPluginManifest, null, 2));
 
+// _headers — security headers for static assets (served without Worker)
+// See: https://developers.cloudflare.com/workers/static-assets/headers/
+const csp = [
+  "default-src 'none'",
+  "script-src 'self' https://challenges.cloudflare.com https://cdn.jsdelivr.net 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https://img.shields.io",
+  "connect-src 'self' https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com",
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
+write('_headers', [
+  '# Security headers for static assets (pages served without Worker invocation)',
+  '/*',
+  '  X-Content-Type-Options: nosniff',
+  '  X-Frame-Options: DENY',
+  '  Referrer-Policy: strict-origin-when-cross-origin',
+  '  Permissions-Policy: camera=(), microphone=(), geolocation=()',
+  `  Content-Security-Policy: ${csp}`,
+  '',
+].join('\n'));
+
 // Client-side JS — served as static assets (ETag-cached, zero Worker cost)
 const jsSrc = resolve(ROOT, 'src/js');
 if (existsSync(jsSrc)) {
