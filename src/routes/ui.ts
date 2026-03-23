@@ -452,7 +452,6 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
   const cachedResponse = await cacheManager.getResponse(cacheKey, false)
   if (cachedResponse) {
-    console.log(`⚡ Cache HIT for: ${c.req.url}`)
     // Page views are tracked client-side via sendBeacon → /_view
     return cachedResponse
   }
