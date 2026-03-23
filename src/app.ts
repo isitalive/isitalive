@@ -48,8 +48,11 @@ app.use('/api/*', cors({
   maxAge: 86400,
 }));
 
-app.use('/api/*', apiKeyAuth);
-app.use('/api/*', rateLimit);
+// Auth + rate limiting — skip badge (CDN-cached, embedded as <img> tags)
+app.use('/api/check/*', apiKeyAuth);
+app.use('/api/check/*', rateLimit);
+app.use('/api/manifest', apiKeyAuth);
+app.use('/api/manifest', rateLimit);
 
 app.route('/api/check', check);
 app.route('/api/badge', badge);
