@@ -598,7 +598,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               type="text"
               name="repo"
               id="searchInput"
-              placeholder="zitadel/zitadel"
+              placeholder="${['vercel/next.js', 'facebook/react', 'golang/go', 'zitadel/zitadel', 'tailwindlabs/tailwindcss'][Math.floor(Math.random() * 5)]}"
               required
               autofocus
             />
