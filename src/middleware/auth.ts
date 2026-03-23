@@ -16,7 +16,7 @@
 // OSS-safe: actual API key values only exist in KV, never in code.
 // ---------------------------------------------------------------------------
 
-import { Context, Next } from 'hono';
+import { createMiddleware } from 'hono/factory';
 import type { Env, ApiKeyEntry } from '../scoring/types';
 import type { Tier } from '../cache/index';
 import { verifyOidcToken, type OidcClaims } from '../github/oidc';
@@ -36,8 +36,10 @@ type AppEnv = {
  * Sets tier, key name, auth status, and OIDC claims on the Hono context.
  *
  * Unauthenticated requests default to 'free' tier.
+ *
+ * Uses createMiddleware() from hono/factory for type-safe context variables.
  */
-export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
+export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
   // Default to free tier, unauthenticated
   c.set('tier', 'free');
   c.set('keyName', null);
@@ -89,4 +91,4 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
   }
 
   return next();
-}
+});

@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
+import { etag } from 'hono/etag';
 import type { Env } from './types/env';
 import { version } from '../package.json';
 import { apiKeyAuth } from './middleware/auth';
@@ -16,30 +18,29 @@ import { aiPluginManifest } from './routes/aiPlugin';
 
 export const app = new Hono<{ Bindings: Env }>();
 
-// Security headers — applied globally
-app.use('*', async (c, next) => {
-  await next();
-  c.header('X-Content-Type-Options', 'nosniff');
-  c.header('X-Frame-Options', 'DENY');
-  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  c.header(
-    'Content-Security-Policy',
-    [
-      "default-src 'none'",
-      "script-src 'self' https://challenges.cloudflare.com https://cdn.jsdelivr.net 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https://img.shields.io",
-      "connect-src 'self' https://challenges.cloudflare.com",
-      "frame-src https://challenges.cloudflare.com",
-      "worker-src 'self' blob:",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; '),
-  );
-});
+// Security headers — applied globally via Hono's secureHeaders middleware
+app.use('*', secureHeaders({
+  xFrameOptions: 'DENY',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  contentSecurityPolicy: {
+    defaultSrc: ["'none'"],
+    scriptSrc: ["'self'", 'https://challenges.cloudflare.com', 'https://cdn.jsdelivr.net', "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
+    fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+    imgSrc: ["'self'", 'data:', 'https://img.shields.io'],
+    connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
+    frameSrc: ['https://challenges.cloudflare.com'],
+    workerSrc: ["'self'", 'blob:'],
+    frameAncestors: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+  },
+  permissionsPolicy: {
+    camera: false,
+    microphone: false,
+    geolocation: false,
+  },
+}));
 
 // CORS — scoped to API routes only (admin excluded)
 app.use('/api/*', cors({
@@ -67,6 +68,12 @@ app.all('/api/audit', (c) => {
 app.route('/github', githubWebhook);
 app.route('/admin', admin);
 app.route('/', ui);
+
+// ETag — conditional caching for slow-changing endpoints
+app.use('/openapi.json', etag());
+app.use('/llms.txt', etag());
+app.use('/llms-full.txt', etag());
+app.use('/.well-known/ai-plugin.json', etag());
 
 app.get('/openapi.json', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');

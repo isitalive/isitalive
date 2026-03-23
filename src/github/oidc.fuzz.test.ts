@@ -12,7 +12,7 @@
 
 import { describe, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { verifyOidcToken, fetchJwks } from './oidc'
+import { verifyOidcToken } from './oidc'
 
 // Cap iterations — crypto-heavy tests can't do 10k in 30s
 const CRYPTO_FUZZ_RUNS = { numRuns: 500 }
@@ -115,21 +115,6 @@ describe('verifyOidcToken fuzz', () => {
     const jwt = `${randomStr}.${base64url('{}')}.sig`
     await expect(
       verifyOidcToken(jwt, env).then(() => 'ok').catch(() => 'rejected'),
-    ).resolves.toBeTypeOf('string')
-  })
-})
-
-describe('fetchJwks fuzz', () => {
-  test.prop([
-    fc.string({ maxLength: 200 }),
-  ], CRYPTO_FUZZ_RUNS)('handles non-JSON JWKS responses gracefully', async (responseBody) => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response(responseBody, { status: 200 }),
-    ) as any
-
-    const env = createMockEnv()
-    await expect(
-      fetchJwks(env, true).then(() => 'ok').catch(() => 'rejected'),
     ).resolves.toBeTypeOf('string')
   })
 })

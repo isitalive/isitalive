@@ -8,7 +8,7 @@
 import { Hono } from 'hono'
 import type { Env } from '../types/env'
 import { timingSafeEqual } from '../utils/crypto'
-import { adminAuth, createSession, sessionCookieHeader, clearSessionCookieHeader } from '../middleware/admin-auth'
+import { adminAuth, createSession, setSessionCookie, clearSessionCookie } from '../middleware/admin-auth'
 import { getAdminOverview, KVKeyStore } from '../admin/data'
 import { queryR2SQL } from '../admin/r2sql'
 import { adminLoginPage } from '../ui/admin-login'
@@ -48,13 +48,13 @@ admin.post('/auth/login', async (c) => {
   // Valid — create session
   const isSecure = new URL(c.req.url).protocol === 'https:'
   const session = await createSession(secret)
-  c.header('Set-Cookie', sessionCookieHeader(session.cookie, session.maxAge, isSecure))
+  setSessionCookie(c, session.cookie, session.maxAge, isSecure)
   return c.redirect('/admin')
 })
 
 admin.get('/auth/logout', (c) => {
   const isSecure = new URL(c.req.url).protocol === 'https:'
-  c.header('Set-Cookie', clearSessionCookieHeader(isSecure))
+  clearSessionCookie(c, isSecure)
   return c.redirect('/admin/auth/login')
 })
 

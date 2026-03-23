@@ -70,20 +70,16 @@ export async function getInstallationToken(
 }
 
 // ---------------------------------------------------------------------------
-// JWT generation (RS256)
+// JWT generation (RS256) — using Hono's sign() helper
 // ---------------------------------------------------------------------------
 
 /**
  * Generate a short-lived JWT for GitHub App authentication.
  * Valid for 10 minutes (GitHub's maximum).
+ * Uses Hono's sign() with a CryptoKey for RS256 signing.
  */
 async function generateAppJwt(appId: string, privateKeyPem: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-
-  const header = {
-    alg: 'RS256',
-    typ: 'JWT',
-  };
 
   const payload = {
     iat: now - 60,     // Issued 60s ago (clock skew tolerance)
@@ -91,19 +87,11 @@ async function generateAppJwt(appId: string, privateKeyPem: string): Promise<str
     iss: appId,
   };
 
-  const headerB64 = base64url(JSON.stringify(header));
-  const payloadB64 = base64url(JSON.stringify(payload));
-  const signingInput = `${headerB64}.${payloadB64}`;
-
   const key = await importPrivateKey(privateKeyPem);
-  const signature = await crypto.subtle.sign(
-    { name: 'RSASSA-PKCS1-v1_5' },
-    key,
-    new TextEncoder().encode(signingInput),
-  );
 
-  const signatureB64 = base64urlFromBuffer(signature);
-  return `${signingInput}.${signatureB64}`;
+  // Hono's sign() accepts CryptoKey for asymmetric algorithms
+  const { sign } = await import('hono/jwt');
+  return sign(payload, key, 'RS256');
 }
 
 /**
@@ -174,27 +162,4 @@ function wrapPkcs1InPkcs8(pkcs1: Uint8Array): Uint8Array {
   result[pkcs8Header.length - 1] = octetLen & 0xff;
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Base64url helpers
-// ---------------------------------------------------------------------------
-
-function base64url(str: string): string {
-  return btoa(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function base64urlFromBuffer(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }
