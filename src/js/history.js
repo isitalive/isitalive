@@ -70,7 +70,7 @@
         var barH = (day.score / 100) * chartH;
         var y = topPad + chartH - barH;
         var color = scoreColor(day.score);
-        bars += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + barH.toFixed(1) + '" rx="1" fill="' + color + '" opacity="0.85">'
+        bars += '<rect class="hbar" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + barH.toFixed(1) + '" rx="1" fill="' + color + '" opacity="0.75">'
           + '<title>' + day.date + ': ' + day.score + '/100</title></rect>';
       } else {
         // Empty day — subtle dashed placeholder
@@ -84,7 +84,7 @@
     var yLabels = '<text x="' + (leftPad - 4) + '" y="' + (topPad + 6) + '" text-anchor="end" font-size="7" fill="currentColor" opacity="0.3">100</text>';
     yLabels += '<text x="' + (leftPad - 4) + '" y="' + (topPad + chartH) + '" text-anchor="end" font-size="7" fill="currentColor" opacity="0.3">0</text>';
 
-    var svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" style="color: var(--text-primary)">'
+    var svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" style="color: var(--text-primary)"><style>.hbar{transition:opacity .15s}.hbar:hover{opacity:1!important}</style>'
       + yLabels + bars
       + '</svg>';
 

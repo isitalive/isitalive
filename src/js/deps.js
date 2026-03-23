@@ -95,7 +95,6 @@
         + '<div class="dep-count-chip" data-filter="stable" role="button" tabindex="0"><div class="dep-count-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="dep-count-label">🟡 Stable</div></div>'
         + '<div class="dep-count-chip" data-filter="degraded" role="button" tabindex="0"><div class="dep-count-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="dep-count-label">⚠️ Degraded</div></div>'
         + '<div class="dep-count-chip" data-filter="at-risk" role="button" tabindex="0"><div class="dep-count-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-count-label">🔴 At Risk</div></div>';
-      summaryContainer.style.display = '';
 
       // Bind click: scroll to deps + filter
       var activeChipFilter = null;
