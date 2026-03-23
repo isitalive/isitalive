@@ -696,7 +696,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   </script>
   <script>
     // Hydrate recently checked chips
-    fetch('/api/recent').then(r => r.json()).then(function(queries) {
+    fetch('/_data/recent').then(r => r.json()).then(function(queries) {
       if (!queries || !queries.length) return;
       var section = document.getElementById('recentSection');
       var list = document.getElementById('recentList');

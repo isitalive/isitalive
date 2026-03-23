@@ -3,6 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2025-03-14"
 compatibility_flags = ["nodejs_compat"]
 
+# Build step — pre-renders static pages to public/ before deploy
+[build]
+command = "npm run build"
+
 [placement]
 mode = "smart"
 
@@ -10,6 +14,7 @@ mode = "smart"
 [[rules]]
 type = "Text"
 globs = ["**/*.md"]
+fallthrough = true
 
 # Custom domain
 routes = [
@@ -27,11 +32,13 @@ binding = "KEYS_KV"
 id = "8d18f5fa0e6046568eb3979c7a57b0eb"
 
 # Native Rate Limiting — two-level infra protection (not billing)
+# Note: CDN-Cache-Control does NOT prevent Worker invocations (ADR-006).
+# Every request — anonymous or authenticated — wakes the Worker (~$0.30/M).
 [[unsafe.bindings]]
 name = "RATE_LIMITER_ANON"
 type = "ratelimit"
 namespace_id = "1001"
-simple = { limit = 10, period = 60 }
+simple = { limit = 5, period = 60 }  # Tightened from 10 — ADR-006
 
 [[unsafe.bindings]]
 name = "RATE_LIMITER_AUTH"
@@ -77,9 +84,14 @@ pipeline = "aceb9a448fc6426ca418d233579a5bc9"
 [triggers]
 crons = ["*/10 * * * *", "0 6 * * *"]
 
+# Public tokens — safe to commit (already embedded in HTML source).
+# Available at runtime via env AND parsed by scripts/build-static.ts at build time.
+# CF_ANALYTICS_TOKEN is NOT needed — CF auto-injects the RUM beacon when enabled.
+[vars]
+TURNSTILE_SITE_KEY = "0x4AAAAAACtWfG0E4_y8k0Dy"
+
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
-# - TURNSTILE_SITE_KEY: Cloudflare Turnstile public key
 # - TURNSTILE_SECRET_KEY: Cloudflare Turnstile secret key
 # - CF_ACCOUNT_ID: Cloudflare account ID (for R2 SQL API in Cron)
 # - CF_R2_SQL_TOKEN: Read-only scoped token for R2 SQL queries
@@ -91,8 +103,21 @@ enabled = true
 
 [observability.logs]
 enabled = true
-invocation_logs = true  # Log every invocation
-head_sampling_rate = 0.1  # 10% sampling — reduce cost while retaining signal
+invocation_logs = true
+head_sampling_rate = 0.1  # 10% — reduce cost while retaining signal
 
 [observability.traces]
 enabled = true
+head_sampling_rate = 0.01  # 1% — traces produce many spans per request, keep tight
+
+# Static Assets (Phase 2 — ADR-006)
+# Pre-rendered UI pages served WITHOUT invoking the Worker — free & unlimited.
+# Build: npx tsx scripts/build-static.ts → public/
+#
+# Default behavior: if a request matches a static file, it's served directly
+# (no Worker invocation). If no match, the Worker handles it.
+# run_worker_first: paths where the Worker should run EVEN IF a static file matches.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "none"

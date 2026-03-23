@@ -591,6 +591,13 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       </div>
     </section>
 
+    <!-- Dependency Health Section — hydrated client-side -->
+    <div id="depsContainer" data-owner="${rawOwner}" data-repo="${rawRepo}">
+      <div class="deps-shimmer" id="depsShimmer">
+        📦 Discovering dependencies…
+      </div>
+    </div>
+
   </div>
 
   ${footerHtml}
@@ -632,6 +639,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       }));
     } catch(e) {}
   </script>
+  <script src="/js/deps.js" defer></script>
   ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
 </body>
 </html>`;

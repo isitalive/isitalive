@@ -66,23 +66,27 @@ app.route('/', ui);
 
 app.get('/openapi.json', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400');
   return c.json(openApiSpec);
 });
 
 app.get('/llms.txt', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400');
   c.header('Content-Type', 'text/plain; charset=utf-8');
   return c.text(llmsTxt);
 });
 
 app.get('/llms-full.txt', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400');
   c.header('Content-Type', 'text/plain; charset=utf-8');
   return c.text(llmsFullTxt);
 });
 
 app.get('/.well-known/ai-plugin.json', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400');
   return c.json(aiPluginManifest);
 });
 

@@ -4,7 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.9.1] - 2026-03-22
+## [0.10.0] - 2026-03-22
+
+### Added
+
+- **ADR-006: Static Assets, Worker Caching & Cost Architecture** — corrects the assumption that Workers can sit behind CDN cache (they can't); documents Cache API + KV as optimal strategy; includes full cost model
+- **Phase 2: Static Assets** — pre-render 10 UI pages at build time; served by Cloudflare Static Assets without invoking the Worker (free & unlimited). Includes `scripts/build-static.ts`, custom `.md` loader, and `[assets]` config in `wrangler.toml`
+- `X-Manifest-Hash` fast-path on `POST /api/manifest` — Worker checks L1/L2 cache *before* parsing JSON body, returning in <1ms CPU on cache hits; hash normalized to lowercase for case-insensitive matching
+- AI-friendly 429 response: short `message` for humans, separate `hint` and `upgrade_url` fields for programmatic use by AI agents
+- `npm run build` / `npm run predeploy` scripts — auto-build static assets before deploy
+
+### Changed
+
+- **Anonymous rate limit tightened** from 10 to 5 req/min per IP — every request wakes Worker (~$0.30/M), ADR-006
+- OIDC private-repo 401 message now includes pricing link and `ISITALIVE_API_KEY` instructions (PLG upsell)
+- ADR-005 updated to reference ADR-006: corrected architecture diagram, decision chain, invariants, and implementation status
+- Cache comments in `cache/index.ts` corrected: `CDN-Cache-Control` does NOT prevent Worker invocations
+- Audit result page API embed changed from removed GET endpoint to `curl -X POST` with `X-Manifest-Hash`
 
 ### Security
 
@@ -15,6 +31,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - Changed Turnstile widget size from `flexible` to `normal` on the landing page — resolves various iframe-related browser console errors and "UNSUPPORTED_OS" warnings in certain environments.
 - Added `https://static.cloudflareinsights.com` to `connect-src` and `img-src` in CSP to prevent `net::ERR_BLOCKED_BY_CLIENT` when analytics are not blocked by the browser.
+
+### Removed
+
+- `GET /api/manifest/hash/:hash` endpoint and OpenAPI spec — Workers always invoke, making the GET a redundant round-trip at the same $0.30/M cost (ADR-006)
+- `.DS_Store` from git tracking
+
+## [0.9.1] - 2026-03-22
+
+### Fixed
+
+- **CDN edge caching for HTML pages** — added `CDN-Cache-Control` headers to all 18 public routes (landing, result, methodology, trending, changelog, audit, sitemap, openapi, llms.txt, ai-plugin); previously only API check routes had this, so HTML responses always invoked the Worker
+- Cache API storing result page responses without `Cache-Control` header on KV cache-hit path — entries may have been evicted prematurely
+- Recent queries endpoint (`/api/recent`) rate-limited by `/api/*` middleware — moved to `/_data/recent` (matching trending/changelog pattern) and increased cache TTL from 10s to 60s
 
 ## [0.9.0] - 2026-03-21
 
