@@ -33,14 +33,14 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     :root {
       --bg-primary: #0a0a0f;
       --bg-secondary: #12121a;
-      --surface: rgba(255,255,255,0.04);
-      --surface-hover: rgba(255,255,255,0.08);
-      --border: rgba(255,255,255,0.08);
-      --text-primary: #e8e8ed;
-      --text-secondary: #8b8b9e;
-      --text-muted: #55556a;
+      --surface: rgba(255,255,255,0.06);
+      --surface-hover: rgba(255,255,255,0.12);
+      --border: rgba(255,255,255,0.10);
+      --text-primary: #f0f0f5;
+      --text-secondary: #9d9db5;
+      --text-muted: #64648a;
       --accent: #6366f1;
-      --accent-glow: rgba(99,102,241,0.3);
+      --accent-glow: rgba(99,102,241,0.35);
       --green: #22c55e;
       --yellow: #eab308;
       --orange: #f97316;
@@ -62,9 +62,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       pointer-events: none;
       z-index: 0;
     }
-    .bg-orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%); top: -200px; left: -150px; }
-    .bg-orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%); bottom: -200px; right: -100px; }
-    .bg-orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%); top: 40%; right: 10%; }
+    .bg-orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%); top: -200px; left: -150px; }
+    .bg-orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 70%); bottom: -200px; right: -100px; }
+    .bg-orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(34,197,94,0.10) 0%, transparent 70%); top: 40%; right: 10%; }
 
     .container {
       position: relative;
@@ -77,7 +77,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     /* ── Header ─────────────────────────────── */
     header {
       text-align: center;
-      padding: 120px 0 60px;
+      padding: 100px 0 10px;
     }
 
     .logo {
@@ -112,7 +112,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       line-height: 1.1;
       letter-spacing: -0.03em;
       margin-bottom: 20px;
-      background: linear-gradient(135deg, #fff 0%, #a5a5c0 100%);
+      background: linear-gradient(135deg, #ffffff 0%, #c8c8e0 50%, #8b8bcc 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -129,7 +129,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     /* ── Search ─────────────────────────────── */
     .search-container {
-      margin-top: 48px;
+      margin-top: 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -137,25 +137,58 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .search-box {
-      background: var(--surface);
+      background: var(--bg-secondary);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 8px;
+      border-radius: 16px;
+      padding: 6px;
       width: 100%;
       display: flex;
       align-items: center;
       gap: 0;
       transition: border-color 0.3s, box-shadow 0.3s;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Animated glow border */
+    .search-box::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 18px;
+      padding: 2px;
+      background: conic-gradient(from var(--glow-angle, 0deg), transparent 30%, rgba(99,102,241,0.6) 50%, transparent 70%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: glow-rotate 4s linear infinite;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @property --glow-angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    @keyframes glow-rotate {
+      to { --glow-angle: 360deg; }
     }
 
     .search-box:focus-within {
       border-color: var(--accent);
-      box-shadow: 0 0 0 4px var(--accent-glow);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .search-box:focus-within::before {
+      background: conic-gradient(from var(--glow-angle, 0deg), transparent 15%, rgba(99,102,241,0.8) 50%, transparent 85%);
     }
 
     #searchForm {
       width: 100%;
-      max-width: 1200px;
+      max-width: 680px;
     }
 
 
@@ -173,8 +206,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       outline: none;
       color: var(--text-primary);
       font-family: 'Inter', sans-serif;
-      font-size: 1.2rem;
-      padding: 20px 28px;
+      font-size: 1.05rem;
+      padding: 14px 20px;
       caret-color: var(--accent);
     }
 
@@ -186,10 +219,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       background: var(--accent);
       color: #fff;
       border: none;
-      border-radius: 14px;
-      padding: 18px 36px;
+      border-radius: 12px;
+      padding: 14px 28px;
       font-family: 'Inter', sans-serif;
-      font-size: 1rem;
+      font-size: 0.92rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
@@ -201,22 +234,52 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     .search-hint {
       text-align: center;
-      margin-top: 12px;
-      font-size: 0.8rem;
+      margin-top: 14px;
+      font-size: 0.82rem;
       color: var(--text-muted);
     }
 
-    .search-hint code {
+    .search-examples {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .search-example {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       background: var(--surface);
-      padding: 2px 8px;
-      border-radius: 6px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 6px 14px;
       font-size: 0.78rem;
       color: var(--text-secondary);
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .search-example:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+
+    .search-example-label {
+      font-family: 'Inter', sans-serif;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     /* ── Recent queries ──────────────────────── */
     .recent-section {
-      margin-top: 32px;
+      margin-top: 16px;
+      margin-bottom: 20px;
       text-align: center;
     }
 
@@ -261,82 +324,210 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       flex-shrink: 0;
     }
 
-    /* ── Two-column Section ─────────────────── */
-    .two-col-section {
+    /* ── Adoption Section ──────────────────── */
+    .adopt-section {
+      padding: 64px 0 48px;
+      border-top: 1px solid var(--border);
+    }
+
+    .adopt-section .section-label {
+      text-align: center;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+    }
+
+    .adopt-section .section-label span {
+      display: inline-block;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 99px;
+      padding: 10px 28px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .adopt-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 32px;
-      margin-top: 60px;
-      align-items: start;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
     }
 
-    .two-col-section h2 {
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin-bottom: 20px;
-      letter-spacing: -0.02em;
+    .adopt-block {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
 
-    .col-right .api-subtitle {
+    .adopt-block:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .adopt-block:last-child {
+      grid-column: 1 / -1;
+    }
+
+    .adopt-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+
+    .adopt-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .adopt-icon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .adopt-icon.icon-badge {
+      background: rgba(99,102,241,0.15);
+      color: #818cf8;
+    }
+
+    .adopt-icon.icon-shield {
+      background: rgba(34,197,94,0.15);
+      color: #22c55e;
+    }
+
+    .adopt-icon.icon-bot {
+      background: rgba(59,130,246,0.15);
+      color: #60a5fa;
+    }
+
+    .adopt-block h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .adopt-block > p {
       color: var(--text-secondary);
       font-size: 0.82rem;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .adopt-code {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.72rem;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      overflow-x: auto;
+      position: relative;
+      white-space: pre;
+      flex: 1;
+    }
+
+    .adopt-code .cm { color: var(--text-muted); }
+    .adopt-code .ac { color: var(--accent); }
+    .adopt-code .gr { color: var(--green); }
+
+    .copy-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-secondary);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
+
+    .adopt-tag {
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .adopt-tag a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .adopt-tag a:hover { text-decoration: underline; }
+
+    /* ── Closing CTA ───────────────────────── */
+    .closing-cta {
+      text-align: center;
+      padding: 80px 0;
+      background: radial-gradient(ellipse at 50% 100%, rgba(99,102,241,0.15) 0%, transparent 70%);
+      border-top: 1px solid var(--border);
+    }
+
+    .closing-cta h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    .closing-cta .cta-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 99px;
+      padding: 14px 36px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: transform 0.2s, box-shadow 0.2s;
       margin-bottom: 16px;
     }
 
-    .signals-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+    .closing-cta .cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 24px rgba(99,102,241,0.4);
     }
 
-    .signal-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 0.82rem;
+    .closing-cta .cta-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
-
-    .signal-weight {
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 4px 8px;
-      border-radius: 6px;
-      white-space: nowrap;
-    }
-
-    /* ── Code Block ─────────────────────────── */
-    .code-block {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      overflow-x: auto;
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      font-size: 0.75rem;
-      line-height: 1.7;
-      color: var(--text-secondary);
-    }
-
-    .code-block .comment { color: var(--text-muted); }
-    .code-block .url { color: var(--accent); }
-    .code-block .key { color: #c084fc; }
-    .code-block .string { color: var(--green); }
-    .code-block .number { color: var(--yellow); }
 
     /* ── Responsive ─────────────────────────── */
     @media (max-width: 768px) {
-      .two-col-section { grid-template-columns: 1fr; gap: 40px; }
+      .adopt-grid { grid-template-columns: 1fr; }
+      .adopt-block:last-child { grid-column: auto; }
     }
 
     @media (max-width: 640px) {
       .container { padding: 0 20px; }
-      header { padding: 60px 0 40px; }
+      header { padding: 60px 0 10px; }
       h1 { font-size: 1.8rem; }
       .subtitle { font-size: 0.9rem; }
 
@@ -356,13 +547,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         padding: 14px 24px;
         font-size: 0.9rem;
       }
-
-      .badge-cta h2 { font-size: 1.3rem; }
-      .badge-snippets { max-width: 100%; }
-      .snippet-block { flex-direction: column; align-items: stretch; gap: 8px; }
-      .snippet-label { min-width: unset; text-align: center; }
-      .snippet-code { font-size: 0.65rem; min-width: 0; }
-      .copy-btn { align-self: center; }
     }
 
     /* ── Loading transition ──────────────────── */
@@ -431,83 +615,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       opacity: 0.6;
       transition: opacity 0.3s ease;
     }
-
-    /* ── Badge CTA ───────────────────────── */
-    .badge-cta {
-      text-align: center;
-      padding: 60px 0 40px;
-    }
-    .badge-cta h2 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .badge-subtitle {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      margin-bottom: 32px;
-    }
-    .badge-preview {
-      margin-bottom: 28px;
-    }
-    .badge-img {
-      height: 20px;
-      border-radius: 3px;
-    }
-    .badge-snippets {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    .snippet-block {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-      overflow: hidden;
-    }
-    .snippet-label {
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      min-width: 70px;
-      text-align: left;
-    }
-    .snippet-code {
-      flex: 1;
-      font-family: 'SF Mono', Menlo, monospace;
-      font-size: 0.72rem;
-      color: var(--text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      text-align: left;
-    }
-    .copy-btn {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 5px 14px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      flex-shrink: 0;
-    }
-    .copy-btn:hover { background: #4f46e5; }
-    .copy-btn:active { transform: scale(0.96); }
-    .copy-btn.copied {
-      background: var(--green);
-    }
   </style>
 </head>
 <body>
@@ -529,7 +636,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               type="text"
               name="repo"
               id="searchInput"
-              placeholder="owner/repo or link to package.json / go.mod"
+              placeholder="zitadel/zitadel"
               required
               autofocus
             />
@@ -540,66 +647,68 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           </div>
           ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
         </form>
-        <p class="search-hint">Try <code>vercel/next.js</code> or paste a link to a <code>package.json</code> or <code>go.mod</code></p>
+        <p class="search-hint">Paste any GitHub repo or pick a recently checked project</p>
       </div>
     </header>
 
-    <div class="recent-section" id="recentSection" style="display:none">
-      <div class="recent-label">Recently checked</div>
-      <div class="recent-list" id="recentList"></div>
+    <div class="recent-section" id="recentSection">
+      <div class="recent-list" id="recentList">
+        <a href="/github/vercel/next.js" class="recent-chip"><span class="recent-dot" style="background:#22c55e"></span>vercel/next.js<span style="color:var(--text-muted)">92</span></a>
+        <a href="/github/facebook/react" class="recent-chip"><span class="recent-dot" style="background:#22c55e"></span>facebook/react<span style="color:var(--text-muted)">88</span></a>
+        <a href="/github/golang/go" class="recent-chip"><span class="recent-dot" style="background:#22c55e"></span>golang/go<span style="color:var(--text-muted)">95</span></a>
+        <a href="/github/zitadel/zitadel" class="recent-chip"><span class="recent-dot" style="background:#22c55e"></span>zitadel/zitadel<span style="color:var(--text-muted)">85</span></a>
+        <a href="/github/tailwindlabs/tailwindcss" class="recent-chip"><span class="recent-dot" style="background:#22c55e"></span>tailwindlabs/tailwindcss<span style="color:var(--text-muted)">90</span></a>
+      </div>
     </div>
 
-    <section class="badge-cta">
-      <h2>Show the world your project is alive</h2>
-      <p class="badge-subtitle">Add a live health badge to your README in seconds.</p>
-
-      <div class="badge-preview">
-        <img src="/api/badge/github/vercel/next.js" alt="Is It Alive? badge" class="badge-img" />
-      </div>
-
-      <div class="badge-snippets">
-        <div class="snippet-block">
-          <div class="snippet-label">Markdown</div>
-          <div class="snippet-code" id="badgeMd">[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)</div>
-          <button class="copy-btn" onclick="copySnippet('badgeMd')">Copy</button>
+    <section class="adopt-section">
+      <div class="section-label"><span>Add it to your project</span></div>
+      <div class="adopt-grid">
+        <div class="adopt-block">
+          <div class="adopt-header">
+            <div class="adopt-icon icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+            <h3>Show your score</h3>
+          </div>
+          <p>One line in your README. Live badge, auto-updated.</p>
+          <div style="margin-bottom:12px"><svg xmlns="http://www.w3.org/2000/svg" width="182" height="20" role="img" aria-label="is it alive?: 92 · healthy"><title>is it alive?: 92 · healthy</title><linearGradient id="bg" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="cr"><rect width="182" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#cr)"><rect width="80" height="20" fill="#555"/><rect x="80" width="102" height="20" fill="#22c55e"/><rect width="182" height="20" fill="url(#bg)"/></g><g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110"><text x="400" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="700">is it alive?</text><text x="400" y="140" transform="scale(.1)" textLength="700">is it alive?</text><text x="1310" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="920">92 · healthy</text><text x="1310" y="140" transform="scale(.1)" textLength="920">92 · healthy</text></g></svg></div>
+          <div class="adopt-code" id="badgeSnippet"><button class="copy-btn" onclick="copySnippet('badgeSnippet')">Copy</button><span class="gr">[![Is It Alive?]</span>
+<span class="gr">(https://isitalive.dev/api/badge/github/ORG/REPO)]</span>
+<span class="gr">(https://isitalive.dev/github/ORG/REPO)</span></div>
+          <span class="adopt-tag">Works with any public repo — no setup needed</span>
         </div>
-        <div class="snippet-block">
-          <div class="snippet-label">HTML</div>
-          <div class="snippet-code" id="badgeHtml">&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;&lt;/a&gt;</div>
-          <button class="copy-btn" onclick="copySnippet('badgeHtml')">Copy</button>
+        <div class="adopt-block">
+          <div class="adopt-header">
+            <div class="adopt-icon icon-shield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <h3>Guard your dependencies</h3>
+          </div>
+          <p>Fail the build when a dependency drops below your threshold.</p>
+          <div class="adopt-code" id="actionSnippet"><button class="copy-btn" onclick="copySnippet('actionSnippet')">Copy</button><span class="cm"># .github/workflows/deps.yml</span>
+<span class="ac">- uses:</span> isitalive/audit-action@v1
+  <span class="ac">with:</span>
+    <span class="ac">threshold:</span> 40</div>
+          <span class="adopt-tag">Free for public repos · <a href="https://github.com/isitalive/audit-action">GitHub Action</a> · <a href="/api">Docs →</a></span>
+        </div>
+        <div class="adopt-block">
+          <div class="adopt-header">
+            <div class="adopt-icon icon-bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
+            <h3>Enable AI agents</h3>
+          </div>
+          <p>Let any LLM or MCP server check dependency health with one API call.</p>
+          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/\
+  github/vercel/next.js
+
+{ <span class="gr">"score"</span>: 92,
+  <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
+  <span class="gr">"signals"</span>: [...] }</div>
+          <span class="adopt-tag"><a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
         </div>
       </div>
     </section>
 
-    <section class="two-col-section">
-      <div class="col-left">
-        <h2>What we check</h2>
-        <div class="signals-grid">
-          <div class="signal-item"><span class="signal-weight">25%</span> Last commit activity</div>
-          <div class="signal-item"><span class="signal-weight">15%</span> Release cadence</div>
-          <div class="signal-item"><span class="signal-weight">15%</span> PR responsiveness</div>
-          <div class="signal-item"><span class="signal-weight">10%</span> Issue staleness</div>
-          <div class="signal-item"><span class="signal-weight">10%</span> Contributor diversity</div>
-          <div class="signal-item"><span class="signal-weight">10%</span> Bus factor risk</div>
-          <div class="signal-item"><span class="signal-weight">10%</span> CI/CD presence</div>
-          <div class="signal-item"><span class="signal-weight">5%</span> Community size</div>
-        </div>
-      </div>
-      <div class="col-right">
-        <h2>Built for machines, too</h2>
-        <p class="api-subtitle">One endpoint. One answer. Perfect for AI agents.</p>
-        <div class="code-block">
-          <span class="comment">// Check any GitHub project</span><br>
-          <span class="url">GET https://isitalive.dev/api/check/github/vercel/next.js</span><br><br>
-          <span class="comment">// Response</span><br>
-          {<br>
-          &nbsp;&nbsp;<span class="key">"score"</span>: <span class="number">92</span>,<br>
-          &nbsp;&nbsp;<span class="key">"verdict"</span>: <span class="string">"healthy"</span>,<br>
-          &nbsp;&nbsp;<span class="key">"project"</span>: <span class="string">"github/vercel/next.js"</span>,<br>
-          &nbsp;&nbsp;<span class="key">"signals"</span>: [ ... ]<br>
-          }
-        </div>
-      </div>
+    <section class="closing-cta">
+      <h2>Ready to ship with confidence?</h2>
+      <a href="/methodology" class="cta-btn">How we calculate scores →</a>
+      <p class="cta-sub">Free for open source. No credit card required.</p>
     </section>
 
   </div>
@@ -711,9 +820,13 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <script>
     function copySnippet(id) {
       var el = document.getElementById(id);
-      var text = el.textContent;
+      // Get text content, excluding the button text
+      var clone = el.cloneNode(true);
+      var btns = clone.querySelectorAll('.copy-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].remove();
+      var text = clone.textContent.trim();
       navigator.clipboard.writeText(text).then(function() {
-        var btn = el.parentElement.querySelector('.copy-btn');
+        var btn = el.querySelector('.copy-btn');
         btn.textContent = 'Copied!';
         btn.classList.add('copied');
         setTimeout(function() {
@@ -724,10 +837,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
   </script>
   <script>
-    // Hydrate recently checked chips
+    // Hydrate recently checked chips (replaces mock defaults with real data)
     fetch('/_data/recent').then(r => r.json()).then(function(queries) {
       if (!queries || !queries.length) return;
-      var section = document.getElementById('recentSection');
       var list = document.getElementById('recentList');
       var COLORS = { healthy:'#22c55e', stable:'#eab308', degraded:'#f97316', critical:'#ef4444', unmaintained:'#6b7280' };
       list.innerHTML = queries.map(function(q) {
@@ -738,7 +850,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           + '<span style="color:var(--text-muted)">' + q.score + '</span>'
           + '</a>';
       }).join('');
-      section.style.display = '';
     }).catch(function() {});
   </script>
   ${analyticsScript(analyticsToken)}

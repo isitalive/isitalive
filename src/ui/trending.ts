@@ -25,8 +25,8 @@ export function trendingPage(analyticsToken?: string): string {
   <style>
     :root {
       --bg: #0a0a0f;
-      --surface: rgba(255,255,255,0.04);
-      --border: rgba(255,255,255,0.08);
+      --surface: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.10);
       --text-primary: #e4e4e7;
       --text-secondary: #a1a1aa;
       --text-muted: #52525b;
@@ -187,7 +187,7 @@ export function trendingPage(analyticsToken?: string): string {
       cursor: pointer;
       transition: all 0.2s;
     }
-    .btn-load-more:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .btn-load-more:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
     .btn-load-more:disabled { opacity: 0.5; cursor: not-allowed; }
     .total-count { color: var(--text-muted); font-size: 0.75rem; margin-top: 8px; }
 

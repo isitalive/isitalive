@@ -17,7 +17,7 @@ export function errorPage(message: string): string {
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: #0a0a0f;
-      color: #e8e8ed;
+      color: #f0f0f5;
       min-height: 100vh;
       display: flex;
       align-items: center;
