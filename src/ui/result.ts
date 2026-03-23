@@ -360,9 +360,11 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       border-radius: 6px;
       padding: 12px 8px;
       text-align: center;
-      transition: border-color 0.2s;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
     .dep-count-chip:hover { border-color: var(--text-muted); }
+    .dep-count-chip.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
     .dep-count-value {
       font-size: 1.3rem;
       font-weight: 700;

@@ -91,11 +91,59 @@
     var summaryContainer = document.getElementById('depSummaryContainer');
     if (summaryGrid && summaryContainer) {
       summaryGrid.innerHTML = ''
-        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#22c55e">' + (s.healthy || 0) + '</div><div class="dep-count-label">✅ Healthy</div></div>'
-        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="dep-count-label">🟡 Stable</div></div>'
-        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="dep-count-label">⚠️ Degraded</div></div>'
-        + '<div class="dep-count-chip"><div class="dep-count-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-count-label">🔴 At Risk</div></div>';
+        + '<div class="dep-count-chip" data-filter="healthy" role="button" tabindex="0"><div class="dep-count-value" style="color:#22c55e">' + (s.healthy || 0) + '</div><div class="dep-count-label">✅ Healthy</div></div>'
+        + '<div class="dep-count-chip" data-filter="stable" role="button" tabindex="0"><div class="dep-count-value" style="color:#eab308">' + (s.stable || 0) + '</div><div class="dep-count-label">🟡 Stable</div></div>'
+        + '<div class="dep-count-chip" data-filter="degraded" role="button" tabindex="0"><div class="dep-count-value" style="color:#f97316">' + (s.degraded || 0) + '</div><div class="dep-count-label">⚠️ Degraded</div></div>'
+        + '<div class="dep-count-chip" data-filter="at-risk" role="button" tabindex="0"><div class="dep-count-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-count-label">🔴 At Risk</div></div>';
       summaryContainer.style.display = '';
+
+      // Bind click: scroll to deps + filter
+      var activeChipFilter = null;
+      summaryGrid.querySelectorAll('.dep-count-chip[data-filter]').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          var filter = chip.getAttribute('data-filter');
+
+          // Toggle off
+          if (activeChipFilter === filter) {
+            activeChipFilter = null;
+            summaryGrid.querySelectorAll('.dep-count-chip').forEach(function (c) { c.classList.remove('active'); });
+            container.querySelectorAll('.dep-row').forEach(function (r) { r.style.display = ''; });
+            return;
+          }
+
+          activeChipFilter = filter;
+          summaryGrid.querySelectorAll('.dep-count-chip').forEach(function (c) { c.classList.remove('active'); });
+          chip.classList.add('active');
+
+          // Map filter to verdicts
+          var verdicts = [];
+          if (filter === 'healthy') verdicts = ['healthy'];
+          else if (filter === 'stable') verdicts = ['stable'];
+          else if (filter === 'degraded') verdicts = ['degraded'];
+          else if (filter === 'at-risk') verdicts = ['critical', 'unmaintained'];
+
+          // Filter rows
+          container.querySelectorAll('.dep-row').forEach(function (row) {
+            var v = row.getAttribute('data-verdict');
+            row.style.display = verdicts.indexOf(v) !== -1 ? '' : 'none';
+          });
+
+          // Expand groups that have visible rows
+          container.querySelectorAll('.deps-group').forEach(function (group) {
+            var hasVisible = group.querySelector('.dep-row:not([style*="display: none"])');
+            var content = group.querySelector('.deps-group-content');
+            var toggle = group.querySelector('.deps-group-toggle');
+            if (hasVisible && content && toggle) {
+              content.classList.add('visible');
+              toggle.classList.add('expanded');
+              toggle.setAttribute('aria-expanded', 'true');
+            }
+          });
+
+          // Scroll to deps
+          container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
     }
 
     // ── Render the drilldown section (collapsible groups only) ──
