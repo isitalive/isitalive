@@ -27,6 +27,7 @@ import changelogMd from '../../CHANGELOG.md'
 import { getScoreHistory, computeTrend } from '../ingest/processor'
 import { apiDocsPage } from '../ui/api-docs'
 import { auditResultPage } from '../ui/audit-result'
+import { pricingPage } from '../ui/pricing'
 import { buildPageViewUsageEvent } from '../events/usage'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
@@ -244,6 +245,27 @@ ui.get('/_data/changelog', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.json({ versions, page, hasMore, total: all.length })
+})
+
+// Score history data — JSON for client-side sparkline chart
+ui.get('/_data/history/:provider/:owner/:repo', async (c) => {
+  const { provider, owner, repo } = c.req.param()
+
+  if (provider !== 'github' || !isValidParam(owner) || !isValidParam(repo)) {
+    return c.json({ history: [] }, 400)
+  }
+
+  const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+  return c.json({ history })
+})
+
+// Pricing page
+ui.get('/pricing', (c) => {
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+  return c.html(pricingPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Dependency health data — JSON for client-side hydration on result pages

@@ -660,6 +660,131 @@ export const componentCss = `
     .dev-toggle .arrow { transition: transform 0.2s; display: inline-block; }
     .dev-toggle.expanded .arrow { transform: rotate(90deg); }
 
+    /* ── Shared: Collapsible Groups ─────────── */
+    .deps-group { margin-bottom: 8px; }
+
+    .deps-group-toggle {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 0;
+      width: 100%;
+      text-align: left;
+      transition: color 0.2s;
+    }
+    .deps-group-toggle:hover { color: var(--text-primary); }
+    .deps-group-toggle .arrow { transition: transform 0.2s; display: inline-block; font-size: 0.7rem; }
+    .deps-group-toggle.expanded .arrow { transform: rotate(90deg); }
+    .deps-group-content { display: none; }
+    .deps-group-content.visible { display: block; }
+    .deps-group-count {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    /* ── Shared: Search Bar ─────────────────── */
+    .deps-search {
+      width: 100%;
+      padding: 10px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .deps-search:focus { border-color: var(--accent); }
+    .deps-search::placeholder { color: var(--text-muted); }
+
+    /* ── Shared: Install CTA ───────────────── */
+    .install-cta {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .install-cta-text h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .install-cta-text p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; }
+    .install-cta-sub { margin-top: 6px; font-size: 0.72rem; color: var(--text-muted); }
+    .install-cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: var(--accent-text);
+      text-decoration: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .install-cta-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+    /* ── Shared: Summary Card active state ──── */
+    .deps-summary-card { cursor: pointer; position: relative; }
+    .deps-summary-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .deps-summary-card.active::after {
+      content: '✕';
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Shared: Score History Chart ──────── */
+    .history-chart {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+    }
+    .history-chart h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text-secondary);
+    }
+    .history-chart svg {
+      width: 100%;
+      height: 80px;
+      display: block;
+    }
+    .history-chart .chart-empty {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 16px 0;
+    }
+    .history-dates {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
     /* ── Shared: CTA Section ────────────────── */
     .cta-section {
       background: transparent;
@@ -747,6 +872,9 @@ export const componentCss = `
       .dep-verdict { display: none; }
       .dep-row td { padding: 8px 0; font-size: 0.8rem; }
       .cta-section { padding: 24px 16px; }
+      .install-cta { flex-direction: column; text-align: center; padding: 24px 20px; }
+      .install-cta-btn { width: 100%; justify-content: center; }
+      .history-chart { padding: 20px; }
     }
 `;
 
@@ -761,6 +889,7 @@ export const navbarHtml = `
       <span class="site-nav-divider"></span>
       <div class="site-nav-links-left">
         <a href="/trending" class="site-nav-link">Trending</a>
+        <a href="/pricing" class="site-nav-link">Pricing</a>
         <a href="/methodology" class="site-nav-link">Methodology</a>
       </div>
       <div class="site-nav-links-right">
@@ -789,6 +918,7 @@ export const footerHtml = `
           <div class="footer-col-title">Product</div>
           <a href="/">Home</a>
           <a href="/trending">Trending</a>
+          <a href="/pricing">Pricing</a>
           <a href="/api">API Docs</a>
         </div>
         <div class="footer-col">
