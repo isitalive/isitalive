@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AuditResult, AuditDep } from '../audit/scorer'
-import { navbarHtml, footerHtml, componentCss } from './components'
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components'
 import { escapeHtml } from './error'
 import { ogTags } from './og'
 import { analyticsScript } from './analytics'
@@ -101,8 +101,11 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
   const hashUrl = `https://isitalive.dev/audit/${result.auditHash}`
   const apiUrl = `curl -X POST https://isitalive.dev/api/manifest -H 'X-Manifest-Hash: ${result.auditHash}'`
 
+  // Suppress unused variable warnings
+  void avgVerdict
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -117,44 +120,20 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    ${themeCss}
     ${componentCss}
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --surface: rgba(255,255,255,0.06);
-      --surface-hover: rgba(255,255,255,0.10);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #f0f0f5;
-      --text-secondary: #9d9db5;
-      --text-muted: #64648a;
-      --accent: #6366f1;
-      --accent-glow: rgba(99,102,241,0.3);
-      --green: #22c55e;
-      --yellow: #eab308;
-      --orange: #f97316;
-      --red: #ef4444;
-      --gray: #6b7280;
-    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
     }
-
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, ${avgColor}22 0%, transparent 70%); top: -150px; right: -100px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
       position: relative;
@@ -199,7 +178,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
     }
 
     .gauge-container svg { display: block; width: 100%; height: 100%; }
-    .gauge-bg { stroke: rgba(255,255,255,0.06); }
+    .gauge-bg { stroke: var(--surface); }
     .gauge-fill {
       stroke: ${avgColor};
       stroke-dasharray: 283;
@@ -231,264 +210,11 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
       margin-top: 2px;
     }
 
-    /* ── Summary Cards ───────────────────── */
-    .summary-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 12px;
-      margin: 24px 0 32px;
-    }
-
-    .summary-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      text-align: center;
-      transition: border-color 0.2s;
-    }
-
-    .summary-card:hover { border-color: rgba(255,255,255,0.15); }
-
-    .summary-card-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .summary-card-label {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* ── Dependencies Table ──────────────── */
-    .deps-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 24px;
-    }
-
-    .deps-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .deps-header h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-    }
-
-    .deps-sort {
-      display: flex;
-      gap: 8px;
-    }
-
-    .sort-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      padding: 4px 12px;
-      border-radius: 8px;
-      font-size: 0.72rem;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .sort-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text-secondary); }
-    .sort-btn.active { border-color: var(--accent); color: var(--accent); }
-
-    .deps-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .deps-table th {
-      text-align: left;
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .deps-table th:nth-child(2),
-    .deps-table th:nth-child(4) { text-align: center; }
-
-    .dep-row {
-      transition: background 0.15s;
-    }
-
-    .dep-row:hover { background: var(--surface-hover); }
-
-    .dep-row td {
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      font-size: 0.85rem;
-    }
-
-    .dep-name {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .dep-name-text { font-weight: 500; }
-
-    .dep-version {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-    }
-
-    .dev-badge {
-      font-size: 0.65rem;
-      background: rgba(139,139,158,0.15);
-      color: var(--text-muted);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    .dep-score {
-      text-align: center;
-      font-weight: 700;
-      font-size: 0.9rem;
-    }
-
-    .dep-verdict {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.82rem;
-    }
-
-    .verdict-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .dep-action { text-align: center; }
-
-    .dep-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 1rem;
-      transition: opacity 0.2s;
-    }
-
-    .dep-link:hover { opacity: 0.7; }
-
-    .unresolved-hint {
-      color: var(--text-muted);
-      cursor: help;
-      font-size: 0.85rem;
-    }
-
-    /* ── Dev deps toggle ─────────────────── */
-    .dev-toggle {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      padding: 8px 16px;
-      border-radius: 10px;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.82rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 16px;
-      transition: all 0.2s;
-      width: 100%;
-      justify-content: center;
-    }
-
-    .dev-toggle:hover { border-color: rgba(255,255,255,0.2); }
-
-    .dev-deps-content {
-      display: none;
-      margin-top: 12px;
-    }
-
-    .dev-deps-content.visible { display: block; }
-
-    .dev-toggle .arrow {
-      transition: transform 0.2s;
-      display: inline-block;
-    }
-
-    .dev-toggle.expanded .arrow { transform: rotate(90deg); }
-
-    /* ── CTA Section ─────────────────────── */
-    .cta-section {
-      background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%);
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 16px;
-      padding: 32px;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .cta-section h2 {
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .cta-section p {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      margin-bottom: 20px;
-      max-width: 460px;
-      margin-left: auto;
-      margin-right: auto;
-      line-height: 1.5;
-    }
-
-    .cta-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      padding: 12px 28px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      transition: all 0.2s;
-    }
-
-    .cta-btn:hover { background: #5558e6; transform: translateY(-1px); }
-
-    .cta-sub {
-      margin-top: 12px;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
     /* ── Share / Embed ───────────────────── */
     .embed-section {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 24px;
       margin-bottom: 28px;
     }
@@ -513,9 +239,9 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
     }
 
     .embed-code {
-      background: rgba(0,0,0,0.3);
+      background: var(--code-bg);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 4px;
       padding: 12px 16px;
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.75rem;
@@ -541,37 +267,17 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
 
     .embed-code:hover .copy-hint { opacity: 1; }
 
-    /* ── Incomplete notice ───────────────── */
-    .incomplete-notice {
-      background: rgba(234,179,8,0.08);
-      border: 1px solid rgba(234,179,8,0.2);
-      color: #fbbf24;
-      padding: 12px 20px;
-      border-radius: 12px;
-      font-size: 0.85rem;
-      margin-bottom: 24px;
-      text-align: center;
-    }
-
     /* ── Responsive ──────────────────────── */
     @media (max-width: 640px) {
       .container { padding: 0 16px; }
       .audit-hero { padding: 24px 0 28px; }
       .audit-title { font-size: 1.3rem; }
-      .summary-cards { grid-template-columns: repeat(2, 1fr); }
-      .deps-section { padding: 16px; }
-      .deps-table th:nth-child(3),
-      .dep-verdict { display: none; }
-      .dep-row td { padding: 8px 0; font-size: 0.8rem; }
-      .cta-section { padding: 24px 16px; }
       .gauge-container { width: 110px; height: 110px; }
       .gauge-score { font-size: 1.8rem; }
     }
   </style>
 </head>
 <body>
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
 
   ${navbarHtml}
 
@@ -595,34 +301,34 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
       </div>
     </section>
 
-    <div class="summary-cards">
-      <div class="summary-card">
-        <div class="summary-card-value" style="color: var(--green)">${result.summary.healthy}</div>
-        <div class="summary-card-label">✅ Healthy</div>
+    <div class="deps-summary-cards">
+      <div class="deps-summary-card">
+        <div class="deps-summary-card-value" style="color: var(--green)">${result.summary.healthy}</div>
+        <div class="deps-summary-card-label">✅ Healthy</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-card-value" style="color: var(--yellow)">${result.summary.stable}</div>
-        <div class="summary-card-label">🟡 Stable</div>
+      <div class="deps-summary-card">
+        <div class="deps-summary-card-value" style="color: var(--yellow)">${result.summary.stable}</div>
+        <div class="deps-summary-card-label">🟡 Stable</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-card-value" style="color: var(--orange)">${result.summary.degraded}</div>
-        <div class="summary-card-label">⚠️ Degraded</div>
+      <div class="deps-summary-card">
+        <div class="deps-summary-card-value" style="color: var(--orange)">${result.summary.degraded}</div>
+        <div class="deps-summary-card-label">⚠️ Degraded</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-card-value" style="color: var(--red)">${result.summary.critical + result.summary.unmaintained}</div>
-        <div class="summary-card-label">🔴 At Risk</div>
+      <div class="deps-summary-card">
+        <div class="deps-summary-card-value" style="color: var(--red)">${result.summary.critical + result.summary.unmaintained}</div>
+        <div class="deps-summary-card-label">🔴 At Risk</div>
       </div>
     </div>
 
     ${!result.complete ? `
-    <div class="incomplete-notice">
+    <div class="deps-incomplete-notice">
       ⏳ ${result.pending} dependencies are still being scored in the background.
       Refresh in a few seconds for the full report.
     </div>
     ` : ''}
 
-    <section class="deps-section">
-      <div class="deps-header">
+    <div class="deps-section-card">
+      <div class="deps-section-header">
         <h2>Dependencies (${prodDeps.length})</h2>
         <div class="deps-sort">
           <button class="sort-btn active" onclick="sortDeps('score-asc')" id="sortScoreAsc">Score ↑</button>
@@ -664,16 +370,16 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
         </table>
       </div>
       ` : ''}
-    </section>
+    </div>
 
-    <section class="cta-section">
+    <div class="cta-section">
       <h2>🚀 Automate this in CI</h2>
       <p>Add dependency health checks to every pull request with the IsItAlive GitHub Action. Zero config for public repos.</p>
       <a href="https://github.com/isitalive/audit-action" class="cta-btn" target="_blank" rel="noopener">
         Get Started →
       </a>
       <div class="cta-sub">Free for public repos · No API key needed · Powered by OIDC</div>
-    </section>
+    </div>
 
     <section class="embed-section">
       <h2>Share & Embed</h2>
@@ -747,6 +453,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
       toggle.classList.toggle('expanded', visible);
     }
   </script>
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`

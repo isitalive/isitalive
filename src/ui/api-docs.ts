@@ -2,13 +2,13 @@
 // API documentation page — interactive reference for the Is It Alive? API
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml, componentCss } from './components';
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components';
 import { ogTags } from './og';
 import { analyticsScript } from './analytics';
 
 export function apiDocsPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -22,45 +22,29 @@ export function apiDocsPage(analyticsToken?: string): string {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    ${themeCss}
     ${componentCss}
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --surface: rgba(255,255,255,0.06);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #f0f0f5;
-      --text-secondary: #9d9db5;
-      --text-muted: #64648a;
-      --accent: #6366f1;
-      --green: #22c55e;
-      --yellow: #eab308;
-      --orange: #f97316;
-      --red: #ef4444;
-    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
     }
-
-    .bg-orb { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
-    .bg-orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); top: -200px; left: -150px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%); bottom: -150px; right: -100px; }
 
     .container {
       position: relative; z-index: 1;
       max-width: 900px;
       margin: 0 auto;
-      padding: 0 24px;
+      padding: 40px 24px 0;
     }
 
-    h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+    h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 8px; }
     .page-subtitle { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 40px; }
 
     h2 {
@@ -79,7 +63,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     .endpoint {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 24px;
       margin-bottom: 20px;
     }
@@ -134,7 +118,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     .param-name {
       font-family: 'SF Mono', Menlo, monospace;
       font-size: 0.78rem;
-      color: #c084fc;
+      color: var(--accent);
     }
     .param-required {
       font-size: 0.65rem;
@@ -151,9 +135,9 @@ export function apiDocsPage(analyticsToken?: string): string {
 
     /* ── Code Block ─────────────────────────── */
     .code-block {
-      background: var(--bg-secondary);
+      background: var(--code-bg);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 4px;
       padding: 18px;
       overflow-x: auto;
       font-family: 'SF Mono', 'Fira Code', monospace;
@@ -164,7 +148,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     }
     .code-block .comment { color: var(--text-muted); }
     .code-block .url { color: var(--accent); }
-    .code-block .key { color: #c084fc; }
+    .code-block .key { color: var(--accent); }
     .code-block .str { color: var(--green); }
     .code-block .num { color: var(--yellow); }
 
@@ -181,7 +165,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     .field-name {
       font-family: 'SF Mono', Menlo, monospace;
       font-size: 0.78rem;
-      color: #c084fc;
+      color: var(--accent);
       min-width: 160px;
       flex-shrink: 0;
     }
@@ -234,9 +218,10 @@ export function apiDocsPage(analyticsToken?: string): string {
     .tier-table tr:last-child td { border-bottom: none; }
 
     .note-box {
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
       padding: 16px 20px;
       font-size: 0.82rem;
       color: var(--text-secondary);
@@ -247,7 +232,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     .inline-code {
       font-family: 'SF Mono', Menlo, monospace;
       font-size: 0.78rem;
-      background: rgba(255,255,255,0.06);
+      background: var(--surface);
       padding: 2px 6px;
       border-radius: 4px;
     }
@@ -266,8 +251,6 @@ export function apiDocsPage(analyticsToken?: string): string {
   </style>
 </head>
 <body>
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
 
   ${navbarHtml}
 
@@ -374,7 +357,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Example Request</h3>
-    <div class="code-block"><span class="comment"># Audit a go.mod file</span><br>curl -X POST https://isitalive.dev/api/manifest \<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
+    <div class="code-block"><span class="comment"># Audit a go.mod file</span><br>curl -X POST https://isitalive.dev/api/manifest \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
 
     <h3>Example Response</h3>
     <div class="code-block">{<br>
@@ -451,6 +434,7 @@ export function apiDocsPage(analyticsToken?: string): string {
 
   ${footerHtml}
 
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`;

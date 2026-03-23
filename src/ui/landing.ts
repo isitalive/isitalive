@@ -1,15 +1,15 @@
 // ---------------------------------------------------------------------------
-// Landing page HTML — dark, modern, glassmorphism design
+// Landing page HTML — super simple dark/light design
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml, componentCss } from './components';
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components';
 import { ogTags } from './og';
 import { analyticsScript } from './analytics';
 
 export function landingPage(siteKey?: string, analyticsToken?: string): string {
   const hasTurnstile = !!siteKey;
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -25,46 +25,20 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"></noscript>
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    ${themeCss}
     ${componentCss}
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --surface: rgba(255,255,255,0.06);
-      --surface-hover: rgba(255,255,255,0.12);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #f0f0f5;
-      --text-secondary: #9d9db5;
-      --text-muted: #64648a;
-      --accent: #6366f1;
-      --accent-glow: rgba(99,102,241,0.35);
-      --green: #22c55e;
-      --yellow: #eab308;
-      --orange: #f97316;
-      --red: #ef4444;
-      --gray: #6b7280;
-    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
     }
-
-    /* Background gradient orbs — use radial-gradient instead of blur() for iOS perf */
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .bg-orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%); top: -200px; left: -150px; }
-    .bg-orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 70%); bottom: -200px; right: -100px; }
-    .bg-orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(34,197,94,0.10) 0%, transparent 70%); top: 40%; right: 10%; }
 
     .container {
       position: relative;
@@ -80,42 +54,13 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       padding: 100px 0 10px;
     }
 
-    .logo {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .logo .pulse {
-      display: inline-block;
-      width: 8px; height: 8px;
-      background: var(--green);
-      border-radius: 50%;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
-      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(34,197,94,0); }
-    }
-
     h1 {
       font-size: clamp(2.5rem, 6vw, 4rem);
       font-weight: 800;
       line-height: 1.1;
       letter-spacing: -0.03em;
       margin-bottom: 20px;
-      background: linear-gradient(135deg, #ffffff 0%, #c8c8e0 50%, #8b8bcc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--text-primary);
     }
 
     .subtitle {
@@ -139,42 +84,13 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .search-box {
       background: var(--bg-secondary);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 6px;
       width: 100%;
       display: flex;
       align-items: center;
       gap: 0;
       transition: border-color 0.3s, box-shadow 0.3s;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Animated glow border */
-    .search-box::before {
-      content: '';
-      position: absolute;
-      inset: -2px;
-      border-radius: 18px;
-      padding: 2px;
-      background: conic-gradient(from var(--glow-angle, 0deg), transparent 30%, rgba(99,102,241,0.6) 50%, transparent 70%);
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      animation: glow-rotate 4s linear infinite;
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    @property --glow-angle {
-      syntax: '<angle>';
-      initial-value: 0deg;
-      inherits: false;
-    }
-
-    @keyframes glow-rotate {
-      to { --glow-angle: 360deg; }
     }
 
     .search-box:focus-within {
@@ -182,16 +98,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
-    .search-box:focus-within::before {
-      background: conic-gradient(from var(--glow-angle, 0deg), transparent 15%, rgba(99,102,241,0.8) 50%, transparent 85%);
-    }
-
     #searchForm {
       width: 100%;
       max-width: 680px;
     }
-
-
 
     .cf-turnstile {
       display: flex;
@@ -217,9 +127,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     .search-box button {
       background: var(--accent);
-      color: #fff;
+      color: var(--accent-text);
       border: none;
-      border-radius: 12px;
+      border-radius: 4px;
       padding: 14px 28px;
       font-family: 'Inter', sans-serif;
       font-size: 0.92rem;
@@ -229,7 +139,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       white-space: nowrap;
     }
 
-    .search-box button:hover { background: #5558e6; }
+    .search-box button:hover { background: var(--accent-hover); }
     .search-box button:active { transform: scale(0.97); }
 
     .search-hint {
@@ -253,7 +163,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       gap: 5px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 99px;
+      border-radius: 4px;
       padding: 6px 14px;
       font-size: 0.78rem;
       color: var(--text-secondary);
@@ -304,7 +214,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       gap: 6px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 99px;
+      border-radius: 4px;
       padding: 6px 14px;
       text-decoration: none;
       color: var(--text-secondary);
@@ -313,7 +223,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .recent-chip:hover {
-      border-color: rgba(255,255,255,0.2);
+      border-color: var(--text-muted);
       color: var(--text-primary);
     }
 
@@ -342,12 +252,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     .adopt-section .section-label span {
       display: inline-block;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 99px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
       padding: 10px 28px;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
     }
 
     .adopt-grid {
@@ -357,19 +265,18 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .adopt-block {
-      background: rgba(255,255,255,0.025);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
       padding: 32px 28px;
       display: flex;
       flex-direction: column;
-      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      transition: transform 0.25s ease, border-color 0.25s ease;
     }
 
     .adopt-block:hover {
       transform: translateY(-4px);
-      border-color: rgba(255,255,255,0.12);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border-color: var(--text-muted);
     }
 
     .adopt-block:last-child {
@@ -386,7 +293,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .adopt-icon {
       width: 44px;
       height: 44px;
-      border-radius: 12px;
+      border-radius: 6px;
       display: flex;
       flex-shrink: 0;
       align-items: center;
@@ -398,19 +305,12 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       height: 22px;
     }
 
-    .adopt-icon.icon-badge {
-      background: rgba(99,102,241,0.15);
-      color: #818cf8;
-    }
-
-    .adopt-icon.icon-shield {
-      background: rgba(34,197,94,0.15);
-      color: #22c55e;
-    }
-
+    .adopt-icon.icon-badge,
+    .adopt-icon.icon-shield,
     .adopt-icon.icon-bot {
-      background: rgba(59,130,246,0.15);
-      color: #60a5fa;
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
     }
 
     .adopt-block h3 {
@@ -427,9 +327,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .adopt-code {
-      background: rgba(0,0,0,0.4);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 12px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
       padding: 20px;
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.72rem;
@@ -442,15 +342,15 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .adopt-code .cm { color: var(--text-muted); }
-    .adopt-code .ac { color: var(--accent); }
+    .adopt-code .ac { color: var(--text-primary); }
     .adopt-code .gr { color: var(--green); }
 
     .copy-btn {
       position: absolute;
       top: 12px;
       right: 12px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: var(--surface);
+      border: 1px solid var(--border);
       color: var(--text-secondary);
       border-radius: 6px;
       padding: 4px 10px;
@@ -460,7 +360,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       transition: background 0.2s, color 0.2s;
     }
 
-    .copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .copy-btn:hover { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
     .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
 
     .adopt-tag {
@@ -471,7 +371,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .adopt-tag a {
-      color: var(--accent);
+      color: var(--text-secondary);
       text-decoration: none;
     }
 
@@ -481,7 +381,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .closing-cta {
       text-align: center;
       padding: 80px 0;
-      background: radial-gradient(ellipse at 50% 100%, rgba(99,102,241,0.15) 0%, transparent 70%);
       border-top: 1px solid var(--border);
     }
 
@@ -494,22 +393,21 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .closing-cta .cta-btn {
       display: inline-block;
       background: var(--accent);
-      color: #fff;
+      color: var(--accent-text);
       border: none;
-      border-radius: 99px;
+      border-radius: 4px;
       padding: 14px 36px;
       font-size: 0.88rem;
       font-weight: 600;
       text-decoration: none;
       text-transform: uppercase;
       letter-spacing: 1px;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform 0.2s;
       margin-bottom: 16px;
     }
 
     .closing-cta .cta-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 24px rgba(99,102,241,0.4);
     }
 
     .closing-cta .cta-sub {
@@ -534,7 +432,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       .search-box {
         flex-direction: column;
         padding: 8px;
-        border-radius: 16px;
+        border-radius: 6px;
       }
       .search-box input {
         width: 100%;
@@ -543,7 +441,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       }
       .search-box button {
         width: 100%;
-        border-radius: 12px;
+        border-radius: 4px;
         padding: 14px 24px;
         font-size: 0.9rem;
       }
@@ -555,15 +453,15 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       top: 0;
       left: 0;
       height: 3px;
-      background: linear-gradient(90deg, var(--accent), #a78bfa, var(--accent));
+      background: linear-gradient(90deg, var(--text-muted), var(--text-secondary), var(--text-muted));
       background-size: 200% 100%;
       width: 0;
       z-index: 9999;
       transition: width 0.4s ease;
-      animation: shimmer 1.5s ease-in-out infinite;
+      animation: loadShimmer 1.5s ease-in-out infinite;
     }
 
-    @keyframes shimmer {
+    @keyframes loadShimmer {
       0% { background-position: -200% 0; }
       100% { background-position: 200% 0; }
     }
@@ -618,9 +516,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   </style>
 </head>
 <body>
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
-  <div class="bg-orb bg-orb-3"></div>
 
   ${navbarHtml}
 
@@ -645,7 +540,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               <span class="btn-spinner"></span>
             </button>
           </div>
-          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="dark" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
+          ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="auto" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
         </form>
         <p class="search-hint">Paste any GitHub repo or pick a recently checked project</p>
       </div>
@@ -694,7 +589,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
             <h3>Enable AI agents</h3>
           </div>
           <p>Let any LLM or MCP server check dependency health with one API call.</p>
-          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/\
+          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/\\
   github/vercel/next.js
 
 { <span class="gr">"score"</span>: 92,
@@ -758,7 +653,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       e.preventDefault();
 
       // Detect manifest URL: github.com/.../package.json or go.mod (only these filenames)
-      var manifestRx = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|go\.mod)$/i;
+      var manifestRx = /(?:https?:\\/\\/)?(?:www\\.)?github\\.com\\/.+\\/blob\\/.+\\/(package\\.json|go\\.mod)$/i;
       if (manifestRx.test(input)) {
         // Submit as audit — POST to /_audit with url field
         var form = document.createElement('form');
@@ -776,9 +671,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       }
 
       let path = input
-        .replace(/^https?:\\/\\//, '')
-        .replace(/^(www\\.)?github\\.com\\//, '')
-        .replace(/\\.git$/, '').replace(/\\/+$/, '');
+        .replace(/^https?:\\\\/\\\\//, '')
+        .replace(/^(www\\\\.)?github\\\\.com\\\\//, '')
+        .replace(/\\\\.git$/, '').replace(/\\\\/+$/, '');
 
       const parts = path.split('/');
       if (parts.length >= 2) {
@@ -852,6 +747,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       }).join('');
     }).catch(function() {});
   </script>
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`;

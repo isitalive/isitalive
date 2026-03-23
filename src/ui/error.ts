@@ -2,9 +2,11 @@
 // Error page HTML
 // ---------------------------------------------------------------------------
 
+import { themeCss, themeHeadScript, themeScript } from './components';
+
 export function errorPage(message: string): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -12,16 +14,21 @@ export function errorPage(message: string): string {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    ${themeCss}
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0a0a0f;
-      color: #f0f0f5;
+      background: var(--bg-primary);
+      color: var(--text-primary);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.3s, color 0.3s;
     }
     .error-card {
       text-align: center;
@@ -38,15 +45,15 @@ export function errorPage(message: string): string {
       margin-bottom: 12px;
     }
     p {
-      color: #8b8b9e;
+      color: var(--text-secondary);
       font-size: 0.9rem;
       line-height: 1.6;
       margin-bottom: 28px;
     }
     .error-detail {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
       padding: 16px;
       font-family: 'SF Mono', monospace;
       font-size: 0.8rem;
@@ -56,16 +63,16 @@ export function errorPage(message: string): string {
     }
     a {
       display: inline-block;
-      background: #6366f1;
-      color: #fff;
+      background: var(--accent);
+      color: var(--accent-text);
       text-decoration: none;
       padding: 12px 28px;
-      border-radius: 12px;
+      border-radius: 6px;
       font-weight: 600;
       font-size: 0.9rem;
       transition: background 0.2s;
     }
-    a:hover { background: #5558e6; }
+    a:hover { background: var(--accent-hover); }
   </style>
 </head>
 <body>
@@ -76,6 +83,7 @@ export function errorPage(message: string): string {
     <div class="error-detail">${escapeHtml(message)}</div>
     <a href="/">← Try another project</a>
   </div>
+  ${themeScript}
 </body>
 </html>`;
 }

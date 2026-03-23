@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
-import { navbarHtml, footerHtml, componentCss } from './components';
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components';
 import { escapeHtml } from './error';
 import { ogTags } from './og';
 import { analyticsScript } from './analytics';
@@ -51,7 +51,7 @@ function signalBar(score: number, color: string): string {
   return `<div style="
     width: 100%;
     height: 6px;
-    background: rgba(255,255,255,0.06);
+    background: var(--surface);
     border-radius: 3px;
     overflow: hidden;
   "><div style="
@@ -171,7 +171,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   const githubUrl = `https://github.com/${owner}/${repo}`;
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -187,37 +187,20 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    ${themeCss}
     ${componentCss}
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --surface: rgba(255,255,255,0.06);
-      --surface-hover: rgba(255,255,255,0.10);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #f0f0f5;
-      --text-secondary: #9d9db5;
-      --text-muted: #64648a;
-      --accent: #6366f1;
-    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
     }
-
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, ${color}22 0%, transparent 70%); top: -150px; right: -100px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
       position: relative;
@@ -226,8 +209,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       margin: 0 auto;
       padding: 0 24px;
     }
-
-
 
     /* ── Score Hero ───────────────────────── */
     .hero {
@@ -244,7 +225,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .project-name a {
       color: var(--text-secondary);
       text-decoration: none;
-      border-bottom: 1px dashed rgba(255,255,255,0.15);
+      border-bottom: 1px dashed var(--border);
       transition: color 0.2s;
     }
 
@@ -264,7 +245,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       height: 100%;
     }
 
-    .gauge-bg { stroke: rgba(255,255,255,0.06); }
+    .gauge-bg { stroke: var(--surface); }
     .gauge-fill {
       stroke: ${color};
       stroke-dasharray: 283;
@@ -272,7 +253,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       transition: stroke-dashoffset 1.2s ease-out;
       transform: rotate(-90deg);
       transform-origin: center;
-      /* drop-shadow removed for iOS perf — filter triggers software rendering */
     }
 
     .gauge-text {
@@ -305,7 +285,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       border: 1px solid ${color}30;
       color: ${color};
       padding: 8px 20px;
-      border-radius: 99px;
+      border-radius: 4px;
       font-size: 0.9rem;
       font-weight: 600;
     }
@@ -317,7 +297,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       border: 1px solid rgba(239,68,68,0.2);
       color: #fca5a5;
       padding: 12px 20px;
-      border-radius: 12px;
+      border-radius: 6px;
       font-size: 0.82rem;
     }
     ` : ''}
@@ -334,7 +314,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .signals {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 28px;
       margin-bottom: 28px;
     }
@@ -381,7 +361,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .embed-section {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 28px;
       margin-bottom: 28px;
     }
@@ -409,9 +389,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
 
     .embed-code {
-      background: rgba(0,0,0,0.3);
+      background: var(--code-bg);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 4px;
       padding: 12px 16px;
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.78rem;
@@ -443,7 +423,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     .meta-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 24px 28px;
       margin-bottom: 28px;
     }
@@ -466,9 +446,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: rgba(255,255,255,0.06);
+      background: var(--surface-hover);
       border: 1px solid var(--border);
-      border-radius: 99px;
+      border-radius: 4px;
       padding: 5px 14px;
       font-size: 0.78rem;
       color: var(--text-secondary);
@@ -495,7 +475,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       margin-top: 10px;
       padding: 4px 14px;
       border: 1px solid;
-      border-radius: 99px;
+      border-radius: 4px;
       font-size: 0.78rem;
       font-weight: 600;
     }
@@ -523,8 +503,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   </style>
 </head>
 <body>
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
 
   ${navbarHtml}
 
@@ -641,6 +619,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     } catch(e) {}
   </script>
   <script src="/js/deps.js" defer></script>
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`;

@@ -5,13 +5,13 @@
 // Fresh trending data is fetched client-side from /_data/trending.
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml, componentCss } from './components';
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components';
 import { ogTags } from './og';
 import { analyticsScript } from './analytics';
 
 export function trendingPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -19,52 +19,40 @@ export function trendingPage(analyticsToken?: string): string {
   <meta name="description" content="Most checked open-source projects in the last 24 hours. See what's trending on Is It Alive.">
   ${ogTags({
     title: 'Trending — Is It Alive?',
-    description: 'Most checked open-source projects in the last 24 hours. See what\'s trending on Is It Alive.',
+    description: "Most checked open-source projects in the last 24 hours. See what's trending on Is It Alive.",
     url: 'https://isitalive.dev/trending',
   })}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  ${themeHeadScript}
   <style>
-    :root {
-      --bg: #0a0a0f;
-      --surface: rgba(255,255,255,0.06);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #e4e4e7;
-      --text-secondary: #a1a1aa;
-      --text-muted: #52525b;
-      --accent: #6366f1;
-    }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    ${themeCss}
     ${componentCss}
 
     body {
-      background: var(--bg);
+      background: var(--bg-primary);
       color: var(--text-primary);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
     }
-
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .bg-orb.a { width: 600px; height: 600px; top: -200px; left: -100px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); }
-    .bg-orb.b { width: 500px; height: 500px; bottom: -150px; right: -100px; background: radial-gradient(circle, rgba(168,85,247,0.10) 0%, transparent 70%); }
 
     .container {
       position: relative;
       z-index: 1;
       max-width: 900px;
       margin: 0 auto;
-      padding: 0 24px 48px;
+      padding: 40px 24px 48px;
     }
 
     h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      margin-bottom: 6px;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 6px;
     }
 
     .subtitle {
@@ -92,15 +80,15 @@ export function trendingPage(analyticsToken?: string): string {
       gap: 14px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 14px 18px;
       text-decoration: none;
       color: var(--text-primary);
       transition: border-color 0.2s, background 0.2s;
     }
     .repo-card:hover {
-      border-color: rgba(255,255,255,0.15);
-      background: rgba(255,255,255,0.06);
+      border-color: var(--text-muted);
+      background: var(--surface-hover);
     }
 
     .repo-rank {
@@ -142,7 +130,7 @@ export function trendingPage(analyticsToken?: string): string {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       padding: 3px 8px;
-      border-radius: 99px;
+      border-radius: 4px;
       font-weight: 600;
       white-space: nowrap;
     }
@@ -154,13 +142,13 @@ export function trendingPage(analyticsToken?: string): string {
       gap: 14px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 14px 18px;
       animation: pulse 1.5s ease-in-out infinite;
     }
     .skeleton-bar {
       height: 12px;
-      background: rgba(255,255,255,0.06);
+      background: var(--surface-hover);
       border-radius: 6px;
     }
     @keyframes pulse {
@@ -177,7 +165,7 @@ export function trendingPage(analyticsToken?: string): string {
       align-items: center;
       gap: 6px;
       padding: 10px 24px;
-      border-radius: 10px;
+      border-radius: 4px;
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text-secondary);
@@ -187,7 +175,7 @@ export function trendingPage(analyticsToken?: string): string {
       cursor: pointer;
       transition: all 0.2s;
     }
-    .btn-load-more:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+    .btn-load-more:hover { background: var(--surface-hover); color: var(--text-primary); }
     .btn-load-more:disabled { opacity: 0.5; cursor: not-allowed; }
     .total-count { color: var(--text-muted); font-size: 0.75rem; margin-top: 8px; }
 
@@ -196,13 +184,8 @@ export function trendingPage(analyticsToken?: string): string {
       .repo-card { padding: 12px 14px; gap: 10px; }
     }
   </style>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="bg-orb a"></div>
-  <div class="bg-orb b"></div>
 
   ${navbarHtml}
 
@@ -328,6 +311,7 @@ export function trendingPage(analyticsToken?: string): string {
           '<div class="empty-state"><div style="font-size:2.5rem">⚠️</div><p>Failed to load trending data.</p></div>';
       });
   </script>
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`;

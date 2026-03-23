@@ -2,13 +2,13 @@
 // Methodology page — explains how the health score is calculated
 // ---------------------------------------------------------------------------
 
-import { navbarHtml, footerHtml, componentCss } from './components';
+import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadScript } from './components';
 import { ogTags } from './og';
 import { analyticsScript } from './analytics';
 
 export function methodologyPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -23,21 +23,12 @@ export function methodologyPage(analyticsToken?: string): string {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  ${themeHeadScript}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    ${themeCss}
     ${componentCss}
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --surface: rgba(255,255,255,0.06);
-      --surface-hover: rgba(255,255,255,0.10);
-      --border: rgba(255,255,255,0.10);
-      --text-primary: #f0f0f5;
-      --text-secondary: #9d9db5;
-      --text-muted: #64648a;
-      --accent: #6366f1;
-    }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -45,31 +36,21 @@ export function methodologyPage(analyticsToken?: string): string {
       color: var(--text-primary);
       min-height: 100vh;
       line-height: 1.6;
+      transition: background 0.3s, color 0.3s;
     }
-
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .bg-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%); top: -150px; right: -100px; }
-    .bg-orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%); bottom: -150px; left: -100px; }
 
     .container {
       position: relative;
       z-index: 1;
       max-width: 900px;
       margin: 0 auto;
-      padding: 0 24px;
+      padding: 40px 24px 0;
     }
-
-
 
     h1 {
       font-size: 2rem;
       font-weight: 800;
-      margin: 32px 0 12px;
+      margin: 0 0 12px;
       letter-spacing: -0.02em;
     }
 
@@ -90,12 +71,12 @@ export function methodologyPage(analyticsToken?: string): string {
     .signal-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 24px 28px;
       margin-bottom: 16px;
       transition: border-color 0.3s;
     }
-    .signal-card:hover { border-color: rgba(255,255,255,0.15); }
+    .signal-card:hover { border-color: var(--text-muted); }
 
     .signal-card-header {
       display: flex;
@@ -111,9 +92,9 @@ export function methodologyPage(analyticsToken?: string): string {
 
     .signal-card-weight {
       background: var(--accent);
-      color: #fff;
+      color: var(--accent-text);
       padding: 4px 12px;
-      border-radius: 99px;
+      border-radius: 4px;
       font-size: 0.75rem;
       font-weight: 700;
     }
@@ -144,7 +125,7 @@ export function methodologyPage(analyticsToken?: string): string {
     .scoring-table td {
       padding: 6px 0;
       color: var(--text-secondary);
-      border-bottom: 1px solid rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
     }
 
     .scoring-table td:last-child {
@@ -163,7 +144,7 @@ export function methodologyPage(analyticsToken?: string): string {
     .verdict-chip {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 16px;
       text-align: center;
     }
@@ -173,9 +154,10 @@ export function methodologyPage(analyticsToken?: string): string {
     .verdict-chip .range { font-size: 0.72rem; color: var(--text-muted); }
 
     .note-box {
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
       padding: 16px 20px;
       margin: 24px 0;
       font-size: 0.85rem;
@@ -190,15 +172,6 @@ export function methodologyPage(analyticsToken?: string): string {
       margin-top: 4px;
     }
 
-    footer {
-      text-align: center;
-      padding: 60px 0 40px;
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
-
-    footer a { color: var(--accent); text-decoration: none; }
-
     @media (max-width: 640px) {
       h1 { font-size: 1.5rem; }
       .signal-card { padding: 18px; }
@@ -209,8 +182,6 @@ export function methodologyPage(analyticsToken?: string): string {
   </style>
 </head>
 <body>
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
 
   ${navbarHtml}
 
@@ -407,6 +378,7 @@ export function methodologyPage(analyticsToken?: string): string {
   </div>
 
   ${footerHtml}
+  ${themeScript}
   ${analyticsScript(analyticsToken)}
 </body>
 </html>`;
