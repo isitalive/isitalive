@@ -103,7 +103,7 @@ jobs:
       - uses: isitalive/audit-action@v1
 `
   if (repoOwner && repoName) {
-    return `https://github.com/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/new/main?filename=.github/workflows/isitalive.yml&value=${encodeURIComponent(yaml)}`
+    return `https://github.com/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/new?filename=.github/workflows/isitalive.yml&value=${encodeURIComponent(yaml)}`
   }
   // Fallback if no repo context
   return `https://github.com/isitalive/audit-action`
@@ -282,100 +282,8 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
       color: var(--text-muted);
     }
 
-    /* ── Deps Groups ─────────────────────── */
-    .deps-group {
-      margin-bottom: 8px;
-    }
 
-    .deps-group-toggle {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 0;
-      width: 100%;
-      text-align: left;
-      transition: color 0.2s;
-    }
-    .deps-group-toggle:hover { color: var(--text-primary); }
-    .deps-group-toggle .arrow { transition: transform 0.2s; display: inline-block; font-size: 0.7rem; }
-    .deps-group-toggle.expanded .arrow { transform: rotate(90deg); }
-    .deps-group-content { display: none; }
-    .deps-group-content.visible { display: block; }
 
-    .deps-group-count {
-      font-size: 0.75rem;
-      font-weight: 400;
-      color: var(--text-muted);
-      margin-left: 4px;
-    }
-
-    /* ── Search Bar ───────────────────────── */
-    .deps-search {
-      width: 100%;
-      padding: 10px 16px;
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-primary);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.85rem;
-      margin-bottom: 16px;
-      transition: border-color 0.2s;
-      outline: none;
-    }
-    .deps-search:focus { border-color: var(--accent); }
-    .deps-search::placeholder { color: var(--text-muted); }
-
-    /* ── Install CTA ─────────────────────── */
-    .install-cta {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 28px 32px;
-      margin-bottom: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-    }
-    .install-cta-text h2 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .install-cta-text p {
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      line-height: 1.5;
-    }
-    .install-cta-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--accent);
-      color: var(--accent-text);
-      text-decoration: none;
-      padding: 10px 24px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      transition: all 0.2s;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .install-cta-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
-    .install-cta-sub {
-      margin-top: 6px;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-    }
 
     /* ── Share / Embed ───────────────────── */
     .embed-section {
@@ -474,22 +382,22 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
     </section>
 
     <div class="deps-summary-cards" id="summaryCards">
-      <div class="deps-summary-card" data-filter="healthy" role="button" tabindex="0">
+      <button type="button" class="deps-summary-card" data-filter="healthy">
         <div class="deps-summary-card-value" style="color: var(--green)">${result.summary.healthy}</div>
         <div class="deps-summary-card-label">✅ Healthy</div>
-      </div>
-      <div class="deps-summary-card" data-filter="stable" role="button" tabindex="0">
+      </button>
+      <button type="button" class="deps-summary-card" data-filter="stable">
         <div class="deps-summary-card-value" style="color: var(--yellow)">${result.summary.stable}</div>
         <div class="deps-summary-card-label">🟡 Stable</div>
-      </div>
-      <div class="deps-summary-card" data-filter="degraded" role="button" tabindex="0">
+      </button>
+      <button type="button" class="deps-summary-card" data-filter="degraded">
         <div class="deps-summary-card-value" style="color: var(--orange)">${result.summary.degraded}</div>
         <div class="deps-summary-card-label">⚠️ Degraded</div>
-      </div>
-      <div class="deps-summary-card" data-filter="at-risk" role="button" tabindex="0">
+      </button>
+      <button type="button" class="deps-summary-card" data-filter="at-risk">
         <div class="deps-summary-card-value" style="color: var(--red)">${result.summary.critical + result.summary.unmaintained}</div>
         <div class="deps-summary-card-label">🔴 At Risk</div>
-      </div>
+      </button>
     </div>
 
     ${!result.complete ? `
@@ -626,19 +534,38 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
       });
     });
 
+    // ── Composing search + verdict filter ───────────────────
+    var activeFilter = null;
+    var searchQuery = '';
+
+    function applyFilters() {
+      document.querySelectorAll('.dep-row').forEach(function(row) {
+        var name = row.querySelector('.dep-name-text');
+        var verdict = row.getAttribute('data-verdict');
+
+        var matchesSearch = !searchQuery || (name && name.textContent.toLowerCase().indexOf(searchQuery) !== -1);
+
+        var matchesVerdict = true;
+        if (activeFilter) {
+          var verdicts = [];
+          if (activeFilter === 'healthy') verdicts = ['healthy'];
+          else if (activeFilter === 'stable') verdicts = ['stable'];
+          else if (activeFilter === 'degraded') verdicts = ['degraded'];
+          else if (activeFilter === 'at-risk') verdicts = ['critical', 'unmaintained'];
+          matchesVerdict = verdicts.indexOf(verdict) !== -1;
+        }
+
+        row.style.display = (matchesSearch && matchesVerdict) ? '' : 'none';
+      });
+    }
+
     // ── Search filter ───────────────────────────────────────
     var searchInput = document.getElementById('depsSearch');
     if (searchInput) {
       searchInput.addEventListener('input', function() {
-        var query = this.value.toLowerCase();
-        document.querySelectorAll('.dep-row').forEach(function(row) {
-          var name = row.querySelector('.dep-name-text');
-          if (!name) return;
-          var match = name.textContent.toLowerCase().indexOf(query) !== -1;
-          row.style.display = match ? '' : 'none';
-        });
-        // Auto-expand all groups when searching
-        if (query.length > 0) {
+        searchQuery = this.value.toLowerCase();
+        applyFilters();
+        if (searchQuery.length > 0) {
           document.querySelectorAll('.deps-group-content').forEach(function(c) { c.classList.add('visible'); });
           document.querySelectorAll('.deps-group-toggle').forEach(function(b) {
             b.classList.add('expanded');
@@ -649,34 +576,20 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
     }
 
     // ── Clickable summary cards (filter) ────────────────────
-    var activeFilter = null;
     document.querySelectorAll('.deps-summary-card[data-filter]').forEach(function(card) {
       card.addEventListener('click', function() {
         var filter = card.getAttribute('data-filter');
 
-        // Toggle off if already active
         if (activeFilter === filter) {
           activeFilter = null;
           document.querySelectorAll('.deps-summary-card').forEach(function(c) { c.classList.remove('active'); });
-          document.querySelectorAll('.dep-row').forEach(function(r) { r.style.display = ''; });
-          return;
+        } else {
+          activeFilter = filter;
+          document.querySelectorAll('.deps-summary-card').forEach(function(c) { c.classList.remove('active'); });
+          card.classList.add('active');
         }
 
-        activeFilter = filter;
-        document.querySelectorAll('.deps-summary-card').forEach(function(c) { c.classList.remove('active'); });
-        card.classList.add('active');
-
-        // Map filter to verdicts
-        var verdicts = [];
-        if (filter === 'healthy') verdicts = ['healthy'];
-        else if (filter === 'stable') verdicts = ['stable'];
-        else if (filter === 'degraded') verdicts = ['degraded'];
-        else if (filter === 'at-risk') verdicts = ['critical', 'unmaintained'];
-
-        document.querySelectorAll('.dep-row').forEach(function(row) {
-          var verdict = row.getAttribute('data-verdict');
-          row.style.display = verdicts.indexOf(verdict) !== -1 ? '' : 'none';
-        });
+        applyFilters();
 
         // Auto-expand groups containing matching rows
         document.querySelectorAll('.deps-group').forEach(function(group) {
