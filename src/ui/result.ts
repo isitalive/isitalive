@@ -590,9 +590,8 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         </div>
       </div>
 
-      <!-- Right column: Signals + Get Started -->
+      <!-- Right column: Signals -->
       <div style="display: flex; flex-direction: column; gap: 16px;">
-
         ${result.signals.length > 0 ? `
         <div class="dash-card">
           <h2>Signals</h2>
@@ -601,34 +600,6 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
           </div>
         </div>
         ` : ''}
-
-        <div class="dash-card">
-          <h2>Use It</h2>
-
-          <div class="embed-row">
-            <div class="embed-label">Badge</div>
-            <div class="embed-code" onclick="copyText(this)" data-text="![Is It Alive?](${badgeUrl})">
-              ![Is It Alive?](${badgeUrl})
-              <span class="copy-hint">click to copy</span>
-            </div>
-          </div>
-
-          <div class="embed-row">
-            <div class="embed-label">API</div>
-            <div class="embed-code" onclick="copyText(this)" data-text="${apiUrl}">
-              GET ${apiUrl}
-              <span class="copy-hint">click to copy</span>
-            </div>
-          </div>
-
-          <div class="embed-row">
-            <div class="embed-label">cURL</div>
-            <div class="embed-code" onclick="copyText(this)" data-text="curl -s ${apiUrl} | jq">
-              curl -s ${apiUrl} | jq
-              <span class="copy-hint">click to copy</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -642,6 +613,39 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       <a href="${escapeHtml(ctaUrl)}" class="install-cta-btn" target="_blank" rel="noopener">
         Install Action →
       </a>
+    </div>
+
+    <!-- Embed / Use It — collapsible -->
+    <div class="deps-section-card" style="margin-bottom: 20px;">
+      <button class="deps-group-toggle" id="embedToggle" data-target="embedContent" aria-expanded="false">
+        <span class="arrow">▶</span>
+        📎 Embed & API
+      </button>
+      <div class="deps-group-content" id="embedContent">
+        <div style="padding-top: 12px;">
+          <div class="embed-row">
+            <div class="embed-label">Badge (Markdown)</div>
+            <div class="embed-code" onclick="copyText(this)" data-text="![Is It Alive?](${badgeUrl})">
+              ![Is It Alive?](${badgeUrl})
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
+          <div class="embed-row">
+            <div class="embed-label">API Endpoint</div>
+            <div class="embed-code" onclick="copyText(this)" data-text="${apiUrl}">
+              GET ${apiUrl}
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
+          <div class="embed-row">
+            <div class="embed-label">cURL</div>
+            <div class="embed-code" onclick="copyText(this)" data-text="curl -s ${apiUrl} | jq">
+              curl -s ${apiUrl} | jq
+              <span class="copy-hint">click to copy</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Dependency Health Drilldown — hydrated client-side -->
@@ -672,6 +676,17 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         }
       });
     }
+    // Collapsible embed section
+    document.querySelectorAll('.deps-group-toggle').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var targetId = btn.getAttribute('data-target');
+        var content = document.getElementById(targetId);
+        if (!content) return;
+        var visible = content.classList.toggle('visible');
+        btn.classList.toggle('expanded', visible);
+        btn.setAttribute('aria-expanded', visible ? 'true' : 'false');
+      });
+    });
     // Localize the checked-at time to user's timezone
     const timeEl = document.getElementById('checkedTime');
     if (timeEl) {
