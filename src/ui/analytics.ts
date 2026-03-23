@@ -1,9 +1,7 @@
 // ---------------------------------------------------------------------------
-// Cloudflare Web Analytics — proxied through our own domain to bypass ad blockers.
-//
-// The beacon script is served from /_cwa/beacon.js (proxied from
-// static.cloudflareinsights.com) and reports to /_cwa/rum (proxied to
-// cloudflareinsights.com/cdn-cgi/rum). This avoids ad-blocker domain lists.
+// Cloudflare Web Analytics — proxied through our own domain to bypass ad
+// blockers. Paths are deliberately generic (/t/a.js, /t/d) to avoid matching
+// filter-list patterns like "beacon", "analytics", "tracking", "rum", etc.
 // ---------------------------------------------------------------------------
 
 /**
@@ -12,5 +10,5 @@
  */
 export function analyticsScript(token?: string): string {
   if (!token) return ''
-  return `<script defer src="/_cwa/beacon.js" data-cf-beacon='{"send":{"to":"/_cwa/rum"},"token":"${token}"}'></script>`
+  return `<script defer src="/t/a.js" data-cf-beacon='{"send":{"to":"/t/d"},"token":"${token}"}'></script>`
 }

@@ -40,15 +40,15 @@ import type { ParsedDep } from '../audit/parsers'
 const ui = new Hono<{ Bindings: Env }>()
 
 // ---------------------------------------------------------------------------
-// CF Web Analytics proxy — serve beacon + RUM from our own domain so ad
-// blockers that target static.cloudflareinsights.com/cloudflareinsights.com
-// can't block analytics.
+// CF Web Analytics proxy — serve beacon + RUM from our own domain.
+// Paths are deliberately generic (/t/a.js, /t/d) to avoid matching
+// ad-blocker filter-list patterns (beacon, analytics, rum, etc.).
 // ---------------------------------------------------------------------------
 
 const CWA_SCRIPT = 'https://static.cloudflareinsights.com/beacon.min.js'
 const CWA_RUM = 'https://cloudflareinsights.com/cdn-cgi/rum'
 
-ui.get('/_cwa/beacon.js', async (c) => {
+ui.get('/t/a.js', async (c) => {
   // Try edge cache first
   const cacheKey = new Request(c.req.url)
   const cached = await caches.default.match(cacheKey)
@@ -62,7 +62,7 @@ ui.get('/_cwa/beacon.js', async (c) => {
   return response
 })
 
-ui.all('/_cwa/rum', async (c) => {
+ui.all('/t/d', async (c) => {
   const url = new URL(c.req.url)
   const req = new Request(`${CWA_RUM}${url.search}`, c.req.raw)
   // Strip cookies — not needed for RUM
