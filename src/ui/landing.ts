@@ -535,13 +535,34 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     .search-box button.loading .btn-text { display: none; }
     .search-box button.loading .btn-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .search-box button.loading .btn-spinner::before,
+    .search-box button.loading .btn-spinner::after,
+    .search-box button.loading .btn-spinner {
+      font-size: 0;
+    }
+
+    .search-box button.loading .btn-spinner::before {
+      content: '';
+      display: block;
+      width: 6px; height: 6px;
       border-radius: 50%;
-      animation: spin 0.6s linear infinite;
+      background: var(--accent-text);
+      animation: dotPulse 1.2s ease-in-out infinite;
+    }
+
+    .search-box button.loading .btn-spinner::after {
+      content: '';
+      display: block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent-text);
+      animation: dotPulse 1.2s ease-in-out 0.4s infinite;
     }
 
     .search-box button.loading {
@@ -550,8 +571,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       min-width: 140px;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    @keyframes dotPulse {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1); }
     }
 
     body.navigating {
@@ -682,13 +704,27 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       if (!turnstileReady) {
         e.preventDefault();
         var form = this;
+        var formInput = input;
         var attempts = 0;
         var waitForToken = setInterval(function() {
           attempts++;
           if (turnstileReady || attempts > 50) {
             clearInterval(waitForToken);
             if (turnstileReady) { form.submit(); }
-            else { btn.classList.remove('loading'); box.classList.remove('loading'); bar.classList.remove('active'); document.getElementById('searchInput').readOnly = false; }
+            else {
+              // Turnstile failed (e.g. preview domain) — fallback to client-side redirect
+              var path = formInput
+                .replace(/^https?:\\/\\//, '')
+                .replace(/^(www\\.)?github\\.com\\//, '')
+                .replace(/\\.git$/, '').replace(/\\/+$/, '');
+              var parts = path.split('/');
+              if (parts.length >= 2) {
+                document.body.classList.add('navigating');
+                window.location.href = '/github/' + parts[0] + '/' + parts[1];
+              } else {
+                btn.classList.remove('loading'); box.classList.remove('loading'); bar.classList.remove('active'); document.getElementById('searchInput').readOnly = false;
+              }
+            }
           }
         }, 100);
         return;
