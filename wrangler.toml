@@ -103,11 +103,12 @@ enabled = true
 
 [observability.logs]
 enabled = true
-invocation_logs = true  # Log every invocation
-head_sampling_rate = 0.1  # 10% sampling — reduce cost while retaining signal
+invocation_logs = true
+head_sampling_rate = 0.1  # 10% — reduce cost while retaining signal
 
 [observability.traces]
 enabled = true
+head_sampling_rate = 0.01  # 1% — traces produce many spans per request, keep tight
 
 # Static Assets (Phase 2 — ADR-006)
 # Pre-rendered UI pages served WITHOUT invoking the Worker — free & unlimited.
