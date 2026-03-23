@@ -11,8 +11,9 @@ import { test, fc } from '@fast-check/vitest'
 import { CacheManager, TIERS, type Tier } from './index'
 import type { ScoringResult, Env, Verdict } from '../scoring/types'
 
-// Cap iterations — async mock operations scale poorly at 10k
-const CACHE_FUZZ_RUNS = { numRuns: 500 }
+// Cap iterations — each iteration involves async mock KV ops that compound.
+// At 500, cumulative overhead triggers Vitest worker timeouts on CI (~117s).
+const CACHE_FUZZ_RUNS = { numRuns: 100 }
 
 // ---------------------------------------------------------------------------
 // Mocks — same pattern as cache-manager.test.ts
