@@ -82,6 +82,7 @@ import { apiDocsPage } from '../src/ui/api-docs.js';
 import { openApiSpec } from '../src/routes/openapi.js';
 import { llmsTxt, llmsFullTxt } from '../src/routes/llms.js';
 import { aiPluginManifest } from '../src/routes/aiPlugin.js';
+import { pricingPage } from '../src/ui/pricing.js';
 
 // ── Render and write ───────────────────────────────────────────────────
 
@@ -101,6 +102,7 @@ write('terms/index.html', termsPage(CF_ANALYTICS_TOKEN));
 write('changelog/index.html', changelogPage(CF_ANALYTICS_TOKEN));
 write('trending/index.html', trendingPage(CF_ANALYTICS_TOKEN));
 write('api/index.html', apiDocsPage(CF_ANALYTICS_TOKEN));
+write('pricing/index.html', pricingPage(CF_ANALYTICS_TOKEN));
 
 // JSON / text files
 write('openapi.json', JSON.stringify(openApiSpec, null, 2));

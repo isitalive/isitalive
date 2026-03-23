@@ -85,6 +85,7 @@
     }
 
     var s = data.summary || {};
+    var activeChipFilter = null;
 
     // ── Populate the dashboard grid summary (2x2 mini-grid) ──
     var summaryGrid = document.getElementById('depSummaryGrid');
@@ -97,35 +98,20 @@
         + '<div class="dep-count-chip" data-filter="at-risk" role="button" tabindex="0"><div class="dep-count-value" style="color:#ef4444">' + ((s.critical || 0) + (s.unmaintained || 0)) + '</div><div class="dep-count-label">🔴 At Risk</div></div>';
 
       // Bind click: scroll to deps + filter
-      var activeChipFilter = null;
       summaryGrid.querySelectorAll('.dep-count-chip[data-filter]').forEach(function (chip) {
         chip.addEventListener('click', function () {
           var filter = chip.getAttribute('data-filter');
 
-          // Toggle off
           if (activeChipFilter === filter) {
             activeChipFilter = null;
             summaryGrid.querySelectorAll('.dep-count-chip').forEach(function (c) { c.classList.remove('active'); });
-            container.querySelectorAll('.dep-row').forEach(function (r) { r.style.display = ''; });
-            return;
+          } else {
+            activeChipFilter = filter;
+            summaryGrid.querySelectorAll('.dep-count-chip').forEach(function (c) { c.classList.remove('active'); });
+            chip.classList.add('active');
           }
 
-          activeChipFilter = filter;
-          summaryGrid.querySelectorAll('.dep-count-chip').forEach(function (c) { c.classList.remove('active'); });
-          chip.classList.add('active');
-
-          // Map filter to verdicts
-          var verdicts = [];
-          if (filter === 'healthy') verdicts = ['healthy'];
-          else if (filter === 'stable') verdicts = ['stable'];
-          else if (filter === 'degraded') verdicts = ['degraded'];
-          else if (filter === 'at-risk') verdicts = ['critical', 'unmaintained'];
-
-          // Filter rows
-          container.querySelectorAll('.dep-row').forEach(function (row) {
-            var v = row.getAttribute('data-verdict');
-            row.style.display = verdicts.indexOf(v) !== -1 ? '' : 'none';
-          });
+          applyDepsFilters();
 
           // Expand groups that have visible rows
           container.querySelectorAll('.deps-group').forEach(function (group) {
@@ -191,17 +177,37 @@
       });
     });
 
+    // Compose search + chip filter
+    var searchQuery = '';
+
+    function applyDepsFilters() {
+      container.querySelectorAll('.dep-row').forEach(function (row) {
+        var name = row.querySelector('.dep-name-text');
+        var verdict = row.getAttribute('data-verdict');
+
+        var matchesSearch = !searchQuery || (name && name.textContent.toLowerCase().indexOf(searchQuery) !== -1);
+
+        var matchesVerdict = true;
+        if (activeChipFilter) {
+          var verdicts = [];
+          if (activeChipFilter === 'healthy') verdicts = ['healthy'];
+          else if (activeChipFilter === 'stable') verdicts = ['stable'];
+          else if (activeChipFilter === 'degraded') verdicts = ['degraded'];
+          else if (activeChipFilter === 'at-risk') verdicts = ['critical', 'unmaintained'];
+          matchesVerdict = verdicts.indexOf(verdict) !== -1;
+        }
+
+        row.style.display = (matchesSearch && matchesVerdict) ? '' : 'none';
+      });
+    }
+
     // Bind search
     var searchInput = document.getElementById('depsSearch');
     if (searchInput) {
       searchInput.addEventListener('input', function () {
-        var query = this.value.toLowerCase();
-        container.querySelectorAll('.dep-row').forEach(function (row) {
-          var name = row.querySelector('.dep-name-text');
-          if (!name) return;
-          row.style.display = name.textContent.toLowerCase().indexOf(query) !== -1 ? '' : 'none';
-        });
-        if (query.length > 0) {
+        searchQuery = this.value.toLowerCase();
+        applyDepsFilters();
+        if (searchQuery.length > 0) {
           container.querySelectorAll('.deps-group-content').forEach(function (c) { c.classList.add('visible'); });
           container.querySelectorAll('.deps-group-toggle').forEach(function (b) {
             b.classList.add('expanded');
