@@ -71,22 +71,22 @@
     // Deps table
     html += '<section class="deps-section-card">';
     html += '<div class="deps-section-header"><h2>Dependencies (' + prodDeps.length + ')</h2>';
-    html += '<div class="deps-sort">';
-    html += '<button class="sort-btn active" data-sort="score-asc" id="rSortScoreAsc">Score ↑</button>';
-    html += '<button class="sort-btn" data-sort="score-desc" id="rSortScoreDesc">Score ↓</button>';
-    html += '<button class="sort-btn" data-sort="name" id="rSortName">A–Z</button>';
+    html += '<div class="deps-sort" role="group" aria-label="Sort dependencies">';
+    html += '<button class="sort-btn active" data-sort="score-asc" aria-pressed="true">Score ↑</button>';
+    html += '<button class="sort-btn" data-sort="score-desc" aria-pressed="false">Score ↓</button>';
+    html += '<button class="sort-btn" data-sort="name" aria-pressed="false">A–Z</button>';
     html += '</div></div>';
     html += '<table class="deps-table"><thead><tr><th>Dependency</th><th>Score</th><th>Verdict</th><th></th></tr></thead>';
-    html += '<tbody id="resultProdBody">';
+    html += '<tbody class="deps-prod-body">';
     html += prodDeps.map(renderRow).join('');
     html += '</tbody></table>';
 
     // Dev deps toggle
     if (devDeps.length > 0) {
-      html += '<button class="dev-toggle" id="resultDevToggle"><span class="arrow">▶</span> Dev Dependencies (' + devDeps.length + ')</button>';
-      html += '<div class="dev-deps-content" id="resultDevContent">';
+      html += '<button class="dev-toggle" aria-expanded="false" aria-controls="depsDevContent"><span class="arrow">▶</span> Dev Dependencies (' + devDeps.length + ')</button>';
+      html += '<div class="dev-deps-content" id="depsDevContent">';
       html += '<table class="deps-table"><thead><tr><th>Dependency</th><th>Score</th><th>Verdict</th><th></th></tr></thead>';
-      html += '<tbody id="resultDevBody">' + devDeps.map(renderRow).join('') + '</tbody></table>';
+      html += '<tbody class="deps-dev-body">' + devDeps.map(renderRow).join('') + '</tbody></table>';
       html += '</div>';
     }
 
@@ -102,19 +102,26 @@
 
     container.innerHTML = html;
 
-    // Bind sort buttons
+    // Bind sort buttons (scoped to container)
     container.querySelectorAll('.sort-btn[data-sort]').forEach(function (btn) {
-      btn.addEventListener('click', function () { sortDeps(btn.getAttribute('data-sort')); });
+      btn.addEventListener('click', function () {
+        sortDeps(container, btn.getAttribute('data-sort'));
+        // Update aria-pressed state
+        container.querySelectorAll('.sort-btn[data-sort]').forEach(function (b) {
+          b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+        });
+      });
     });
 
     // Bind dev deps toggle
-    var devToggle = document.getElementById('resultDevToggle');
+    var devToggle = container.querySelector('.dev-toggle');
     if (devToggle) {
       devToggle.addEventListener('click', function () {
-        var content = document.getElementById('resultDevContent');
+        var content = document.getElementById('depsDevContent');
         if (!content) return;
         var visible = content.classList.toggle('visible');
         devToggle.classList.toggle('expanded', visible);
+        devToggle.setAttribute('aria-expanded', visible ? 'true' : 'false');
       });
     }
 
@@ -153,7 +160,10 @@
     if (!owner || !repo) return;
 
     fetch('/_data/deps/github/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo))
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
       .then(renderDeps)
       .catch(function () {
         // Non-critical — hide the shimmer silently
@@ -162,8 +172,8 @@
       });
   }
 
-  function sortDeps(mode) {
-    var tbody = document.getElementById('resultProdBody');
+  function sortDeps(container, mode) {
+    var tbody = container.querySelector('.deps-prod-body');
     if (!tbody) return;
     var rows = Array.from(tbody.querySelectorAll('.dep-row'));
     rows.sort(function (a, b) {
@@ -175,10 +185,9 @@
         .localeCompare(b.querySelector('.dep-name-text').textContent);
     });
     rows.forEach(function (r) { tbody.appendChild(r); });
-    document.querySelectorAll('.deps-sort .sort-btn').forEach(function (b) { b.classList.remove('active'); });
-    if (mode === 'score-asc') document.getElementById('rSortScoreAsc').classList.add('active');
-    if (mode === 'score-desc') document.getElementById('rSortScoreDesc').classList.add('active');
-    if (mode === 'name') document.getElementById('rSortName').classList.add('active');
+    // Update active state (scoped to container)
+    container.querySelectorAll('.deps-sort .sort-btn').forEach(function (b) { b.classList.remove('active'); });
+    container.querySelector('.sort-btn[data-sort="' + mode + '"]').classList.add('active');
   }
 
   // Start loading

@@ -213,18 +213,45 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
     return c.json({ manifests: [], error: 'Invalid parameters' }, 400)
   }
 
-  // Check for cached deps result first
-  const depsCacheKey = `deps:github:${owner}/${repo}`
+  // Check for cached deps result first (lowercase to match GitHub's case-insensitive slugs)
+  const normalizedOwner = owner.toLowerCase()
+  const normalizedRepo = repo.toLowerCase()
+  const depsCacheKey = `deps:github:${normalizedOwner}/${normalizedRepo}`
   const cachedDeps = await c.env.CACHE_KV.get(depsCacheKey)
   if (cachedDeps) {
-    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
-    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-    return c.json(JSON.parse(cachedDeps))
+    try {
+      const parsed = JSON.parse(cachedDeps) as unknown as { complete?: boolean; pending?: number }
+
+      // If the cached payload is an incomplete result, bypass cache so we can
+      // recompute and pick up freshly scored dependencies.
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'complete' in parsed &&
+        parsed.complete === false &&
+        typeof (parsed as { pending?: number }).pending === 'number' &&
+        (parsed as { pending: number }).pending > 0
+      ) {
+        await c.env.CACHE_KV.delete(depsCacheKey)
+      } else {
+        c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+        c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+        return c.json(parsed)
+      }
+    } catch {
+      // Corrupted cache entry — evict and recompute
+      await c.env.CACHE_KV.delete(depsCacheKey)
+    }
   }
 
   // Discover manifests at repo root
   if (!c.env.GITHUB_TOKEN) {
-    return c.json({ manifests: [] }, 500)
+    c.header('Cache-Control', 'no-store')
+    c.header('CDN-Cache-Control', 'no-store')
+    return c.json(
+      { manifests: [], error: 'GitHub integration is not configured (missing GITHUB_TOKEN)' },
+      503,
+    )
   }
   const manifests = await discoverManifests(owner, repo, c.env.GITHUB_TOKEN, c.env.CACHE_KV)
 
@@ -275,6 +302,9 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
     seen.add(d.name)
     return true
   })
+
+  // Sort deterministically for stable content hash across runs
+  allDeps.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version))
 
   // Resolve to GitHub repos + score
   const resolved = await resolveAll(allDeps, c.env)

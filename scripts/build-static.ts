@@ -13,7 +13,7 @@
 // Reads TURNSTILE_SITE_KEY and CF_ANALYTICS_TOKEN from environment or .dev.vars.
 // ---------------------------------------------------------------------------
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, rmSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -111,7 +111,9 @@ write('.well-known/ai-plugin.json', JSON.stringify(aiPluginManifest, null, 2));
 // Client-side JS — served as static assets (ETag-cached, zero Worker cost)
 const jsSrc = resolve(ROOT, 'src/js');
 if (existsSync(jsSrc)) {
-  cpSync(jsSrc, resolve(OUT, 'js'), { recursive: true });
+  const jsDest = resolve(OUT, 'js');
+  rmSync(jsDest, { recursive: true, force: true });
+  cpSync(jsSrc, jsDest, { recursive: true });
   console.log('  ✅ js/ (copied from src/js/)');
 }
 
