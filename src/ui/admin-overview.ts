@@ -46,7 +46,7 @@ export function adminOverviewPage(data: AdminOverview): string {
     <div class="admin-section">
       <div class="admin-section-title">Rate Limit Configuration</div>
       <p style="color:var(--text-secondary); font-size:0.82rem; margin-bottom:16px">
-        These limits are code-defined in <code style="background:var(--surface); padding:2px 6px; border-radius:4px; font-size:0.78rem">src/middleware/rateLimit.ts</code>.
+        These limits are code-defined in <code style="background:transparent; padding:2px 6px; border-radius:4px; font-size:0.78rem">src/middleware/rateLimit.ts</code>.
         Changes go through PRs.
       </p>
       <div class="admin-table-wrapper">

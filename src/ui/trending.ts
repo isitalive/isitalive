@@ -78,7 +78,7 @@ export function trendingPage(analyticsToken?: string): string {
       display: flex;
       align-items: center;
       gap: 14px;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 14px 18px;
@@ -140,7 +140,7 @@ export function trendingPage(analyticsToken?: string): string {
       display: flex;
       align-items: center;
       gap: 14px;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 14px 18px;
@@ -166,7 +166,7 @@ export function trendingPage(analyticsToken?: string): string {
       gap: 6px;
       padding: 10px 24px;
       border-radius: 4px;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       color: var(--text-secondary);
       font-family: 'Inter', sans-serif;

@@ -61,7 +61,7 @@ export function apiDocsPage(analyticsToken?: string): string {
 
     /* ── Endpoint Card ──────────────────────── */
     .endpoint {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px;
@@ -135,7 +135,7 @@ export function apiDocsPage(analyticsToken?: string): string {
 
     /* ── Code Block ─────────────────────────── */
     .code-block {
-      background: var(--code-bg);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 18px;
@@ -218,7 +218,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     .tier-table tr:last-child td { border-bottom: none; }
 
     .note-box {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-left: 3px solid var(--accent);
       border-radius: 4px;
@@ -232,7 +232,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     .inline-code {
       font-family: 'SF Mono', Menlo, monospace;
       font-size: 0.78rem;
-      background: var(--surface);
+      background: transparent;
       padding: 2px 6px;
       border-radius: 4px;
     }

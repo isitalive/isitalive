@@ -162,7 +162,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
     }
 
     .audit-subtitle code {
-      background: var(--surface);
+      background: transparent;
       padding: 2px 8px;
       border-radius: 6px;
       font-size: 0.82rem;
@@ -212,7 +212,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
 
     /* ── Share / Embed ───────────────────── */
     .embed-section {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px;
@@ -239,7 +239,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
     }
 
     .embed-code {
-      background: var(--code-bg);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 12px 16px;

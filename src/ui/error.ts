@@ -51,7 +51,7 @@ export function errorPage(message: string): string {
       margin-bottom: 28px;
     }
     .error-detail {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 16px;
