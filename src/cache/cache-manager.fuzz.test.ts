@@ -1,11 +1,18 @@
 // ---------------------------------------------------------------------------
 // Fuzz tests for CacheManager — property-based invariants
+//
+// NOTE: numRuns capped at 500 — each iteration creates a CacheManager,
+// seeds mock KV, and performs async cache operations. The global FC_NUM_RUNS
+// (10k in CI) would cause multi-minute timeouts.
 // ---------------------------------------------------------------------------
 
 import { describe, expect, vi, beforeEach, afterEach } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
 import { CacheManager, TIERS, type Tier } from './index'
 import type { ScoringResult, Env, Verdict } from '../scoring/types'
+
+// Cap iterations — async mock operations scale poorly at 10k
+const CACHE_FUZZ_RUNS = { numRuns: 500 }
 
 // ---------------------------------------------------------------------------
 // Mocks — same pattern as cache-manager.test.ts
@@ -105,7 +112,7 @@ function seedKV(provider: string, owner: string, repo: string, result: ScoringRe
 // ---------------------------------------------------------------------------
 
 describe('CacheManager fuzz', () => {
-  test.prop([identArb, identArb])(
+  test.prop([identArb, identArb], CACHE_FUZZ_RUNS)(
     'key normalization: same logical repo regardless of casing',
     async (owner, repo) => {
       const result: ScoringResult = {
@@ -134,7 +141,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([scoringResultArb, tierArb])(
+  test.prop([scoringResultArb, tierArb], CACHE_FUZZ_RUNS)(
     'put→get round-trip preserves score and verdict',
     async (result, tier) => {
       const cm = new CacheManager(env, ctx)
@@ -152,7 +159,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([scoringResultArb, tierArb])(
+  test.prop([scoringResultArb, tierArb], CACHE_FUZZ_RUNS)(
     'fresh entries always return hit status',
     async (result, tier) => {
       // Store 1 second ago — always fresh for any tier
@@ -168,7 +175,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([scoringResultArb])(
+  test.prop([scoringResultArb], CACHE_FUZZ_RUNS)(
     'entries stored beyond max staleTtl always return miss',
     async (result) => {
       // 100 days ago — beyond any tier's staleTtl
@@ -186,7 +193,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([scoringResultArb, tierArb])(
+  test.prop([scoringResultArb, tierArb], CACHE_FUZZ_RUNS)(
     'status transitions: hit → stale → miss as age increases',
     async (result, tier) => {
       const config = TIERS[tier]
@@ -216,7 +223,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([scoringResultArb])(
+  test.prop([scoringResultArb], CACHE_FUZZ_RUNS)(
     'higher tiers expire faster than lower tiers',
     async (result) => {
       // 2 hours ago — fresh for free, stale for pro, miss for enterprise
@@ -244,7 +251,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([scoringResultArb, scoringResultArb])(
+  test.prop([scoringResultArb, scoringResultArb], CACHE_FUZZ_RUNS)(
     'last write wins: second put overwrites first',
     async (result1, result2) => {
       const cm = new CacheManager(env, ctx)
@@ -259,7 +266,7 @@ describe('CacheManager fuzz', () => {
     },
   )
 
-  test.prop([fc.stringMatching(/^[a-z]{1,10}$/)])(
+  test.prop([fc.stringMatching(/^[a-z]{1,10}$/)], CACHE_FUZZ_RUNS)(
     'arbitrary provider names produce valid cache operations',
     async (provider) => {
       const result: ScoringResult = {
