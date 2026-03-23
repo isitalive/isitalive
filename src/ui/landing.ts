@@ -4,6 +4,7 @@
 
 import { navbarHtml, footerHtml, componentCss } from './components';
 import { ogTags } from './og';
+import { analyticsScript } from './analytics';
 
 export function landingPage(siteKey?: string, analyticsToken?: string): string {
   const hasTurnstile = !!siteKey;
@@ -718,7 +719,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       section.style.display = '';
     }).catch(function() {});
   </script>
-  ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
+  ${analyticsScript(analyticsToken)}
 </body>
 </html>`;
 }

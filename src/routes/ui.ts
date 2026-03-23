@@ -39,6 +39,41 @@ import type { ParsedDep } from '../audit/parsers'
 
 const ui = new Hono<{ Bindings: Env }>()
 
+// ---------------------------------------------------------------------------
+// CF Web Analytics proxy — serve beacon + RUM from our own domain so ad
+// blockers that target static.cloudflareinsights.com/cloudflareinsights.com
+// can't block analytics.
+// ---------------------------------------------------------------------------
+
+const CWA_SCRIPT = 'https://static.cloudflareinsights.com/beacon.min.js'
+const CWA_RUM = 'https://cloudflareinsights.com/cdn-cgi/rum'
+
+ui.get('/_cwa/beacon.js', async (c) => {
+  // Try edge cache first
+  const cacheKey = new Request(c.req.url)
+  const cached = await caches.default.match(cacheKey)
+  if (cached) return cached
+
+  const res = await fetch(CWA_SCRIPT)
+  const response = new Response(res.body, res)
+  response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  response.headers.set('Content-Type', 'application/javascript')
+  c.executionCtx.waitUntil(caches.default.put(cacheKey, response.clone()))
+  return response
+})
+
+ui.all('/_cwa/rum', async (c) => {
+  const url = new URL(c.req.url)
+  const req = new Request(`${CWA_RUM}${url.search}`, c.req.raw)
+  // Strip cookies — not needed for RUM
+  const headers = new Headers(req.headers)
+  headers.delete('cookie')
+  return fetch(`${CWA_RUM}${url.search}`, {
+    method: c.req.method,
+    headers,
+    body: c.req.method !== 'GET' ? c.req.raw.body : undefined,
+  })
+})
 
 
 const allowedViewHosts = new Set(['isitalive.dev', 'www.isitalive.dev', 'localhost', '127.0.0.1', '[::1]'])

@@ -4,6 +4,7 @@
 
 import { navbarHtml, footerHtml, componentCss } from './components';
 import { ogTags } from './og';
+import { analyticsScript } from './analytics';
 
 export function methodologyPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -406,7 +407,7 @@ export function methodologyPage(analyticsToken?: string): string {
   </div>
 
   ${footerHtml}
-  ${analyticsToken ? '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"' + analyticsToken + '"}\'></script>' : ''}
+  ${analyticsScript(analyticsToken)}
 </body>
 </html>`;
 }

@@ -9,6 +9,7 @@ import type { AuditResult, AuditDep } from '../audit/scorer'
 import { navbarHtml, footerHtml, componentCss } from './components'
 import { escapeHtml } from './error'
 import { ogTags } from './og'
+import { analyticsScript } from './analytics'
 
 const VERDICT_COLORS: Record<string, string> = {
   healthy: '#22c55e',
@@ -746,7 +747,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string): s
       toggle.classList.toggle('expanded', visible);
     }
   </script>
-  ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
+  ${analyticsScript(analyticsToken)}
 </body>
 </html>`
 }

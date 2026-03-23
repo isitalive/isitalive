@@ -27,11 +27,11 @@ app.use('*', async (c, next) => {
     'Content-Security-Policy',
     [
       "default-src 'none'",
-      "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://cdn.jsdelivr.net 'unsafe-inline'",
+      "script-src 'self' https://challenges.cloudflare.com https://cdn.jsdelivr.net 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https://img.shields.io",
-      "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com https://static.cloudflareinsights.com",
+      "connect-src 'self' https://challenges.cloudflare.com",
       "frame-src https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "frame-ancestors 'none'",

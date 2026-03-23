@@ -7,6 +7,7 @@
 
 import { navbarHtml, footerHtml, componentCss } from './components';
 import { ogTags } from './og';
+import { analyticsScript } from './analytics';
 
 export function changelogPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -352,7 +353,7 @@ export function changelogPage(analyticsToken?: string): string {
     // Initial load
     loadPage();
   </script>
-  ${analyticsToken ? '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{"token":"' + analyticsToken + '"}\'></script>' : ''}
+  ${analyticsScript(analyticsToken)}
 </body>
 </html>`;
 }

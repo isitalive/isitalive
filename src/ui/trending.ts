@@ -7,6 +7,7 @@
 
 import { navbarHtml, footerHtml, componentCss } from './components';
 import { ogTags } from './og';
+import { analyticsScript } from './analytics';
 
 export function trendingPage(analyticsToken?: string): string {
   return `<!DOCTYPE html>
@@ -327,7 +328,7 @@ export function trendingPage(analyticsToken?: string): string {
           '<div class="empty-state"><div style="font-size:2.5rem">⚠️</div><p>Failed to load trending data.</p></div>';
       });
   </script>
-  ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
+  ${analyticsScript(analyticsToken)}
 </body>
 </html>`;
 }

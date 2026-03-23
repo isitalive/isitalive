@@ -6,6 +6,7 @@ import type { ScoringResult, Verdict, ProjectMetadata } from '../scoring/types';
 import { navbarHtml, footerHtml, componentCss } from './components';
 import { escapeHtml } from './error';
 import { ogTags } from './og';
+import { analyticsScript } from './analytics';
 import type { Trend } from '../ingest/processor';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
@@ -640,7 +641,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     } catch(e) {}
   </script>
   <script src="/js/deps.js" defer></script>
-  ${analyticsToken ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${analyticsToken}"}'></script>` : ''}
+  ${analyticsScript(analyticsToken)}
 </body>
 </html>`;
 }
