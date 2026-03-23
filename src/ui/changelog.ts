@@ -67,7 +67,7 @@ export function changelogPage(analyticsToken?: string): string {
     /* ── Version cards ── */
     .version-card {
       position: relative;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 28px;
@@ -152,7 +152,7 @@ export function changelogPage(analyticsToken?: string): string {
 
     /* ── Loading skeleton ── */
     .skeleton-card {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 28px;
@@ -178,7 +178,7 @@ export function changelogPage(analyticsToken?: string): string {
       font-size: 0.82rem;
     }
     .load-more-btn {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       color: var(--text-secondary);

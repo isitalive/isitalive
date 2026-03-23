@@ -69,7 +69,7 @@ export function methodologyPage(analyticsToken?: string): string {
     }
 
     .signal-card {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px 28px;
@@ -142,7 +142,7 @@ export function methodologyPage(analyticsToken?: string): string {
     }
 
     .verdict-chip {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 16px;
@@ -154,7 +154,7 @@ export function methodologyPage(analyticsToken?: string): string {
     .verdict-chip .range { font-size: 0.72rem; color: var(--text-muted); }
 
     .note-box {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-left: 3px solid var(--accent);
       border-radius: 6px;

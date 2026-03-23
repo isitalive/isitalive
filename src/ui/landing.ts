@@ -82,7 +82,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .search-box {
-      background: var(--bg-secondary);
+      position: relative;
+      background: var(--bg-primary);
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 6px;
@@ -90,12 +91,51 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       display: flex;
       align-items: center;
       gap: 0;
-      transition: border-color 0.3s, box-shadow 0.3s;
+      overflow: hidden;
+      z-index: 0;
     }
 
-    .search-box:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
+    .search-box::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 8px;
+      background: conic-gradient(
+        from var(--glow-angle, 0deg),
+        transparent 0%,
+        var(--accent) 5%,
+        var(--accent) 35%,
+        transparent 40%,
+        transparent 100%
+      );
+      animation: glow-rotate 4s linear infinite;
+      z-index: -1;
+      opacity: 0.4;
+    }
+
+    .search-box::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 4px;
+      background: var(--bg-primary);
+      z-index: -1;
+    }
+
+    @keyframes glow-rotate {
+      to {
+        --glow-angle: 360deg;
+      }
+    }
+
+    @property --glow-angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    .search-box:focus-within::before {
+      opacity: 0.8;
     }
 
     #searchForm {
@@ -161,7 +201,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 6px 14px;
@@ -212,7 +252,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 6px 14px;
@@ -237,25 +277,30 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     /* ── Adoption Section ──────────────────── */
     .adopt-section {
       padding: 64px 0 48px;
-      border-top: 1px solid var(--border);
     }
 
     .adopt-section .section-label {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 0;
       text-transform: uppercase;
-      font-size: 0.82rem;
+      font-size: 0.72rem;
       font-weight: 600;
       letter-spacing: 2px;
-      color: var(--text-secondary);
+      color: var(--text-muted);
       margin-bottom: 40px;
     }
 
+    .adopt-section .section-label::before,
+    .adopt-section .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
     .adopt-section .section-label span {
-      display: inline-block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 10px 28px;
+      padding: 0 24px;
     }
 
     .adopt-grid {
@@ -265,7 +310,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .adopt-block {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 32px 28px;
@@ -308,7 +353,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     .adopt-icon.icon-badge,
     .adopt-icon.icon-shield,
     .adopt-icon.icon-bot {
-      background: var(--surface);
+      background: transparent;
       color: var(--text-secondary);
       border: 1px solid var(--border);
     }
@@ -327,7 +372,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     }
 
     .adopt-code {
-      background: var(--code-bg);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 20px;
@@ -349,7 +394,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       position: absolute;
       top: 12px;
       right: 12px;
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       color: var(--text-secondary);
       border-radius: 6px;

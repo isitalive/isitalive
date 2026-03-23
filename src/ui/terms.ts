@@ -164,7 +164,7 @@ export function termsPage(analyticsToken?: string): string {
     }
 
     .section-card {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px 28px;
@@ -186,7 +186,7 @@ export function termsPage(analyticsToken?: string): string {
     }
 
     .note-box {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-left: 3px solid var(--accent);
       border-radius: 6px;

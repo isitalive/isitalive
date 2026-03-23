@@ -20,7 +20,7 @@ export function adminJobsPage(): string {
       <div class="admin-section-title">Cron Aggregation</div>
       <p style="color:var(--text-secondary); font-size:0.82rem; margin-bottom:16px">
         Queries Iceberg tables and refreshes KV-cached materialized views.
-        Normally runs every 10 minutes via <code style="background:var(--surface); padding:2px 6px; border-radius:4px; font-size:0.78rem">*/10 * * * *</code>.
+        Normally runs every 10 minutes via <code style="background:transparent; padding:2px 6px; border-radius:4px; font-size:0.78rem">*/10 * * * *</code>.
       </p>
 
       <div class="job-grid">

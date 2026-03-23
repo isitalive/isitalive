@@ -24,8 +24,8 @@ export const themeCss = `
       --surface-hover: #1c1c1f;
       --border: #27272a;
       --text-primary: #fafafa;
-      --text-secondary: #a1a1aa;
-      --text-muted: #71717a;
+      --text-secondary: #d4d4d8;
+      --text-muted: #a1a1aa;
       --accent: #ffffff;
       --accent-hover: #e4e4e7;
       --accent-glow: rgba(255,255,255,0.08);
@@ -369,8 +369,7 @@ export const componentCss = `
     .site-footer {
       position: relative;
       z-index: 10;
-      border-top: 1px solid var(--border);
-      padding: 60px 24px 40px;
+      padding: 40px 24px 40px;
     }
     .site-footer > * {
       max-width: 1000px;
@@ -383,7 +382,8 @@ export const componentCss = `
       justify-content: space-between;
       align-items: flex-start;
       gap: 48px;
-      padding-bottom: 32px;
+      padding: 32px 0;
+      border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
     }
 
@@ -476,7 +476,7 @@ export const componentCss = `
     }
 
     .deps-summary-card {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 16px;
@@ -502,7 +502,7 @@ export const componentCss = `
 
     /* ── Shared: Deps Table ─────────────────── */
     .deps-section-card {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px;
@@ -662,7 +662,7 @@ export const componentCss = `
 
     /* ── Shared: CTA Section ────────────────── */
     .cta-section {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 32px;
@@ -711,7 +711,7 @@ export const componentCss = `
     }
 
     .deps-shimmer {
-      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+      background: linear-gradient(90deg, transparent 25%, var(--surface-hover) 50%, transparent 75%);
       background-size: 200% 100%;
       animation: shimmer 1.5s ease-in-out infinite;
       border-radius: 6px;

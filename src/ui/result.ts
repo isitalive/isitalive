@@ -51,7 +51,7 @@ function signalBar(score: number, color: string): string {
   return `<div style="
     width: 100%;
     height: 6px;
-    background: var(--surface);
+    background: transparent;
     border-radius: 3px;
     overflow: hidden;
   "><div style="
@@ -312,7 +312,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     /* ── Signals ─────────────────────────── */
     .signals {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 28px;
@@ -359,7 +359,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     /* ── Embed / API ─────────────────────── */
     .embed-section {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 28px;
@@ -389,7 +389,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
 
     .embed-code {
-      background: var(--code-bg);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 12px 16px;
@@ -421,7 +421,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     /* ── Metadata Card ──────────────────── */
     .meta-card {
-      background: var(--surface);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 24px 28px;
