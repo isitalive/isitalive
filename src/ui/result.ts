@@ -86,7 +86,7 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
 
   // Language
   if (meta.language) {
-    const dotColor = escapeHtml(meta.languageColor || '#8b8b9e');
+    const dotColor = escapeHtml(meta.languageColor || '#9d9db5');
     pills.push(`<span class="meta-pill"><span class="lang-dot" style="background:${dotColor}"></span>${escapeHtml(meta.language)}</span>`);
   }
 
@@ -134,7 +134,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
   // Trend display
   const TREND_ICONS: Record<string, string> = { improving: '↗', stable: '→', declining: '↘' };
-  const TREND_COLORS: Record<string, string> = { improving: '#22c55e', stable: '#8b8b9e', declining: '#ef4444' };
+  const TREND_COLORS: Record<string, string> = { improving: '#22c55e', stable: '#9d9db5', declining: '#ef4444' };
   const TREND_LABELS: Record<string, string> = { improving: 'Improving', stable: 'Stable', declining: 'Declining' };
 
   let trendHtml = '';
@@ -194,12 +194,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     :root {
       --bg-primary: #0a0a0f;
-      --surface: rgba(255,255,255,0.04);
-      --surface-hover: rgba(255,255,255,0.08);
-      --border: rgba(255,255,255,0.08);
-      --text-primary: #e8e8ed;
-      --text-secondary: #8b8b9e;
-      --text-muted: #55556a;
+      --surface: rgba(255,255,255,0.06);
+      --surface-hover: rgba(255,255,255,0.10);
+      --border: rgba(255,255,255,0.10);
+      --text-primary: #f0f0f5;
+      --text-secondary: #9d9db5;
+      --text-muted: #64648a;
       --accent: #6366f1;
     }
 
@@ -466,7 +466,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.06);
       border: 1px solid var(--border);
       border-radius: 99px;
       padding: 5px 14px;

@@ -39,6 +39,12 @@ import type { ParsedDep } from '../audit/parsers'
 
 const ui = new Hono<{ Bindings: Env }>()
 
+/** Suppress Turnstile + CF Web Analytics on local dev */
+function isLocalDev(c: any): boolean {
+  const host = new URL(c.req.url).hostname
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+}
+
 // ---------------------------------------------------------------------------
 // CF Web Analytics proxy — serve beacon + RUM from our own domain.
 // Paths are deliberately generic (/t/a.js, /t/d) to avoid matching
@@ -129,7 +135,8 @@ ${repos.map(repo => `  <url>
 ui.get('/', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-  return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN))
+  const local = isLocalDev(c)
+  return c.html(landingPage(local ? undefined : c.env.TURNSTILE_SITE_KEY, local ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Recent queries API — lightweight JSON for client-side hydration
@@ -175,28 +182,28 @@ ui.post('/_view', async (c) => {
 ui.get('/methodology', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
   c.header('CDN-Cache-Control', 'public, s-maxage=86400')
-  return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN))
+  return c.html(methodologyPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // API docs page
 ui.get('/api', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
   c.header('CDN-Cache-Control', 'public, s-maxage=86400')
-  return c.html(apiDocsPage(c.env.CF_ANALYTICS_TOKEN))
+  return c.html(apiDocsPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Terms of Service page — static per deploy
 ui.get('/terms', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
   c.header('CDN-Cache-Control', 'public, s-maxage=86400')
-  return c.html(termsPage(c.env.CF_ANALYTICS_TOKEN))
+  return c.html(termsPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Trending page — static HTML shell (data hydrated client-side)
 ui.get('/trending', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-  return c.html(trendingPage(c.env.CF_ANALYTICS_TOKEN))
+  return c.html(trendingPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Trending data — paginated JSON for client-side hydration
@@ -221,7 +228,7 @@ ui.get('/_data/trending', async (c) => {
 ui.get('/changelog', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-  return c.html(changelogPage(c.env.CF_ANALYTICS_TOKEN))
+  return c.html(changelogPage(isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Changelog data — paginated JSON for client-side hydration
@@ -451,7 +458,7 @@ ui.get('/audit/:hash', async (c) => {
 
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-  return c.html(auditResultPage(result, c.env.CF_ANALYTICS_TOKEN))
+  return c.html(auditResultPage(result, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN))
 })
 
 // GET /_data/audit/:hash — JSON data endpoint for client-side use
@@ -518,7 +525,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       const trend = computeTrend(history)
       c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
       c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-      const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
+      const response = c.html(resultPage(cached, owner, repo, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
       c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
       return response
     }
@@ -546,7 +553,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-    const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
+    const response = c.html(resultPage(result, owner, repo, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
     return response

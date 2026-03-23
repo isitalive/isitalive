@@ -30,12 +30,12 @@ export function methodologyPage(analyticsToken?: string): string {
 
     :root {
       --bg-primary: #0a0a0f;
-      --surface: rgba(255,255,255,0.04);
-      --surface-hover: rgba(255,255,255,0.08);
-      --border: rgba(255,255,255,0.08);
-      --text-primary: #e8e8ed;
-      --text-secondary: #8b8b9e;
-      --text-muted: #55556a;
+      --surface: rgba(255,255,255,0.06);
+      --surface-hover: rgba(255,255,255,0.10);
+      --border: rgba(255,255,255,0.10);
+      --text-primary: #f0f0f5;
+      --text-secondary: #9d9db5;
+      --text-muted: #64648a;
       --accent: #6366f1;
     }
 
