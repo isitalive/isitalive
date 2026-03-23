@@ -4,6 +4,7 @@
 **Date**: 2026-03-22
 **Authors**: @fforootd
 **Supersedes**: Parts of ADR-002 § "CDN edge at zero Worker cost"
+**Related**: ADR-007 (GTM & billing)
 
 ## Context
 
@@ -65,15 +66,23 @@ Anonymous rate limit tightened from 10 to **5 req/min per IP**. Every request wa
 
 Metering by "manifest audits" is hostile to CI/CD — developers can't predict how many CI triggers they'll have. Cache-hit audits cost ~$0.000015 each.
 
-| Tier | Single checks | CI Audits | Private repos | Cache | Price |
-|------|--------------|-----------|-----------|-------|-------|
-| **Free (web)** | Unlimited (Turnstile) | — | — | 24h | $0 |
-| **Free (OIDC)** | — | Unlimited | Public only | 24h | $0 |
-| **Starter** | 10,000/mo | Unlimited | 3 | 1h | $9/mo |
-| **Pro** | 50,000/mo | Unlimited | 15 | 1h | $29/mo |
-| **Business** | 250,000/mo | Unlimited | Unlimited | 15min | $99/mo |
+| Tier | Single checks | CI Audits | Private repos | Scored-dep budget† | Cache | Price |
+|------|--------------|-----------|-----------|---------|-------|-------|
+| **Free (web)** | Unlimited (Turnstile) | — | — | — | 24h | $0 |
+| **Free (OIDC)** | — | Unlimited | Public only | 500/mo per repo | 24h | $0 |
+| **Free (API key)** | 1,000/mo | — | — | — | 24h | $0 |
+| **Starter** | 10,000/mo | Unlimited | 5 | 10,000/mo | 1h | $19/mo |
+| **Pro** | 50,000/mo | Unlimited | 25 | 50,000/mo | 1h | $49/mo |
+| **Business** | 250,000/mo | Unlimited | Unlimited | 250,000/mo | 15min | $99/mo |
+
+**†** Invisible safety net — cache hits don't count. Fail Open in CI on exhaustion (see ADR-007 § 3).
+
+**Annual plans**: 2 months free (Starter $190/yr, Pro $490/yr, Business $990/yr).
 
 OIDC requests with `repository_visibility: 'private'` get a graceful 401 with upsell.
+
+> [!NOTE]
+> Free API Key tier requires email signup → lead capture. See ADR-007 for Stripe billing and GitHub Sponsors channel.
 
 ## Cost Model
 
@@ -125,4 +134,5 @@ OIDC requests with `repository_visibility: 'private'` get a graceful 401 with up
 - `GET /api/manifest/hash/:hash` endpoint **removed** — replaced by POST with hash header
 - Anonymous rate limit tightened (10 → 5/min)
 - UI pages will move to Static Assets (Phase 2)
-- Pricing model uses private repo count, not audit count
+- Pricing model uses private repo count, not audit count, at **$19/$49/$99** tiers
+- GTM and billing decisions captured in ADR-007

@@ -1,9 +1,10 @@
 # ADR-002: Economic Viability — Tiered Access & Cost-Optimized Architecture
 
-**Status**: Proposed  
+**Status**: Accepted  
 **Date**: 2026-03-21  
 **Authors**: @fforootd  
 **Supersedes**: Partially updates ADR-001 (usage event collection strategy)
+**Related**: ADR-006 (cost model correction), ADR-007 (GTM & billing)
 
 ## Context
 
@@ -148,16 +149,7 @@ Parsing lock files (`package-lock.json`, `yarn.lock`, `go.sum`, `pnpm-lock.yaml`
 - They contain hundreds to thousands of transitive deps
 - Each dep requires resolution + scoring
 
-**Decision**: Lock file parsing is a paid-only feature, available on Pro+ tiers. Pricing model (to be finalized):
-
-| Tier | Repos/hour | Price | Benefit |
-|---|---|---|---|
-| Free | 0 (manifests only via web) | $0 | Direct deps only, Turnstile-gated |
-| Pro | Up to 100 repos/hour | $5/mo (or pay-as-you-go) | Lock file parsing, fresher cache (1h) |
-| Enterprise | Up to 1000 repos/hour | Custom | Lock files, 15min freshness, SLA |
-
-> [!WARNING]
-> Exact pricing requires cost modeling: GitHub API rate limits, Pipeline write costs, KV read costs per scored dep, and R2 SQL query costs for aggregation. This ADR establishes the architecture; pricing is a separate business decision.
+**Decision**: Lock file parsing is a paid-only feature, available on Starter+ tiers. See finalized tiers in § 9.
 
 ### 8. PLG Motion — Website Upload
 
@@ -243,17 +235,25 @@ Alert thresholds: 80%, 90%, 100% → email/webhook notification
 > [!IMPORTANT]
 > The ~10 minute staleness means a customer can slightly exceed their quota (at most 10 min of requests beyond the limit). This is acceptable and acts as a natural grace period. The rate limiter prevents extreme overshoot.
 
-#### Proposed Tier Table
+#### Tier Table
 
-| Tier | Health checks/month | Rate limit | Cache freshness | Lock files | Price |
-| --- | --- | --- | --- | --- | --- |
-| Free (web only) | Unlimited (Turnstile-gated) | N/A | 24h | No | $0 |
-| Free (API key) | 1,000 | 60/min | 24h | No | $0 |
-| Pro | 10,000 | 300/min | 1h | Yes | TBD |
-| Enterprise | 100,000+ | 1,000/min | 15min | Yes | Custom |
+The hybrid model sells **private repos** as the visible product (predictable, anxiety-free) and uses a **scored-dep budget** as an invisible safety net. "Unlimited CI audits" is the marketing headline — the dep budget is the circuit breaker that 95% of customers never see.
 
-> [!WARNING]
-> Exact check quotas and pricing require cost modeling. The numbers above are directional — actual limits depend on GitHub API rate limits per installation, Pipeline write costs, and KV read costs per scored dep.
+| Tier | Private repos | CI Audits | Scored-dep budget† | Single checks | Freshness | Rate limit | Price |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Free (web) | — | — | — | Unlimited (Turnstile) | 24h | N/A | $0 |
+| Free (OIDC) | Public only | Unlimited | 500/mo per repo | — | 24h | 60/min | $0 |
+| Free (API key) | — | — | — | 1,000/mo | 24h | 60/min | $0 |
+| Starter | 5 | Unlimited | 10,000/mo | 10,000/mo | 1h | 60/min | $19/mo |
+| Pro | 25 | Unlimited | 50,000/mo | 50,000/mo | 1h | 300/min | $49/mo |
+| Business | Unlimited | Unlimited | 250,000/mo | 250,000/mo | 15min | 1,000/min | $99/mo |
+
+**†** Scored-dep budget = invisible safety net. Cache hits don't count. Quota exhaustion in CI triggers "Fail Open" — yellow warning, build stays green (see ADR-007 § 3).
+
+**Annual plans**: 2 months free (e.g., Starter $190/yr, Pro $490/yr, Business $990/yr).
+
+> [!NOTE]
+> The Free API Key tier captures leads — AI agent builders and CLI developers sign up with email to get 1,000 single checks/mo at 60/min. When multiple keys come from one org, it's a sales signal. See ADR-007 for billing and GTM details.
 
 ## Architecture Diagram
 

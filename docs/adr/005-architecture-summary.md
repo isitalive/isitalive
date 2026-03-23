@@ -5,7 +5,7 @@
 **Authors**: @fforootd
 
 > [!NOTE]
-> This ADR is not a decision — it is a **checkpoint** that summarises the current architectural state established by ADRs 001–006. Update this document whenever an ADR is added, accepted, or superseded.
+> This ADR is not a decision — it is a **checkpoint** that summarises the current architectural state established by ADRs 001–007. Update this document whenever an ADR is added, accepted, or superseded.
 
 ## Current Architecture at a Glance
 
@@ -40,7 +40,7 @@ All data flows through **4 typed event domains** (provider, result, usage, manif
 
 ### ADR-002 — Economic Viability: Tiered Access & Cost-Optimised Architecture
 
-Anonymous traffic uses L1 Cache API (free ops, per-datacenter); only authenticated requests emit usage events. ~~Workers are served from CDN edge at zero Worker cost~~ **(corrected by ADR-006: Workers always wake up, ~$0.30/M)**. Revenue comes from **prepaid tiers** priced by private repos monitored (ADR-006).
+Anonymous traffic uses L1 Cache API (free ops, per-datacenter); only authenticated requests emit usage events. Workers always wake up (~$0.30/M, corrected by ADR-006). Revenue comes from **hybrid prepaid tiers** at **$19/$49/$99** — selling private repos as the visible product with scored-dep budgets as an invisible safety net. Free API Key tier (1,000 checks/mo) captures leads.
 
 ### ADR-003 — GitHub Action: Dependency Health Auditing in CI
 
@@ -48,7 +48,11 @@ A **composite GitHub Action** hashes manifest content client-side (SHA-256) and 
 
 ### ADR-004 — Quota Accounting & Cache Freshness Tiers
 
-Quota is consumed only when the Worker **actually scores a dependency** (Layer 3 cache miss) — cache hits are free. Authenticated users get **1h KV TTL** for fresher data; anonymous users get **24h**. Enforcement lags ~10 minutes (cron-based), with the rate limiter preventing extreme overshoot.
+Quota is consumed only when the Worker **actually scores a dependency** (Layer 3 cache miss) — cache hits are free. Scored-dep budget is an invisible safety net, not a marketing feature. Authenticated users get **1h KV TTL** for fresher data; anonymous users get **24h**. Enforcement lags ~10 minutes (cron-based). Quota exhaustion in CI triggers **Fail Open** — build stays green with a warning.
+
+### ADR-007 — Go-to-Market & Billing
+
+**Stripe Managed Payments** (MoR, successor to LemonSqueezy) as primary billing option, with **Stripe + Stripe Tax** as fallback. **GitHub Sponsors** as alternative billing channel — webhook auto-provisions API keys. Free API Key tier requires email signup for lead capture. **Fail-Open CI** ensures quota exhaustion never breaks builds. Annual billing (2 months free) for cash flow. **94%+ gross margins** proven at worst-case usage.
 
 ## How the Decisions Chain Together
 
@@ -62,12 +66,16 @@ graph TD
     D --> E["ADR-006<br/>Worker cache + cost model"]
     B --> E
     C --> E
+    E --> F["ADR-007<br/>GTM + billing"]
+    B --> F
+    D --> F
 ```
 
 - **001 → 002**: The event-driven foundation enabled the two-track model.
 - **002 → 003**: The caching strategy drove the Action's hash-first POST flow.
 - **002 + 003 → 004**: Quota accounting defines when events are emitted.
 - **002 + 003 + 004 → 006**: Cost modelling corrected CDN assumptions, simplified manifest flow, and defined repo-based pricing.
+- **002 + 004 + 006 → 007**: GTM decisions define how pricing is billed (Stripe, Sponsors), how quota exhaustion behaves (Fail Open), and prove margin viability.
 
 ## Key Invariants
 
@@ -84,6 +92,9 @@ These hold true across all decisions:
 | OIDC auth is zero-config for public repos | ADR-003 |
 | Private repos upsell to paid API key | ADR-006 |
 | Scoring uses GraphQL (most signals) + REST (CI activity) | ADR-001, impl |
+| Fail Open in CI — quota exhaustion never breaks builds | ADR-004, ADR-007 |
+| Stripe Managed Payments (or Stripe Tax) for billing | ADR-007 |
+| Free API Key tier for lead capture (1,000 checks/mo) | ADR-002, ADR-007 |
 
 ## Implementation Status
 
@@ -104,9 +115,14 @@ These hold true across all decisions:
 | Log Explorer ETL (Phase 2) | ⬜ Not started | Deferred until revenue ≥ $1k/mo |
 | Lock file parsing | ⬜ Not started | Paid-only, Phase 5 |
 | GitHub App gating (paid-only) | ⬜ Not started | Webhook handler accepts all installations |
+| Stripe billing integration | ⬜ Not started | ADR-007: checkout → webhook → key provisioning |
+| Free API Key signup | ⬜ Not started | ADR-007: email → key generation |
+| GitHub Sponsors webhook | ⬜ Not started | ADR-007: auto-provision keys for sponsors |
+| Fail-Open CI in audit-action | ⬜ Not started | ADR-007: handle 429 as yellow warning |
 
 ## Open Questions
 
-- **Exact pricing for paid tiers** — ADR-006 proposes per-repo pricing; needs market validation
 - **Lock file format coverage** — which formats (yarn.lock, pnpm-lock.yaml, go.sum) to prioritise
 - **Scoring algorithm versioning** — use version-tagged cache keys (e.g., `isitalive:v3:`) and roll gradually (ADR-006: avoids HIBP's "DDoS machine" flush problem)
+- **Stripe Managed Payments vs Stripe Tax** — evaluate Managed Payments availability in our jurisdiction; fall back to Stripe + Stripe Tax if needed
+- **Disposable email filtering** — which service/list to use for Free API Key signup validation

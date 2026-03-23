@@ -1,9 +1,9 @@
 # ADR-004: Quota Accounting & Cache Freshness Tiers
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-03-21
 **Authors**: @fforootd
-**Related**: ADR-002 (billing model), ADR-003 (content-addressed caching)
+**Related**: ADR-002 (billing model), ADR-003 (content-addressed caching), ADR-007 (GTM & billing)
 
 ## Context
 
@@ -32,6 +32,9 @@ A quota unit is consumed when the Worker **actually scores a dependency** — me
 
 > [!NOTE]
 > "You only pay for new scores" is the value prop. Cache hits are free because no new compute was consumed. This aligns revenue with infrastructure cost and rewards the crowdsource effect — identical manifests across the community are scored once.
+
+> [!IMPORTANT]
+> The scored-dep budget is positioned as an **invisible safety net**, not a marketing feature. The customer-facing product is "private repos monitored" with "unlimited CI audits." The dep budget exists to protect infrastructure from abuse — 95% of customers never see it. See ADR-007 § 3 for Fail-Open CI behavior when the budget is exhausted.
 
 ### 2. Cache Freshness by Tier
 
@@ -123,7 +126,26 @@ For OIDC, the same flow applies with `oidc:quota:{repository}` as the key.
 > [!NOTE]
 > The ~10 minute lag means a customer could slightly exceed their quota. This is acceptable — the rate limiter (1,000 req/min) prevents extreme overshoot, and the small overage acts as a natural grace period.
 
-### 6. Interaction Between GET Cache and Freshness
+### 6. Fail-Open CI Behavior
+
+When a GitHub Action audit exhausts the scored-dep budget, the CI pipeline **must not break**. The action prints a warning and continues with exit code 0:
+
+```
+⚠️ IsItAlive quota exceeded (10,000/10,000 scored deps this month).
+   Dependency audit skipped — build continues.
+   Upgrade: https://isitalive.dev/pricing
+```
+
+This "Fail Open" design serves three purposes:
+
+1. **Never break a customer's CI** — builds stay green even under quota exhaustion
+2. **Natural upsell** — the warning creates a conversation without friction
+3. **Abuse protection** — a rogue script can't consume infinite compute; it hits the budget and gets warned
+
+> [!NOTE]
+> The 429 API response for quota exhaustion includes AI-friendly messaging so LLM agents can relay the upsell to their users.
+
+### 7. Interaction Between GET Cache and Freshness
 
 A subtle scenario: a Pro customer who wants 1h-fresh data for a manifest that the 7-day GET cache already has.
 
