@@ -30,7 +30,7 @@
 
     // Chart dimensions
     var width = 800;
-    var height = 80;
+    var height = 40;
     var padding = 4;
     var chartWidth = width - padding * 2;
     var chartHeight = height - padding * 2;
@@ -81,10 +81,9 @@
       + '<span>' + lastDate + '</span>'
       + '</div>';
 
-    container.innerHTML = '<section class="history-chart">'
-      + '<h2>Score History</h2>'
+    container.innerHTML = '<div class="history-bar">'
       + svg + dateRow
-      + '</section>';
+      + '</div>';
 
     // Add hover interactivity
     container.querySelectorAll('.history-dot').forEach(function (dot) {
