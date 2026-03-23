@@ -1,5 +1,15 @@
 node_modules/
 dist/
+public/
 .dev.vars
 .wrangler/
 *.log
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

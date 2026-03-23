@@ -34,6 +34,8 @@ import { emitAll } from '../pipeline/emit'
 import { parseManifest, type ManifestFormat } from '../audit/parsers'
 import { resolveAll } from '../audit/resolver'
 import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
+import { discoverManifests } from '../audit/discovery'
+import type { ParsedDep } from '../audit/parsers'
 
 const ui = new Hono<{ Bindings: Env }>()
 
@@ -48,7 +50,7 @@ function hasAllowedViewOrigin(originHeader: string): boolean {
 
   try {
     const { hostname } = new URL(originHeader)
-    return allowedViewHosts.has(hostname)
+    return allowedViewHosts.has(hostname) || hostname.endsWith('.rootd.workers.dev')
   } catch {
     return false
   }
@@ -84,19 +86,23 @@ ${repos.map(repo => `  <url>
 
   c.header('Content-Type', 'application/xml')
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.text(xml)
 })
 
 // Landing page — static shell, chips hydrated client-side
 ui.get('/', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(landingPage(c.env.TURNSTILE_SITE_KEY, c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Recent queries API — lightweight JSON for client-side hydration
-ui.get('/api/recent', async (c) => {
+// Mounted under /_data/ to avoid /api/* rate-limit + auth middleware
+ui.get('/_data/recent', async (c) => {
   const recent = await getRecentQueries(c.env.CACHE_KV)
-  c.header('Cache-Control', 'public, max-age=10, s-maxage=10')
+  c.header('Cache-Control', 'public, max-age=60, s-maxage=60')
+  c.header('CDN-Cache-Control', 'public, s-maxage=60')
   return c.json(recent)
 })
 
@@ -133,24 +139,28 @@ ui.post('/_view', async (c) => {
 // Methodology page — static per deploy
 ui.get('/methodology', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400')
   return c.html(methodologyPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // API docs page
 ui.get('/api', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400')
   return c.html(apiDocsPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Terms of Service page — static per deploy
 ui.get('/terms', (c) => {
   c.header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  c.header('CDN-Cache-Control', 'public, s-maxage=86400')
   return c.html(termsPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
 // Trending page — static HTML shell (data hydrated client-side)
 ui.get('/trending', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(trendingPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -162,6 +172,7 @@ ui.get('/_data/trending', async (c) => {
   const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10))
   const page = allRepos.slice(offset, offset + limit)
   c.header('Cache-Control', 'public, max-age=60, s-maxage=60')
+  c.header('CDN-Cache-Control', 'public, s-maxage=60')
   return c.json({
     repos: page,
     total: allRepos.length,
@@ -174,6 +185,7 @@ ui.get('/_data/trending', async (c) => {
 // Changelog page — static HTML shell (data hydrated client-side)
 ui.get('/changelog', (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(changelogPage(c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -188,10 +200,141 @@ ui.get('/_data/changelog', (c) => {
   const hasMore = start + limit < all.length
 
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.json({ versions, page, hasMore, total: all.length })
 })
 
-// POST /_check — form submission with Turnstile verification
+// Dependency health data — JSON for client-side hydration on result pages
+// Discovers manifests at repo root, parses + deduplicates deps, scores them.
+ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
+  const { provider, owner, repo } = c.req.param()
+
+  if (provider !== 'github' || !isValidParam(owner) || !isValidParam(repo)) {
+    return c.json({ manifests: [], error: 'Invalid parameters' }, 400)
+  }
+
+  // Check for cached deps result first (lowercase to match GitHub's case-insensitive slugs)
+  const normalizedOwner = owner.toLowerCase()
+  const normalizedRepo = repo.toLowerCase()
+  const depsCacheKey = `deps:github:${normalizedOwner}/${normalizedRepo}`
+  const cachedDeps = await c.env.CACHE_KV.get(depsCacheKey)
+  if (cachedDeps) {
+    try {
+      const parsed = JSON.parse(cachedDeps) as unknown as { complete?: boolean; pending?: number }
+
+      // If the cached payload is an incomplete result, bypass cache so we can
+      // recompute and pick up freshly scored dependencies.
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'complete' in parsed &&
+        parsed.complete === false &&
+        typeof (parsed as { pending?: number }).pending === 'number' &&
+        (parsed as { pending: number }).pending > 0
+      ) {
+        await c.env.CACHE_KV.delete(depsCacheKey)
+      } else {
+        c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+        c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+        return c.json(parsed)
+      }
+    } catch {
+      // Corrupted cache entry — evict and recompute
+      await c.env.CACHE_KV.delete(depsCacheKey)
+    }
+  }
+
+  // Discover manifests at repo root
+  if (!c.env.GITHUB_TOKEN) {
+    c.header('Cache-Control', 'no-store')
+    c.header('CDN-Cache-Control', 'no-store')
+    return c.json(
+      { manifests: [], error: 'GitHub integration is not configured (missing GITHUB_TOKEN)' },
+      503,
+    )
+  }
+  const manifests = await discoverManifests(owner, repo, c.env.GITHUB_TOKEN, c.env.CACHE_KV)
+
+  if (manifests.length === 0) {
+    const empty = { manifests: [] as string[] }
+    // Cache the "no manifests" result briefly (1 hour)
+    await c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+    return c.json(empty)
+  }
+
+  // Fetch and parse all discovered manifests
+  let allDeps: ParsedDep[] = []
+  const manifestNames: string[] = []
+
+  for (const manifest of manifests) {
+    try {
+      const res = await fetch(manifest.downloadUrl, {
+        headers: { 'User-Agent': 'isitalive/1.0' },
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!res.ok) continue
+
+      const content = await res.text()
+      if (content.length > 512 * 1024) continue // Skip oversized manifests
+
+      const deps = parseManifest(manifest.format, content)
+      allDeps.push(...deps)
+      manifestNames.push(manifest.filename)
+    } catch {
+      // Non-critical — skip this manifest
+    }
+  }
+
+  if (allDeps.length === 0) {
+    const empty = { manifests: manifestNames, dependencies: [], summary: { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0, avgScore: 0 }, total: 0, scored: 0, pending: 0, complete: true }
+    await c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+    return c.json(empty)
+  }
+
+  // Deduplicate deps by name (keep first occurrence)
+  const seen = new Set<string>()
+  allDeps = allDeps.filter((d) => {
+    if (seen.has(d.name)) return false
+    seen.add(d.name)
+    return true
+  })
+
+  // Sort deterministically for stable content hash across runs
+  allDeps.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version))
+
+  // Resolve to GitHub repos + score
+  const resolved = await resolveAll(allDeps, c.env)
+
+  // Hash the combined content for scoreAudit's cache key
+  const combinedContent = allDeps.map(d => `${d.name}@${d.version}`).join('\n')
+  const contentHash = await hashManifest(combinedContent)
+
+  const auditResult = await scoreAudit(resolved, manifestNames.join('+'), contentHash, c.env, c.executionCtx)
+
+  const result = {
+    manifests: manifestNames,
+    dependencies: auditResult.dependencies,
+    summary: auditResult.summary,
+    total: auditResult.total,
+    scored: auditResult.scored,
+    pending: auditResult.pending,
+    complete: auditResult.complete,
+  }
+
+  // Cache complete results for 6 hours, partial for 5 min
+  const ttl = auditResult.complete ? 6 * 60 * 60 : 5 * 60
+  c.executionCtx.waitUntil(
+    c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(result), { expirationTtl: ttl }),
+  )
+
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
+  return c.json(result)
+})
 // This redirects to the result page after verifying the human.
 // Smart detection: if the input is a manifest URL, redirect to the audit flow.
 ui.post('/_check', verifyTurnstile, async (c) => {
@@ -272,6 +415,7 @@ ui.get('/audit/:hash', async (c) => {
   }
 
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.html(auditResultPage(result, c.env.CF_ANALYTICS_TOKEN))
 })
 
@@ -289,6 +433,7 @@ ui.get('/_data/audit/:hash', async (c) => {
   }
 
   c.header('Cache-Control', 'public, max-age=3600')
+  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   try {
     return c.json(JSON.parse(cached))
   } catch {
@@ -337,6 +482,8 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
       const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
       const trend = computeTrend(history)
+      c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+      c.header('CDN-Cache-Control', 'public, s-maxage=3600')
       const response = c.html(resultPage(cached, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
       c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
       return response
@@ -364,6 +511,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     const trend = computeTrend(history)
     
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    c.header('CDN-Cache-Control', 'public, s-maxage=3600')
     const response = c.html(resultPage(result, owner, repo, c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
