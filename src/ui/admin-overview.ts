@@ -285,11 +285,16 @@ export function adminOverviewPage(data: AdminOverview): string {
         pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM manifest_events\`,
         freshness: \`
           SELECT
-            COUNT(DISTINCT project) as total,
-            COUNT(DISTINCT CASE WHEN timestamp > (now() - INTERVAL '6' HOUR) THEN project END) as fresh,
-            COUNT(DISTINCT CASE WHEN timestamp > (now() - INTERVAL '24' HOUR) AND timestamp <= (now() - INTERVAL '6' HOUR) THEN project END) as aging,
-            COUNT(DISTINCT CASE WHEN timestamp <= (now() - INTERVAL '24' HOUR) THEN project END) as stale
-          FROM result_events_v2
+            COUNT(*) as total,
+            SUM(CASE WHEN latest_ts > now() - INTERVAL '6' HOUR THEN 1 ELSE 0 END) as fresh,
+            SUM(CASE WHEN latest_ts <= now() - INTERVAL '6' HOUR AND latest_ts > now() - INTERVAL '24' HOUR THEN 1 ELSE 0 END) as aging,
+            SUM(CASE WHEN latest_ts <= now() - INTERVAL '24' HOUR THEN 1 ELSE 0 END) as stale
+          FROM (
+            SELECT project, MAX(timestamp) as latest_ts
+            FROM usage_events
+            WHERE source != 'cron' AND project != ''
+            GROUP BY project
+          )
         \`,
       };
 
@@ -436,11 +441,15 @@ export function adminOverviewPage(data: AdminOverview): string {
       async function loadPipeline() {
         try {
           const pipelineKeys = ['pipeline_usage', 'pipeline_result', 'pipeline_provider', 'pipeline_manifest'];
+          const pipelineNames = ['usage_events', 'result_events_v2', 'provider_events_v2', 'manifest_events'];
           const results = await Promise.allSettled(pipelineKeys.map(k => runQuery(QUERIES[k])));
           const allRows = [];
-          for (const r of results) {
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i];
             if (r.status === 'fulfilled' && r.value.rows && r.value.rows.length) {
               allRows.push(r.value.rows[0]);
+            } else {
+              allRows.push([pipelineNames[i], '—', null]);
             }
           }
           const tbody = document.querySelector('#pipeline-table tbody');
@@ -450,8 +459,16 @@ export function adminOverviewPage(data: AdminOverview): string {
           }
           tbody.innerHTML = allRows.map(row => {
             const [name, rows, latest] = row;
+            if (!latest) {
+              return \`<tr>
+                <td><code style="font-size:0.78rem">\${name}</code></td>
+                <td>\${rows}</td>
+                <td>—</td>
+                <td class="status-dead">\ud83d\udd34 Error</td>
+              </tr>\`;
+            }
             const ago = timeAgo(latest);
-            const diffSec = latest ? (Date.now() - new Date(latest).getTime()) / 1000 : Infinity;
+            const diffSec = (Date.now() - new Date(latest).getTime()) / 1000;
             let statusClass = 'status-fresh';
             let statusIcon = '\ud83d\udfe2';
             if (diffSec > 3600) { statusClass = 'status-stale'; statusIcon = '\ud83d\udfe1'; }
