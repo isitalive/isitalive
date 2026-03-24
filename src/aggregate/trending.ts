@@ -18,14 +18,14 @@ export interface TrendingRepo {
 
 const TRENDING_SQL = `
 SELECT
-  project as repo,
+  repo,
   COUNT(*) as checks,
   AVG(score) as avg_score,
   MAX(verdict) as last_verdict
-FROM result_events_v2
+FROM usage_events
 WHERE timestamp > NOW() - INTERVAL '24 hours'
-  AND project != ''
-GROUP BY project
+  AND repo != ''
+GROUP BY repo
 ORDER BY checks DESC
 LIMIT 250
 `
