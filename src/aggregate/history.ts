@@ -53,8 +53,8 @@ export async function getScoreHistory(
       DATE(timestamp) as day,
       CAST(AVG(score) AS INTEGER) as score,
       MAX(verdict) as verdict
-    FROM result_events
-    WHERE repo = '${repoSlug}'
+    FROM result_events_v2
+    WHERE project = '${repoSlug}'
       AND timestamp > NOW() - INTERVAL '90 days'
     GROUP BY day
     ORDER BY day

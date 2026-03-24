@@ -22,7 +22,7 @@ SELECT
   COUNT(*) as checks,
   AVG(score) as avg_score,
   MAX(verdict) as last_verdict
-FROM result_events
+FROM result_events_v2
 WHERE timestamp > NOW() - INTERVAL '24 hours'
   AND project != ''
 GROUP BY project
