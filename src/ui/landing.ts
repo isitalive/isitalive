@@ -490,6 +490,16 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         padding: 14px 24px;
         font-size: 0.9rem;
       }
+
+      .adopt-block { padding: 24px 20px; }
+      .adopt-code {
+        font-size: 0.65rem;
+        padding: 16px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .closing-cta { padding: 48px 0; }
+      .closing-cta h2 { font-size: 1.4rem; }
     }
 
     /* ── Loading transition ──────────────────── */

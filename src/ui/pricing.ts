@@ -323,9 +323,11 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
       .pricing-hero { padding: 32px 0 28px; }
       .pricing-hero h1 { font-size: 1.6rem; }
       .tier-card { padding: 24px; }
+      .paid-tier { padding: 24px 20px; }
       .tier-actions { flex-direction: column; }
       .tier-btn { width: 100%; justify-content: center; }
       .waitlist-input-row { flex-direction: column; }
+      .waitlist-btn { font-family: inherit; width: 100%; justify-content: center; }
       .tier-card.featured .tier-features { grid-template-columns: 1fr; }
     }
   </style>
