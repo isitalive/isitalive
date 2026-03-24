@@ -223,7 +223,7 @@ export const PRESET_QUERIES: PresetQuery[] = [
   },
   {
     label: 'Score Distribution',
-    sql: `SELECT\n  CASE\n    WHEN score >= 80 THEN 'healthy (80-100)'\n    WHEN score >= 60 THEN 'stable (60-79)'\n    WHEN score >= 40 THEN 'degraded (40-59)'\n    WHEN score >= 20 THEN 'critical (20-39)'\n    ELSE 'unmaintained (0-19)'\n  END as bucket,\n  COUNT(*) as count\nFROM result_events\nGROUP BY bucket\nORDER BY count DESC`,
+    sql: `SELECT\n  CASE\n    WHEN score >= 80 THEN 'healthy (80-100)'\n    WHEN score >= 60 THEN 'stable (60-79)'\n    WHEN score >= 40 THEN 'degraded (40-59)'\n    WHEN score >= 20 THEN 'critical (20-39)'\n    ELSE 'unmaintained (0-19)'\n  END as bucket,\n  COUNT(*) as count\nFROM result_events_v2\nGROUP BY bucket\nORDER BY count DESC`,
     chart: 'donut',
   },
   {
@@ -233,17 +233,17 @@ export const PRESET_QUERIES: PresetQuery[] = [
   },
   {
     label: 'Language Distribution',
-    sql: `SELECT language, COUNT(*) as count\nFROM provider_events\nWHERE language IS NOT NULL\nGROUP BY language\nORDER BY count DESC\nLIMIT 15`,
+    sql: `SELECT language, COUNT(*) as count\nFROM provider_events_v2\nWHERE language IS NOT NULL\nGROUP BY language\nORDER BY count DESC\nLIMIT 15`,
     chart: 'bar',
   },
   {
     label: 'Top Repos by Stars',
-    sql: `SELECT owner || '/' || repo as project, MAX(stars) as stars\nFROM provider_events\nGROUP BY project\nORDER BY stars DESC\nLIMIT 20`,
+    sql: `SELECT owner || '/' || repo as project, MAX(stars) as stars\nFROM provider_events_v2\nGROUP BY project\nORDER BY stars DESC\nLIMIT 20`,
     chart: 'hbar',
   },
   {
     label: 'Signal Averages',
-    sql: `SELECT\n  ROUND(AVG(signal_last_commit_score), 1) as last_commit,\n  ROUND(AVG(signal_last_release_score), 1) as last_release,\n  ROUND(AVG(signal_stars_score), 1) as stars,\n  ROUND(AVG(signal_ci_score), 1) as ci,\n  ROUND(AVG(signal_bus_factor_score), 1) as bus_factor,\n  ROUND(AVG(signal_issue_staleness_score), 1) as issues,\n  ROUND(AVG(signal_pr_responsiveness_score), 1) as prs,\n  ROUND(AVG(signal_recent_contributors_score), 1) as contributors\nFROM result_events`,
+    sql: `SELECT\n  ROUND(AVG(signal_last_commit_score), 1) as last_commit,\n  ROUND(AVG(signal_last_release_score), 1) as last_release,\n  ROUND(AVG(signal_stars_score), 1) as stars,\n  ROUND(AVG(signal_ci_score), 1) as ci,\n  ROUND(AVG(signal_bus_factor_score), 1) as bus_factor,\n  ROUND(AVG(signal_issue_staleness_score), 1) as issues,\n  ROUND(AVG(signal_pr_responsiveness_score), 1) as prs,\n  ROUND(AVG(signal_recent_contributors_score), 1) as contributors\nFROM result_events_v2`,
     chart: 'bar',
   },
 ]

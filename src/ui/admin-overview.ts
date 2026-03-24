@@ -282,13 +282,10 @@ export function adminOverviewPage(data: AdminOverview): string {
           GROUP BY user_agent
           ORDER BY count DESC
         \`,
-        pipeline: \`
-          SELECT 'usage_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM usage_events
-          UNION ALL SELECT 'result_events_v2', COUNT(*), MAX(__ingest_ts) FROM result_events_v2
-          UNION ALL SELECT 'provider_events_v2', COUNT(*), MAX(__ingest_ts) FROM provider_events_v2
-          UNION ALL SELECT 'manifest_events', COUNT(*), MAX(__ingest_ts) FROM manifest_events
-          ORDER BY tbl
-        \`,
+        pipeline_usage: \`SELECT 'usage_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM usage_events\`,
+        pipeline_result: \`SELECT 'result_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM result_events_v2\`,
+        pipeline_provider: \`SELECT 'provider_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM provider_events_v2\`,
+        pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM manifest_events\`,
       };
 
       async function runQuery(sql) {
@@ -431,16 +428,27 @@ export function adminOverviewPage(data: AdminOverview): string {
 
       async function loadPipeline() {
         try {
-          const data = await runQuery(QUERIES.pipeline);
+          const pipelineKeys = ['pipeline_usage', 'pipeline_result', 'pipeline_provider', 'pipeline_manifest'];
+          const results = await Promise.allSettled(pipelineKeys.map(k => runQuery(QUERIES[k])));
+          const allRows = [];
+          for (const r of results) {
+            if (r.status === 'fulfilled' && r.value.rows && r.value.rows.length) {
+              allRows.push(r.value.rows[0]);
+            }
+          }
           const tbody = document.querySelector('#pipeline-table tbody');
-          tbody.innerHTML = data.rows.map(row => {
+          if (!allRows.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">No data</td></tr>';
+            return;
+          }
+          tbody.innerHTML = allRows.map(row => {
             const [name, rows, latest] = row;
             const ago = timeAgo(latest);
             const diffSec = latest ? (Date.now() - new Date(latest).getTime()) / 1000 : Infinity;
             let statusClass = 'status-fresh';
-            let statusIcon = '🟢';
-            if (diffSec > 3600) { statusClass = 'status-stale'; statusIcon = '🟡'; }
-            if (diffSec > 86400) { statusClass = 'status-dead'; statusIcon = '🔴'; }
+            let statusIcon = '\ud83d\udfe2';
+            if (diffSec > 3600) { statusClass = 'status-stale'; statusIcon = '\ud83d\udfe1'; }
+            if (diffSec > 86400) { statusClass = 'status-dead'; statusIcon = '\ud83d\udd34'; }
             return \`<tr>
               <td><code style="font-size:0.78rem">\${name}</code></td>
               <td>\${fmt(parseInt(rows))}</td>
