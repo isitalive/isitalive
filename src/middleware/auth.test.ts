@@ -242,5 +242,31 @@ describe('apiKeyAuth middleware', () => {
       expect(body.isAuthenticated).toBe(false)
       expect(body.tier).toBe('free')
     })
+
+    it('falls through to free tier when JWKS fetch fails (no cached keys)', async () => {
+      // No JWKS cached — forces remote fetch which will fail (no fetch mock)
+      const env = createMockEnv()
+      const { app } = createTestApp(env)
+
+      // Mock fetch to simulate JWKS endpoint returning 404
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = vi.fn(async () =>
+        new Response('not found', { status: 404 }),
+      ) as any
+
+      try {
+        const jwt = await buildJwt(validOidcClaims(), keyPair.privateKey, 'test-kid-1')
+        const res = await app.request('/test', {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }, env)
+        const body = await res.json() as any
+        // Should fall through as unauthenticated, NOT return 500
+        expect(res.status).toBe(200)
+        expect(body.isAuthenticated).toBe(false)
+        expect(body.tier).toBe('free')
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
   })
 })

@@ -263,4 +263,44 @@ describe('verifyOidcToken', () => {
     const result = await verifyOidcToken(jwt, env)
     expect(result.repository_visibility).toBe('private')
   })
+
+  // ── JWKS fetch failure scenarios ──────────────────────────────────
+  // These cover the gap that let the .well-known/jwks.json bug through.
+
+  it('throws when JWKS fetch returns 404', async () => {
+    const { verifyOidcToken } = await getVerifier()
+    // No cached keys — forces a remote fetch
+    const env = createMockEnv()
+
+    globalThis.fetch = vi.fn(async () =>
+      new Response('404 page not found', { status: 404 }),
+    ) as any
+
+    const jwt = await buildJwt(validClaims(), keyPair.privateKey, 'test-kid-1')
+    await expect(verifyOidcToken(jwt, env)).rejects.toThrow('Failed to fetch JWKS')
+  })
+
+  it('throws when JWKS fetch returns non-JSON', async () => {
+    const { verifyOidcToken } = await getVerifier()
+    const env = createMockEnv()
+
+    globalThis.fetch = vi.fn(async () =>
+      new Response('<html>Server Error</html>', { status: 200 }),
+    ) as any
+
+    const jwt = await buildJwt(validClaims(), keyPair.privateKey, 'test-kid-1')
+    await expect(verifyOidcToken(jwt, env)).rejects.toThrow()
+  })
+
+  it('throws when JWKS fetch has network error', async () => {
+    const { verifyOidcToken } = await getVerifier()
+    const env = createMockEnv()
+
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error('Network error')
+    }) as any
+
+    const jwt = await buildJwt(validClaims(), keyPair.privateKey, 'test-kid-1')
+    await expect(verifyOidcToken(jwt, env)).rejects.toThrow()
+  })
 })

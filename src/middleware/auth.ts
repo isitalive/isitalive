@@ -71,9 +71,11 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
         c.set('isAuthenticated', true);
         c.set('oidcClaims', claims);
         return next();
-      } catch {
-        // Invalid OIDC token — fall through to free tier (not API key,
-        // since OIDC tokens are unambiguously identified by 'eyJ' prefix)
+      } catch (err) {
+        // OIDC verification failed — log for observability, fall through
+        // to unauthenticated. Don't return 401 here since the token
+        // could be legitimately malformed (not a real OIDC attempt).
+        console.warn('OIDC verification failed:', err instanceof Error ? err.message : err)
       }
       return next();
     }
