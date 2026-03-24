@@ -5,6 +5,9 @@
 // R2 SQL, parses the JSON blobs, and re-emits them as flattened events
 // to the new pipeline schemas.
 //
+// IMPORTANT: Read + transform + write happen in a SINGLE step to avoid
+// passing large JSON blobs across step boundaries (1 MiB limit).
+//
 // Triggered manually via admin route: POST /admin/backfill
 // ---------------------------------------------------------------------------
 
@@ -25,7 +28,9 @@ type BackfillParams = {
 export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
   async run(event: WorkflowEvent<BackfillParams>, step: WorkflowStep) {
     const tables = event.payload.tables ?? ['provider', 'result']
-    const batchSize = event.payload.batchSize ?? 500
+    // Keep batches small — raw_json blobs are 5-10 KB each, and Workflow
+    // step output is capped at 1 MiB.
+    const batchSize = event.payload.batchSize ?? 50
 
     const stats = { provider: 0, result: 0 }
 
@@ -54,11 +59,13 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
     while (true) {
       batchNum++
 
-      const rows = await step.do(
-        `provider-read-${batchNum}`,
+      // Read + transform + write in ONE step to avoid exceeding the
+      // 1 MiB step-output limit (raw_json blobs are huge).
+      const result = await step.do(
+        `provider-batch-${batchNum}`,
         { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } },
         async () => {
-          const result = await queryR2SQL(
+          const qr = await queryR2SQL(
             this.env,
             `SELECT id, timestamp, provider, owner, repo, raw_json
              FROM provider_events
@@ -67,40 +74,26 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
              LIMIT ${batchSize}`,
           )
 
-          if (result.error) {
-            throw new Error(`R2 SQL error: ${result.error}`)
+          if (qr.error) {
+            throw new Error(`R2 SQL error: ${qr.error}`)
           }
 
-          return result.rows.map(row => ({
-            id: row[0] as string,
-            timestamp: row[1] as string,
-            provider: row[2] as string,
-            owner: row[3] as string,
-            repo: row[4] as string,
-            raw_json: row[5] as string,
-          }))
-        },
-      )
+          if (qr.rows.length === 0) {
+            return { migrated: 0, lastTimestamp: null, rowCount: 0 }
+          }
 
-      if (rows.length === 0) break
-
-      // Transform and send to new pipeline
-      const migrated = await step.do(
-        `provider-write-${batchNum}`,
-        { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } },
-        async () => {
           const flatEvents: Record<string, unknown>[] = []
 
-          for (const row of rows) {
+          for (const row of qr.rows) {
             try {
-              const data = JSON.parse(row.raw_json)
+              const data = JSON.parse(row[5] as string) // raw_json
               flatEvents.push({
                 domain: 'provider',
-                id: row.id,
-                timestamp: row.timestamp,
-                provider: row.provider,
-                owner: row.owner,
-                repo: row.repo,
+                id: row[0] as string,
+                timestamp: row[1] as string,
+                provider: row[2] as string,
+                owner: row[3] as string,
+                repo: row[4] as string,
                 archived: data.archived ?? false,
                 description: data.description ?? null,
                 stars: data.stars ?? 0,
@@ -125,7 +118,7 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
                 ci_run_count: data.ciRunCount ?? data.ci_run_count ?? 0,
               })
             } catch {
-              console.warn(`Backfill: skipping provider row ${row.id} — invalid JSON`)
+              console.warn(`Backfill: skipping provider row ${row[0]} — invalid JSON`)
             }
           }
 
@@ -133,15 +126,20 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
             await this.env.PROVIDER_PIPELINE.send(flatEvents)
           }
 
-          return flatEvents.length
+          // Return only the small metadata — not the full rows
+          return {
+            migrated: flatEvents.length,
+            lastTimestamp: qr.rows[qr.rows.length - 1][1] as string,
+            rowCount: qr.rows.length,
+          }
         },
       )
 
-      totalMigrated += migrated
-      cursor = rows[rows.length - 1].timestamp
-      console.log(`Backfill: provider batch ${batchNum} — ${migrated} events (total: ${totalMigrated})`)
+      totalMigrated += result.migrated
+      console.log(`Backfill: provider batch ${batchNum} — ${result.migrated} events (total: ${totalMigrated})`)
 
-      if (rows.length < batchSize) break
+      if (result.rowCount < batchSize || !result.lastTimestamp) break
+      cursor = result.lastTimestamp
 
       await step.sleep(`provider-pause-${batchNum}`, '1 second')
     }
@@ -158,11 +156,12 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
     while (true) {
       batchNum++
 
-      const rows = await step.do(
-        `result-read-${batchNum}`,
+      // Read + transform + write in ONE step
+      const result = await step.do(
+        `result-batch-${batchNum}`,
         { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } },
         async () => {
-          const result = await queryR2SQL(
+          const qr = await queryR2SQL(
             this.env,
             `SELECT id, timestamp, project, score, verdict, source, signals_json
              FROM result_events
@@ -171,34 +170,19 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
              LIMIT ${batchSize}`,
           )
 
-          if (result.error) {
-            throw new Error(`R2 SQL error: ${result.error}`)
+          if (qr.error) {
+            throw new Error(`R2 SQL error: ${qr.error}`)
           }
 
-          return result.rows.map(row => ({
-            id: row[0] as string,
-            timestamp: row[1] as string,
-            project: row[2] as string,
-            score: row[3] as number,
-            verdict: row[4] as string,
-            source: row[5] as string,
-            signals_json: row[6] as string,
-          }))
-        },
-      )
+          if (qr.rows.length === 0) {
+            return { migrated: 0, lastTimestamp: null, rowCount: 0 }
+          }
 
-      if (rows.length === 0) break
-
-      // Transform and send to new pipeline
-      const migrated = await step.do(
-        `result-write-${batchNum}`,
-        { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } },
-        async () => {
           const flatEvents: Record<string, unknown>[] = []
 
-          for (const row of rows) {
+          for (const row of qr.rows) {
             try {
-              const signals = JSON.parse(row.signals_json) as Array<{
+              const signals = JSON.parse(row[6] as string) as Array<{
                 name: string
                 score: number
                 value: string | number
@@ -214,12 +198,12 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
 
               flatEvents.push({
                 domain: 'result',
-                id: row.id,
-                timestamp: row.timestamp,
-                project: row.project,
-                score: row.score,
-                verdict: row.verdict,
-                source: row.source,
+                id: row[0] as string,
+                timestamp: row[1] as string,
+                project: row[2] as string,
+                score: row[3] as number,
+                verdict: row[4] as string,
+                source: row[5] as string,
                 signal_last_commit_score: get('lastCommit').score,
                 signal_last_commit_value: get('lastCommit').value,
                 signal_last_release_score: get('lastRelease').score,
@@ -238,7 +222,7 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
                 signal_bus_factor_value: get('busFactor').value,
               })
             } catch {
-              console.warn(`Backfill: skipping result row ${row.id} — invalid JSON`)
+              console.warn(`Backfill: skipping result row ${row[0]} — invalid JSON`)
             }
           }
 
@@ -246,15 +230,19 @@ export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
             await this.env.RESULT_PIPELINE.send(flatEvents)
           }
 
-          return flatEvents.length
+          return {
+            migrated: flatEvents.length,
+            lastTimestamp: qr.rows[qr.rows.length - 1][1] as string,
+            rowCount: qr.rows.length,
+          }
         },
       )
 
-      totalMigrated += migrated
-      cursor = rows[rows.length - 1].timestamp
-      console.log(`Backfill: result batch ${batchNum} — ${migrated} events (total: ${totalMigrated})`)
+      totalMigrated += result.migrated
+      console.log(`Backfill: result batch ${batchNum} — ${result.migrated} events (total: ${totalMigrated})`)
 
-      if (rows.length < batchSize) break
+      if (result.rowCount < batchSize || !result.lastTimestamp) break
+      cursor = result.lastTimestamp
 
       await step.sleep(`result-pause-${batchNum}`, '1 second')
     }
