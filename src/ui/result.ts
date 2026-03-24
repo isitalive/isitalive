@@ -159,16 +159,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   const TREND_LABELS: Record<string, string> = { improving: 'Improving', stable: 'Stable', declining: 'Declining' };
 
   let trendHtml = '';
-  if (trend) {
-    if (trend.direction) {
-      const tIcon = TREND_ICONS[trend.direction];
-      const tColor = TREND_COLORS[trend.direction];
-      const tLabel = TREND_LABELS[trend.direction];
-      const deltaStr = trend.delta > 0 ? `+${trend.delta}` : `${trend.delta}`;
-      trendHtml = `<span class="trend-pill" style="color: ${tColor}; border-color: ${tColor}33">${tIcon} ${tLabel} <span class="trend-delta">${deltaStr} pts over ${trend.daySpan}d</span></span>`;
-    } else {
-      trendHtml = `<span class="trend-pill trend-collecting">📊 Collecting trend data (${trend.dataPoints} point${trend.dataPoints !== 1 ? 's' : ''}, need ${trend.minDaysRequired}d span)</span>`;
-    }
+  if (trend?.direction) {
+    const tIcon = TREND_ICONS[trend.direction];
+    const tColor = TREND_COLORS[trend.direction];
+    const tLabel = TREND_LABELS[trend.direction];
+    const deltaStr = trend.delta > 0 ? `+${trend.delta}` : `${trend.delta}`;
+    trendHtml = `<span class="trend-pill" style="color: ${tColor}; border-color: ${tColor}33">${tIcon} ${tLabel} <span class="trend-delta">${deltaStr} pts over ${trend.daySpan}d</span></span>`;
   }
 
   // Compact signal rows for grid (2 columns of signal pairs)
@@ -559,11 +555,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       opacity: 0.7;
       margin-left: 4px;
     }
-    .trend-collecting {
-      color: var(--text-muted);
-      border-color: var(--border);
-      font-weight: 400;
-    }
+
 
     /* ── Responsive ──────────────────────── */
     @media (max-width: 768px) {
