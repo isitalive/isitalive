@@ -496,7 +496,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         font-size: 0.65rem;
         padding: 16px;
         white-space: pre-wrap;
-        word-break: break-all;
+        word-break: normal;
+        overflow-wrap: anywhere;
       }
       .closing-cta { padding: 48px 0; }
       .closing-cta h2 { font-size: 1.4rem; }

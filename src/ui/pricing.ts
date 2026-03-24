@@ -338,7 +338,7 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
       .tier-actions { flex-direction: column; }
       .tier-btn { width: 100%; justify-content: center; }
       .waitlist-input-row { flex-direction: column; }
-      .waitlist-btn { font-family: inherit; width: 100%; justify-content: center; }
+      .waitlist-btn { font-family: inherit; }
       .tier-card.featured .tier-features { grid-template-columns: 1fr; }
     }
   </style>
