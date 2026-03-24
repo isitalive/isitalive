@@ -297,6 +297,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       flex-wrap: wrap;
       gap: 10px;
       align-items: center;
+      justify-content: center;
     }
 
     .verdict-badge {
@@ -510,7 +511,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      align-items: center;
+      align-items: stretch;
     }
 
     .meta-pill {
@@ -520,11 +521,12 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       background: var(--surface-hover);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 5px 14px;
+      padding: 6px 14px;
       font-size: 0.78rem;
       color: var(--text-secondary);
       text-decoration: none;
       transition: border-color 0.2s, color 0.2s;
+      line-height: 1.2;
     }
 
     a.meta-pill:hover {

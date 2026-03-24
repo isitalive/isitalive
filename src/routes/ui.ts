@@ -11,7 +11,7 @@ import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
 import { providers, revalidateInBackground } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
-import { CacheManager, getFirstSeen } from '../cache/index'
+import { CacheManager, getFirstSeen, trackFirstSeen } from '../cache/index'
 import { landingPage } from '../ui/landing'
 import { resultPage } from '../ui/result'
 import { errorPage } from '../ui/error'
@@ -630,6 +630,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     // Emit result/provider events on miss (powers trending) and track for landing page.
     c.executionCtx.waitUntil(Promise.all([
       cacheManager.put(provider, owner, repo, result),
+      trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
       trackRecentQuery(c.env.CACHE_KV, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),

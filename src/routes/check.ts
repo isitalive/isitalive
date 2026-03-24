@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
 import { providers, revalidateInBackground } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
-import { CacheManager, cacheControlHeaders, TIERS, type Tier } from '../cache/index'
+import { CacheManager, cacheControlHeaders, TIERS, type Tier, trackFirstSeen } from '../cache/index'
 import { buildResultEvent } from '../events/result'
 import { buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildProviderEvent } from '../events/provider'
@@ -163,6 +163,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
     const bgTasks: Promise<unknown>[] = [
       cacheManager.put(provider, owner, repo, result, tier),
+      trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
     ]
 
     // Always emit result/provider events on cache miss (powers trending + data freshness)
