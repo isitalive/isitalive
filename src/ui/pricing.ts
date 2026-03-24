@@ -70,7 +70,7 @@ function tierCardHtml(tier: PaidTier): string {
       </ul>
       <form class="waitlist-form" data-tier="${tier.id}">
         <div class="waitlist-input-row">
-          <input type="email" placeholder="you@company.com" required autocomplete="email" class="waitlist-email" />
+          <input type="email" placeholder="you@company.com" aria-label="Work email" required autocomplete="email" class="waitlist-email" />
           <button type="submit" class="tier-btn tier-btn-primary waitlist-btn">🔔 Join Waitlist</button>
         </div>
         <div class="cf-turnstile-slot"></div>
@@ -392,12 +392,26 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
       var widgetId = null;
       var submitted = false;
 
-      // Render Turnstile widget on email focus (lazy)
-      if (siteKey && window.turnstile) {
+      // Render Turnstile widget on email focus (lazy, handles async script load)
+      if (siteKey) {
         emailInput.addEventListener('focus', function renderWidget() {
           if (widgetId !== null) return;
-          widgetId = turnstile.render(turnstileSlot, { sitekey: siteKey, size: 'normal' });
-          emailInput.removeEventListener('focus', renderWidget);
+          if (window.turnstile) {
+            widgetId = turnstile.render(turnstileSlot, { sitekey: siteKey, size: 'normal' });
+            emailInput.removeEventListener('focus', renderWidget);
+          } else {
+            // Script not loaded yet — retry shortly
+            var retryCount = 0;
+            var interval = setInterval(function() {
+              retryCount++;
+              if (window.turnstile) {
+                clearInterval(interval);
+                widgetId = turnstile.render(turnstileSlot, { sitekey: siteKey, size: 'normal' });
+              } else if (retryCount > 20) {
+                clearInterval(interval); // Give up after ~5s
+              }
+            }, 250);
+          }
         }, { once: true });
       }
 
