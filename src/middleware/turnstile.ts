@@ -68,13 +68,19 @@ export async function verifyTurnstile(
   return next();
 }
 
+/** Escape HTML entities to prevent XSS in error templates */
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 function errorHtml(message: string): string {
+  const safe = escapeHtml(message)
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Verification Required — Is It Alive?</title>
 <style>body{font-family:Inter,sans-serif;background:#0a0a0f;color:#e8e8ed;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
 .card{text-align:center;max-width:400px;padding:40px}.icon{font-size:3rem;margin-bottom:16px}h1{font-size:1.2rem;margin-bottom:12px}
 p{color:#8b8b9e;font-size:.9rem;margin-bottom:24px}a{background:#6366f1;color:#fff;text-decoration:none;padding:12px 28px;border-radius:12px;font-weight:600}</style>
-</head><body><div class="card"><div class="icon">🛡️</div><h1>${message}</h1>
+</head><body><div class="card"><div class="icon">🛡️</div><h1>${safe}</h1>
 <p>This helps us protect the service from automated abuse.</p><a href="/">← Back to search</a></div></body></html>`;
 }

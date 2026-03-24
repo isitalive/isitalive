@@ -230,7 +230,7 @@ describe('apiKeyAuth middleware', () => {
       expect(body.error).toContain('free for open-source')
     })
 
-    it('falls through to free tier for invalid OIDC token', async () => {
+    it('returns 401 for invalid OIDC token', async () => {
       const env = createMockEnv({ jwksJson })
       const { app } = createTestApp(env)
 
@@ -238,12 +238,12 @@ describe('apiKeyAuth middleware', () => {
       const res = await app.request('/test', {
         headers: { Authorization: 'Bearer eyJhbGciOiJSUzI1NiJ9.eyJmb28iOiJiYXIifQ.invalidsig' },
       }, env)
+      expect(res.status).toBe(401)
       const body = await res.json() as any
-      expect(body.isAuthenticated).toBe(false)
-      expect(body.tier).toBe('free')
+      expect(body.error).toContain('OIDC token verification failed')
     })
 
-    it('falls through to free tier when JWKS fetch fails (no cached keys)', async () => {
+    it('returns 401 when JWKS fetch fails (no cached keys)', async () => {
       // No JWKS cached — forces remote fetch which will fail (no fetch mock)
       const env = createMockEnv()
       const { app } = createTestApp(env)
@@ -259,11 +259,10 @@ describe('apiKeyAuth middleware', () => {
         const res = await app.request('/test', {
           headers: { Authorization: `Bearer ${jwt}` },
         }, env)
+        // Should return 401 with clear OIDC error, NOT fall through to free tier
+        expect(res.status).toBe(401)
         const body = await res.json() as any
-        // Should fall through as unauthenticated, NOT return 500
-        expect(res.status).toBe(200)
-        expect(body.isAuthenticated).toBe(false)
-        expect(body.tier).toBe('free')
+        expect(body.error).toContain('OIDC token verification failed')
       } finally {
         globalThis.fetch = originalFetch
       }

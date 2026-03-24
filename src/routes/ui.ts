@@ -38,6 +38,9 @@ import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
 
+// Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
+const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
+
 const ui = new Hono<{ Bindings: Env }>()
 
 /** Suppress Turnstile + CF Web Analytics on local dev */
@@ -240,7 +243,7 @@ ui.get('/_data/changelog', (c) => {
   const page = Math.max(1, parseInt(c.req.query('page') || '1', 10))
   const limit = Math.min(20, Math.max(1, parseInt(c.req.query('limit') || '5', 10)))
 
-  const all = parseChangelogMd(changelogMd)
+  const all = ALL_CHANGELOG_VERSIONS
   const start = (page - 1) * limit
   const versions = all.slice(start, start + limit)
   const hasMore = start + limit < all.length
@@ -391,22 +394,26 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
   let allDeps: ParsedDep[] = []
   const manifestNames: string[] = []
 
-  for (const manifest of manifests) {
-    try {
+  // Fetch all manifests concurrently
+  const results = await Promise.allSettled(
+    manifests.map(async (manifest) => {
       const res = await fetch(manifest.downloadUrl, {
         headers: { 'User-Agent': 'isitalive/1.0' },
         signal: AbortSignal.timeout(5000),
       })
-      if (!res.ok) continue
+      if (!res.ok) return null
 
       const content = await res.text()
-      if (content.length > 512 * 1024) continue // Skip oversized manifests
+      if (content.length > 512 * 1024) return null // Skip oversized manifests
 
-      const deps = parseManifest(manifest.format, content)
-      allDeps.push(...deps)
-      manifestNames.push(manifest.filename)
-    } catch {
-      // Non-critical — skip this manifest
+      return { deps: parseManifest(manifest.format, content), filename: manifest.filename }
+    }),
+  )
+
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      allDeps.push(...r.value.deps)
+      manifestNames.push(r.value.filename)
     }
   }
 
@@ -612,8 +619,10 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
       ]))
-      const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
-      const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
+      const [firstIndexed, history] = await Promise.all([
+        getFirstSeen(c.env.CACHE_KV, provider, owner, repo),
+        getScoreHistory(c.env.CACHE_KV, owner, repo),
+      ])
       const trend = computeTrend(history)
       c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
       c.header('CDN-Cache-Control', 'public, s-maxage=3600')
@@ -645,8 +654,10 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       })),
     ]))
 
-    const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
-    const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
+    const [firstIndexed, history] = await Promise.all([
+      getFirstSeen(c.env.CACHE_KV, provider, owner, repo),
+      getScoreHistory(c.env.CACHE_KV, owner, repo),
+    ])
     const trend = computeTrend(history)
     
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')

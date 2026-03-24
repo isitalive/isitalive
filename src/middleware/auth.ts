@@ -72,12 +72,15 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
         c.set('oidcClaims', claims);
         return next();
       } catch (err) {
-        // OIDC verification failed — log for observability, fall through
-        // to unauthenticated. Don't return 401 here since the token
-        // could be legitimately malformed (not a real OIDC attempt).
-        console.warn('OIDC verification failed:', err instanceof Error ? err.message : err)
+        // OIDC verification failed — return 401 with clear error so
+        // legitimate OIDC users get feedback instead of a silent downgrade.
+        const message = err instanceof Error ? err.message : 'Verification failed'
+        return c.json({
+          error: 'OIDC token verification failed',
+          detail: message,
+          hint: 'Ensure your workflow has `permissions: { id-token: write }` and the token audience is https://isitalive.dev',
+        }, 401);
       }
-      return next();
     }
 
     // ── API key (existing flow) ─────────────────────────────────────

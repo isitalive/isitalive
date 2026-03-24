@@ -102,3 +102,9 @@ app.get('/.well-known/ai-plugin.json', (c) => {
 });
 
 app.get('/health', (c) => c.json({ status: 'ok', version }));
+
+// Global error handler — structured response for unhandled exceptions
+app.onError((err, c) => {
+  console.error('Unhandled error:', err);
+  return c.json({ error: 'Internal server error' }, 500);
+});

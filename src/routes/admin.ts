@@ -7,7 +7,7 @@
 
 import { Hono } from 'hono'
 import type { Env } from '../types/env'
-import { timingSafeEqual } from '../utils/crypto'
+import { timingSafeEqual, sha256Hex } from '../utils/crypto'
 import { adminAuth, createSession, setSessionCookie, clearSessionCookie } from '../middleware/admin-auth'
 import { getAdminOverview, KVKeyStore } from '../admin/data'
 import { queryR2SQL } from '../admin/r2sql'
@@ -40,8 +40,10 @@ admin.post('/auth/login', async (c) => {
   const body = await c.req.parseBody()
   const input = (body['secret'] as string || '').trim()
 
-  // Constant-time comparison to prevent timing attacks
-  if (!input || input.length !== secret.length || !timingSafeEqual(input, secret)) {
+  // Constant-time comparison via hash — prevents leaking secret length via timing
+  const inputHash = await sha256Hex(input || '\0')
+  const secretHash = await sha256Hex(secret)
+  if (!input || !timingSafeEqual(inputHash, secretHash)) {
     return c.html(adminLoginPage('Invalid secret. Please try again.'), 401)
   }
 

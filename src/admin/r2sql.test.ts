@@ -153,6 +153,34 @@ describe('r2sql', () => {
       const err = validateReadOnly('SELECT repo FROM usage_events -- get all repos')
       expect(err).toBeNull()
     })
+
+    // Edge cases found in security review (S4)
+    it('should reject semicolons hidden inside block comments followed by SQL', () => {
+      const err = validateReadOnly('SELECT 1 /* ; */ DROP TABLE analytics')
+      expect(err).not.toBeNull()
+    })
+
+    it('should reject SELECT with trailing comment hiding a semicolon then more SQL', () => {
+      // This tests the scenario: `SELECT 1; --` where trailing comment makes the
+      // semicolon appear to be "last char" but there's actually more after
+      const err = validateReadOnly('SELECT 1; -- comment\nDROP TABLE analytics')
+      expect(err).not.toBeNull()
+    })
+
+    it('should reject UNION-based stacking with write operation', () => {
+      const err = validateReadOnly('SELECT 1 UNION ALL SELECT 1; DELETE FROM analytics')
+      expect(err).not.toBeNull()
+    })
+
+    it('should reject nested block comments hiding DDL', () => {
+      const err = validateReadOnly('SELECT 1 /* /* nested */ DROP TABLE analytics */')
+      expect(err).not.toBeNull()
+    })
+
+    it('should reject DDL after a line comment on previous line', () => {
+      const err = validateReadOnly('SELECT 1 -- innocent\n; INSERT INTO t VALUES(1)')
+      expect(err).not.toBeNull()
+    })
   })
 
   // ─── Fuzz: random and adversarial inputs ─────────────────────────── 
