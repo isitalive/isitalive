@@ -42,7 +42,7 @@ export interface Env {
   // Workflows — durable ingest + refresh pipelines
   INGEST_WORKFLOW: Workflow;
   REFRESH_WORKFLOW: Workflow;
-  BACKFILL_WORKFLOW: Workflow;
+
 
   // Pipelines — event streams → Iceberg tables
   PROVIDER_PIPELINE: Pipeline;   // Raw upstream API data

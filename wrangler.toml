@@ -63,10 +63,6 @@ name = "refresh-workflow"
 binding = "REFRESH_WORKFLOW"
 class_name = "RefreshWorkflow"
 
-[[workflows]]
-name = "backfill-workflow"
-binding = "BACKFILL_WORKFLOW"
-class_name = "BackfillWorkflow"
 
 # R2 — data lake (Iceberg tables via R2 Data Catalog)
 [[r2_buckets]]
