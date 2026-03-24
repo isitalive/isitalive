@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../scoring/types';
+import { sign } from 'hono/jwt';
 
 const GITHUB_API = 'https://api.github.com';
 const TOKEN_CACHE_PREFIX = 'gh-app:token:';
@@ -90,7 +91,6 @@ async function generateAppJwt(appId: string, privateKeyPem: string): Promise<str
   const key = await importPrivateKey(privateKeyPem);
 
   // Hono's sign() accepts CryptoKey for asymmetric algorithms
-  const { sign } = await import('hono/jwt');
   return sign(payload, key, 'RS256');
 }
 
