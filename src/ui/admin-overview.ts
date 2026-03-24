@@ -115,34 +115,29 @@ export function adminOverviewPage(data: AdminOverview): string {
       </div>
     </div>
 
-    <!-- ── Tracked Repos ────────────────────────────── -->
+    <!-- ── Data Freshness ──────────────────────────── -->
     <div class="admin-section">
-      <div class="admin-section-title">Index</div>
-      <div class="card-grid">
-        <div class="card">
+      <div class="admin-section-title">Data Freshness</div>
+      <div class="card-grid freshness-cards">
+        <div class="card shimmer">
           <div class="card-label">Tracked Repos</div>
-          <div class="card-value">${data.trackedRepoCount.toLocaleString()}</div>
-          <div class="card-sub">Total repos in the index</div>
+          <div class="card-value" id="total-repos">—</div>
+          <div class="card-sub" id="total-repos-sub">Loading…</div>
         </div>
-        <div class="card">
-          <div class="card-label">🔥 Hot</div>
-          <div class="card-value" style="color:var(--green)">${data.hotRepoCount.toLocaleString()}</div>
-          <div class="card-sub">Requested in last 7 days</div>
+        <div class="card shimmer">
+          <div class="card-label">🟢 Fresh (&lt;6h)</div>
+          <div class="card-value" id="fresh-count" style="color:var(--green)">—</div>
+          <div class="card-sub" id="fresh-sub">Loading…</div>
         </div>
-        <div class="card">
-          <div class="card-label">🌤 Warm</div>
-          <div class="card-value" style="color:var(--yellow)">${data.warmRepoCount.toLocaleString()}</div>
-          <div class="card-sub">Requested in last 30 days</div>
+        <div class="card shimmer">
+          <div class="card-label">🟡 Aging (6–24h)</div>
+          <div class="card-value" id="aging-count" style="color:var(--yellow)">—</div>
+          <div class="card-sub" id="aging-sub">Loading…</div>
         </div>
-        <div class="card">
-          <div class="card-label">❄️ Cold</div>
-          <div class="card-value" style="color:var(--text-muted)">${data.coldRepoCount.toLocaleString()}</div>
-          <div class="card-sub">Older than 30 days</div>
-        </div>
-        <div class="card">
-          <div class="card-label">Trending (24h)</div>
-          <div class="card-value">${data.trendingCount}</div>
-          <div class="card-sub">Repos in trending list</div>
+        <div class="card shimmer">
+          <div class="card-label">🔴 Stale (&gt;24h)</div>
+          <div class="card-value" id="stale-repos" style="color:var(--red)">—</div>
+          <div class="card-sub" id="stale-repos-sub">Loading…</div>
         </div>
       </div>
     </div>
@@ -288,6 +283,14 @@ export function adminOverviewPage(data: AdminOverview): string {
         pipeline_result: \`SELECT 'result_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM result_events_v2\`,
         pipeline_provider: \`SELECT 'provider_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM provider_events_v2\`,
         pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM manifest_events\`,
+        freshness: \`
+          SELECT
+            COUNT(DISTINCT project) as total,
+            COUNT(DISTINCT CASE WHEN timestamp > (now() - INTERVAL '6' HOUR) THEN project END) as fresh,
+            COUNT(DISTINCT CASE WHEN timestamp > (now() - INTERVAL '24' HOUR) AND timestamp <= (now() - INTERVAL '6' HOUR) THEN project END) as aging,
+            COUNT(DISTINCT CASE WHEN timestamp <= (now() - INTERVAL '24' HOUR) THEN project END) as stale
+          FROM result_events_v2
+        \`,
       };
 
       async function runQuery(sql) {
@@ -467,8 +470,28 @@ export function adminOverviewPage(data: AdminOverview): string {
         }
       }
 
+      async function loadFreshness() {
+        try {
+          const data = await runQuery(QUERIES.freshness);
+          if (data.rows && data.rows.length) {
+            const [total, fresh, aging, stale] = data.rows[0].map(v => parseInt(v) || 0);
+            document.getElementById('total-repos').textContent = fmt(total);
+            document.getElementById('total-repos-sub').textContent = 'Unique projects scored';
+            document.getElementById('fresh-count').textContent = fmt(fresh);
+            document.getElementById('fresh-sub').textContent = pct(fresh, total) + ' of index';
+            document.getElementById('aging-count').textContent = fmt(aging);
+            document.getElementById('aging-sub').textContent = pct(aging, total) + ' of index';
+            document.getElementById('stale-repos').textContent = fmt(stale);
+            document.getElementById('stale-repos-sub').textContent = pct(stale, total) + ' of index';
+          }
+          document.querySelectorAll('.freshness-cards .card').forEach(markLoaded);
+        } catch (e) {
+          console.error('Freshness query failed:', e);
+        }
+      }
+
       async function refreshAll() {
-        await Promise.all([loadCache(), loadVolume(), loadBreakdowns(), loadPipeline()]);
+        await Promise.all([loadCache(), loadVolume(), loadBreakdowns(), loadPipeline(), loadFreshness()]);
       }
 
       // Initial load + auto-refresh
