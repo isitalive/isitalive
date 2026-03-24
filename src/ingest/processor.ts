@@ -82,7 +82,7 @@ export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean>
           verdict: result.verdict,
           source: 'cron',
           api_key: 'system',
-          cache_status: 'miss',
+          cache_status: 'l3-miss',
           country: 'XX',
           user_agent: 'cron',
           response_time_ms: 0,
