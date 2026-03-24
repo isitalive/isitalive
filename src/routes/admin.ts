@@ -22,6 +22,16 @@ import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap } from '../aggregate/sitemap'
 import type { ApiKeyEntry } from '../scoring/types'
 
+/**
+ * Constant-time admin secret verification via SHA-256 hash comparison.
+ * Prevents leaking the secret's length through timing side channels.
+ */
+export async function verifyAdminSecret(input: string, secret: string): Promise<boolean> {
+  const inputHash = await sha256Hex(input)
+  const secretHash = await sha256Hex(secret)
+  return timingSafeEqual(inputHash, secretHash)
+}
+
 
 const admin = new Hono<{ Bindings: Env }>()
 
@@ -40,10 +50,7 @@ admin.post('/auth/login', async (c) => {
   const body = await c.req.parseBody()
   const input = (body['secret'] as string || '').trim()
 
-  // Constant-time comparison via hash — prevents leaking secret length via timing
-  const inputHash = await sha256Hex(input || '\0')
-  const secretHash = await sha256Hex(secret)
-  if (!input || !timingSafeEqual(inputHash, secretHash)) {
+  if (!input || !await verifyAdminSecret(input, secret)) {
     return c.html(adminLoginPage('Invalid secret. Please try again.'), 401)
   }
 
