@@ -24,7 +24,7 @@ export interface UsageEventData {
   source: string
   /** API key display name or non-secret identifier (e.g. 'anon', or 'oidc:{owner}/{repo}') */
   api_key: string
-  /** Cache status: 'l1-hit' | 'hit' | 'stale' | 'miss' */
+  /** Cache status: 'l1-hit' | 'l2-hit' | 'l2-stale' | 'l3-miss' */
   cache_status: string
   /** ISO country code */
   country: string

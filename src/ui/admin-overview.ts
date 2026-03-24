@@ -334,9 +334,9 @@ export function adminOverviewPage(data: AdminOverview): string {
           }
 
           const l1 = map['l1-hit'] || 0;
-          const l2 = (map['hit'] || 0) + (map['kv-hit'] || 0);
-          const stale = map['stale'] || 0;
-          const miss = map['miss'] || 0;
+          const l2 = map['l2-hit'] || 0;
+          const stale = map['l2-stale'] || 0;
+          const miss = map['l3-miss'] || 0;
 
           document.getElementById('l1-pct').textContent = pct(l1, total);
           document.getElementById('l1-count').textContent = fmt(l1) + ' requests';
@@ -382,7 +382,7 @@ export function adminOverviewPage(data: AdminOverview): string {
             for (const row of cacheData.rows) {
               const count = parseInt(row[1]);
               cacheTotal += count;
-              if (row[0] !== 'miss') hits += count;
+              if (row[0] !== 'l3-miss') hits += count;
             }
             document.getElementById('hit-rate').textContent = pct(hits, cacheTotal);
             document.getElementById('hit-rate').style.color = 'var(--green)';
@@ -399,9 +399,11 @@ export function adminOverviewPage(data: AdminOverview): string {
           container.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem">No data</div>';
           return;
         }
+        const LABELS = { browser: 'UI Page', api: 'API', cron: 'Cron', audit: 'Manifest Audit', 'page-view': 'Beacon', badge: 'Badge', 'github-app': 'GitHub App' };
         const maxCount = Math.max(...data.rows.map(r => parseInt(r[1])));
         container.innerHTML = data.rows.map(row => {
-          const name = row[0] || 'unknown';
+          const rawName = row[0] || 'unknown';
+          const name = LABELS[rawName] || rawName;
           const count = parseInt(row[1]);
           const barWidth = (count / maxCount * 100).toFixed(0);
           return \`

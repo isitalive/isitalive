@@ -136,8 +136,8 @@ describe('CacheManager fuzz', () => {
       const upper = await cm.get('github', owner.toUpperCase(), repo.toUpperCase())
       const lower = await cm.get('github', owner.toLowerCase(), repo.toLowerCase())
 
-      expect(['l1-hit', 'hit']).toContain(upper.status)
-      expect(['l1-hit', 'hit']).toContain(lower.status)
+      expect(['l1-hit', 'l2-hit']).toContain(upper.status)
+      expect(['l1-hit', 'l2-hit']).toContain(lower.status)
       expect(upper.result!.score).toBe(lower.result!.score)
     },
   )
@@ -153,7 +153,7 @@ describe('CacheManager fuzz', () => {
 
       const cached = await cm.get('github', 'owner', 'repo', tier)
 
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(result.score)
       expect(cached.result!.verdict).toBe(result.verdict)
       expect(cached.result!.cached).toBe(true) // cache flag set on read
@@ -171,7 +171,7 @@ describe('CacheManager fuzz', () => {
       mockCache._store.clear()
       const cached = await cm.get('github', 'test', 'repo', tier)
 
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result).not.toBeNull()
     },
   )
@@ -188,7 +188,7 @@ describe('CacheManager fuzz', () => {
 
       for (const tier of TIERS_LIST) {
         const cached = await cm.get('github', 'test', 'repo', tier)
-        expect(cached.status).toBe('miss')
+        expect(cached.status).toBe('l3-miss')
         expect(cached.result).toBeNull()
       }
     },
@@ -218,9 +218,9 @@ describe('CacheManager fuzz', () => {
       mockCache._store.clear()
       const expired = await cm.get('github', 'e', 'f', tier)
 
-      expect(fresh.status).toBe('hit')
-      expect(stale.status).toBe('stale')
-      expect(expired.status).toBe('miss')
+      expect(fresh.status).toBe('l2-hit')
+      expect(stale.status).toBe('l2-stale')
+      expect(expired.status).toBe('l3-miss')
     },
   )
 
@@ -244,11 +244,11 @@ describe('CacheManager fuzz', () => {
       const ent = await cm.get('github', 'ent', 'test', 'enterprise')
 
       // Free: 2h < 24h freshTtl → hit
-      expect(free.status).toBe('hit')
+      expect(free.status).toBe('l2-hit')
       // Pro: 2h > 1h freshTtl, < 6h staleTtl → stale
-      expect(pro.status).toBe('stale')
+      expect(pro.status).toBe('l2-stale')
       // Enterprise: 2h > 1h staleTtl → miss
-      expect(ent.status).toBe('miss')
+      expect(ent.status).toBe('l3-miss')
     },
   )
 
@@ -286,7 +286,7 @@ describe('CacheManager fuzz', () => {
       mockCache._store.clear()
       const cached = await cm.get(provider, 'test', 'test')
 
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(50)
     },
   )

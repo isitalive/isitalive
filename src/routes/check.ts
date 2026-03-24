@@ -107,7 +107,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
   // ── Check cache ─────────────────────────────────────────────────
   const cached = await cacheManager.get(provider, owner, repo, tier)
 
-  if ((cached.status === 'l1-hit' || cached.status === 'hit') && cached.result) {
+  if ((cached.status === 'l1-hit' || cached.status === 'l2-hit') && cached.result) {
     // Emit usage event for all requests (operational visibility)
     const usageCtx = buildUsageCtx(cached.status)
     c.executionCtx.waitUntil(
@@ -122,19 +122,19 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
     response.headers.set('Cache-Control', headers['Cache-Control'])
     response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
-    response.headers.set('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'HIT')
+    response.headers.set('X-Cache', cached.status === 'l1-hit' ? 'L1-HIT' : 'L2-HIT')
 
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
     return response
   }
 
-  if (cached.status === 'stale' && cached.result) {
+  if (cached.status === 'l2-stale' && cached.result) {
     const bgTasks: Promise<unknown>[] = [
       revalidateInBackground(c.env, provider, owner, repo),
     ]
 
     // Emit usage event for all requests
-    const usageCtx = buildUsageCtx('stale')
+    const usageCtx = buildUsageCtx('l2-stale')
     bgTasks.push(
       buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
         .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
@@ -149,7 +149,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
     response.headers.set('Cache-Control', headers['Cache-Control'])
     response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
-    response.headers.set('X-Cache', 'STALE')
+    response.headers.set('X-Cache', 'L2-STALE')
 
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
     return response
@@ -172,7 +172,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     }
 
     // Emit usage + result/provider events for all requests
-    const usageCtx = buildUsageCtx('miss')
+    const usageCtx = buildUsageCtx('l3-miss')
     bgTasks.push(
       buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
         .then(ue => emitAll(c.env, { usage: [ue], ...resultEvents })),
@@ -184,12 +184,12 @@ check.get('/:provider/:owner/:repo', async (c) => {
     
     const response = c.json({
       ...result,
-      ...cacheMeta('miss', tier, 0, now, now, now),
+      ...cacheMeta('l3-miss', tier, 0, now, now, now),
     })
 
     response.headers.set('Cache-Control', headers['Cache-Control'])
     response.headers.set('CDN-Cache-Control', headers['CDN-Cache-Control'])
-    response.headers.set('X-Cache', 'MISS')
+    response.headers.set('X-Cache', 'L3-MISS')
 
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 

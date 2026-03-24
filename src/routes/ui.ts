@@ -597,8 +597,8 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
   try {
     const { result: cached, status } = await cacheManager.get(provider, owner, repo)
 
-    if (cached && (status === 'l1-hit' || status === 'hit' || status === 'stale')) {
-      if (status === 'stale') {
+    if (cached && (status === 'l1-hit' || status === 'l2-hit' || status === 'l2-stale')) {
+      if (status === 'l2-stale') {
         c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo))
       }
       // Track cache hit for operational visibility
@@ -634,7 +634,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
       buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, {
-        source: 'browser', apiKey: 'anon', cacheStatus: 'miss',
+        source: 'browser', apiKey: 'anon', cacheStatus: 'l3-miss',
         responseTimeMs: Date.now() - startTime,
         cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
       }).then(ue => emitAll(c.env, {

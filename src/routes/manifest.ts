@@ -176,7 +176,7 @@ audit.post('/', async (c) => {
 
     // Emit usage events in background — parse cached JSON AFTER response
     // is sent so it doesn't affect latency.
-    // NOTE: these events have cacheStatus='kv-hit' so quota aggregation
+    // NOTE: these events have cacheStatus='l2-hit' so quota aggregation
     // cron must exclude them (ADR-004: only Layer 3 misses consume quota).
     c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
 
@@ -299,7 +299,7 @@ async function emitUsageFromCached(cachedJson: string, c: Context<AppEnv>): Prom
         {
           source: 'audit',
           apiKey: c.get('keyName') ?? 'anon',
-          cacheStatus: 'kv-hit',
+          cacheStatus: 'l2-hit',
           responseTimeMs: 0,
           cf: { country: (c.req.raw as any).cf?.country },
           userAgent: c.req.header('User-Agent') ?? null,

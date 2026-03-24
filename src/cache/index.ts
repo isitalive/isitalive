@@ -73,7 +73,7 @@ interface CachedEntry {
 // Cache read — three-tier lookup
 // ---------------------------------------------------------------------------
 
-export type CacheStatus = 'l1-hit' | 'hit' | 'stale' | 'miss';
+export type CacheStatus = 'l1-hit' | 'l2-hit' | 'l2-stale' | 'l3-miss';
 
 export interface CacheResult {
   result: ScoringResult | null;
@@ -170,7 +170,7 @@ export class CacheManager {
     const entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
 
     if (!entry) {
-      return { result: null, status: 'miss', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
+      return { result: null, status: 'l3-miss', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
     }
 
     const ageSeconds = Math.round((Date.now() - entry.storedAt) / 1000);
@@ -188,7 +188,7 @@ export class CacheManager {
       }
       return {
         result: { ...entry.result, cached: true },
-        status: 'hit',
+        status: 'l2-hit',
         ageSeconds, storedAt, freshUntil, staleUntil,
       };
     }
@@ -197,13 +197,13 @@ export class CacheManager {
       // Stale — serve + caller triggers background revalidation
       return {
         result: { ...entry.result, cached: true },
-        status: 'stale',
+        status: 'l2-stale',
         ageSeconds, storedAt, freshUntil, staleUntil,
       };
     }
 
     // Too old
-    return { result: null, status: 'miss' as const, ageSeconds, storedAt, freshUntil, staleUntil };
+    return { result: null, status: 'l3-miss' as const, ageSeconds, storedAt, freshUntil, staleUntil };
   }
 
   /**

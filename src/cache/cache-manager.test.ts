@@ -145,7 +145,7 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
       const cached = await cm.get('github', 'vercel', 'next.js', 'free')
 
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result).not.toBeNull()
       expect(cached.result!.cached).toBe(true)
       expect(cached.ageSeconds).toBeGreaterThanOrEqual(0)
@@ -176,7 +176,7 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
       const cached = await cm.get('github', 'vercel', 'next.js', 'free')
 
-      expect(cached.status).toBe('stale')
+      expect(cached.status).toBe('l2-stale')
       expect(cached.result).not.toBeNull()
       expect(cached.result!.cached).toBe(true)
       expect(cached.ageSeconds).toBeGreaterThan(TIERS.free.freshTtl)
@@ -192,7 +192,7 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
       const cached = await cm.get('github', 'vercel', 'next.js', 'free')
 
-      expect(cached.status).toBe('miss')
+      expect(cached.status).toBe('l3-miss')
       expect(cached.result).toBeNull()
       expect(cached.ageSeconds).not.toBeNull() // still reports age
     })
@@ -201,7 +201,7 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
       const cached = await cm.get('github', 'vercel', 'next.js')
 
-      expect(cached.status).toBe('miss')
+      expect(cached.status).toBe('l3-miss')
       expect(cached.result).toBeNull()
       expect(cached.ageSeconds).toBeNull()
       expect(cached.storedAt).toBeNull()
@@ -219,13 +219,13 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
 
       const freeCached = await cm.get('github', 'vercel', 'next.js', 'free')
-      expect(freeCached.status).toBe('hit')
+      expect(freeCached.status).toBe('l2-hit')
 
       // Reset L1 so it doesn't short-circuit the pro lookup
       mockCache._store.clear()
 
       const proCached = await cm.get('github', 'vercel', 'next.js', 'pro')
-      expect(proCached.status).toBe('stale')
+      expect(proCached.status).toBe('l2-stale')
     })
 
     it('normalizes owner/repo to lowercase for key lookup', async () => {
@@ -235,7 +235,7 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
       const cached = await cm.get('github', 'Vercel', 'Next.js')
 
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(92)
     })
 
@@ -247,7 +247,7 @@ describe('CacheManager', () => {
       const cm = new CacheManager(env, ctx)
       const cached = await cm.get('github', 'vercel', 'next.js')
 
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(92)
     })
   })
@@ -313,7 +313,7 @@ describe('CacheManager', () => {
       mockCache._store.clear()
 
       const cached = await cm.get('github', 'facebook', 'react')
-      expect(cached.status).toBe('hit')
+      expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(73)
       expect(cached.result!.verdict).toBe('stable')
     })

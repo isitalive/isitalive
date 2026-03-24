@@ -70,7 +70,7 @@ badge.get('/:provider/:owner/:repo', async (c) => {
 
     let result = cached;
 
-    if (status === 'stale' && cached) {
+    if (status === 'l2-stale' && cached) {
       // Serve stale, revalidate in background
       c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo));
     }

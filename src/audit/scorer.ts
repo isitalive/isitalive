@@ -140,7 +140,7 @@ export async function scoreAudit(
     if (result.status === 'rejected') continue;
     const { dep, cached } = result.value;
 
-    if ((cached.status === 'hit' || cached.status === 'l1-hit' || cached.status === 'stale') && cached.result) {
+    if ((cached.status === 'l2-hit' || cached.status === 'l1-hit' || cached.status === 'l2-stale') && cached.result) {
       scored.push(depToAudit(dep, cached.result, 'cached'));
     } else {
       uncached.push(dep);
