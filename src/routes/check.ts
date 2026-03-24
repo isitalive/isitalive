@@ -68,7 +68,17 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const isAuthenticated = c.get('isAuthenticated') ?? false
 
   const cachedResponse = await cacheManager.getResponse(cacheKey, isAuthenticated)
-  if (cachedResponse) return cachedResponse
+  if (cachedResponse) {
+    // Track L1 response cache hit for operational visibility
+    c.executionCtx.waitUntil(
+      buildUsageEvent(`${owner}/${repo}`, provider, 0, '', {
+        source: 'api', apiKey: c.get('keyName') ?? 'anon', cacheStatus: 'l1-hit',
+        responseTimeMs: Date.now() - startTime,
+        cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+      }).then(ue => emitAll(c.env, { usage: [ue] })),
+    )
+    return cachedResponse
+  }
 
   console.log(`🐌 Cache MISS. Fetching fresh data for: ${c.req.url}`)
 
@@ -98,14 +108,12 @@ check.get('/:provider/:owner/:repo', async (c) => {
   const cached = await cacheManager.get(provider, owner, repo, tier)
 
   if ((cached.status === 'l1-hit' || cached.status === 'hit') && cached.result) {
-    // Usage events only for authenticated requests (billing/metering)
-    if (isAuthenticated) {
-      const usageCtx = buildUsageCtx(cached.status)
-      c.executionCtx.waitUntil(
-        buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
-          .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
-      )
-    }
+    // Emit usage event for all requests (operational visibility)
+    const usageCtx = buildUsageCtx(cached.status)
+    c.executionCtx.waitUntil(
+      buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
+        .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
+    )
 
     const response = c.json({
       ...cached.result,
@@ -125,14 +133,12 @@ check.get('/:provider/:owner/:repo', async (c) => {
       revalidateInBackground(c.env, provider, owner, repo),
     ]
 
-    // Usage events only for authenticated requests
-    if (isAuthenticated) {
-      const usageCtx = buildUsageCtx('stale')
-      bgTasks.push(
-        buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
-          .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
-      )
-    }
+    // Emit usage event for all requests
+    const usageCtx = buildUsageCtx('stale')
+    bgTasks.push(
+      buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
+        .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
+    )
 
     c.executionCtx.waitUntil(Promise.all(bgTasks))
 
@@ -165,17 +171,12 @@ check.get('/:provider/:owner/:repo', async (c) => {
       provider: [buildProviderEvent('github', owner, repo, rawData)],
     }
 
-    // Usage events only for authenticated requests (billing/metering)
-    if (isAuthenticated) {
-      const usageCtx = buildUsageCtx('miss')
-      bgTasks.push(
-        buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
-          .then(ue => emitAll(c.env, { usage: [ue], ...resultEvents })),
-      )
-    } else {
-      // Anonymous: emit result/provider events only (no usage)
-      bgTasks.push(emitAll(c.env, resultEvents))
-    }
+    // Emit usage + result/provider events for all requests
+    const usageCtx = buildUsageCtx('miss')
+    bgTasks.push(
+      buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, usageCtx)
+        .then(ue => emitAll(c.env, { usage: [ue], ...resultEvents })),
+    )
 
     c.executionCtx.waitUntil(Promise.all(bgTasks))
 

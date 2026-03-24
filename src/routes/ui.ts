@@ -28,7 +28,7 @@ import { getScoreHistory, computeTrend } from '../ingest/processor'
 import { apiDocsPage } from '../ui/api-docs'
 import { auditResultPage } from '../ui/audit-result'
 import { pricingPage } from '../ui/pricing'
-import { buildPageViewUsageEvent } from '../events/usage'
+import { buildPageViewUsageEvent, buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
 import { emitAll } from '../pipeline/emit'
@@ -575,7 +575,14 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
   const cachedResponse = await cacheManager.getResponse(cacheKey, false)
   if (cachedResponse) {
-    // Page views are tracked client-side via sendBeacon → /_view
+    // Track L1 response cache hit — page views also tracked via sendBeacon
+    c.executionCtx.waitUntil(
+      buildUsageEvent(`${owner}/${repo}`, provider, 0, '', {
+        source: 'browser', apiKey: 'anon', cacheStatus: 'l1-hit',
+        responseTimeMs: Date.now() - startTime,
+        cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+      }).then(ue => emitAll(c.env, { usage: [ue] })),
+    )
     return cachedResponse
   }
 
@@ -594,9 +601,13 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       if (status === 'stale') {
         c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo))
       }
-      // Browser checks are anonymous — no usage events (tracked via Web Analytics).
-      // Track recent queries for landing page (trending/emissions are handled elsewhere).
+      // Track cache hit for operational visibility
       c.executionCtx.waitUntil(Promise.all([
+        buildUsageEvent(`${owner}/${repo}`, provider, cached.score, cached.verdict, {
+          source: 'browser', apiKey: 'anon', cacheStatus: status,
+          responseTimeMs: Date.now() - startTime,
+          cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+        }).then(ue => emitAll(c.env, { usage: [ue] })),
         trackRecentQuery(c.env.CACHE_KV, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
@@ -622,10 +633,15 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       trackRecentQuery(c.env.CACHE_KV, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
-      emitAll(c.env, {
+      buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, {
+        source: 'browser', apiKey: 'anon', cacheStatus: 'miss',
+        responseTimeMs: Date.now() - startTime,
+        cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+      }).then(ue => emitAll(c.env, {
+        usage: [ue],
         result: [buildResultEvent(result, 'browser')],
         provider: [buildProviderEvent('github', owner, repo, rawData)],
-      }),
+      })),
     ]))
 
     const firstIndexed = await getFirstSeen(c.env.CACHE_KV, provider, owner, repo)
