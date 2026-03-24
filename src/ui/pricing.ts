@@ -284,10 +284,8 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
 
     .cf-turnstile-slot {
       margin-top: 12px;
-      min-height: 0;
-      transition: min-height 0.3s;
+      overflow: hidden;
     }
-    .cf-turnstile-slot:not(:empty) { min-height: 65px; }
 
     .waitlist-status {
       font-size: 0.8rem;
