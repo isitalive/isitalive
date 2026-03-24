@@ -28,9 +28,9 @@ type BackfillParams = {
 export class BackfillWorkflow extends WorkflowEntrypoint<Env, BackfillParams> {
   async run(event: WorkflowEvent<BackfillParams>, step: WorkflowStep) {
     const tables = event.payload.tables ?? ['provider', 'result']
-    // Keep batches small — raw_json blobs are 5-10 KB each, and Workflow
-    // step output is capped at 1 MiB.
-    const batchSize = event.payload.batchSize ?? 50
+    // Large batches are fine — only tiny metadata (~100 bytes) crosses step
+    // boundaries. The raw_json blobs stay within the single step.
+    const batchSize = event.payload.batchSize ?? 500
 
     const stats = { provider: 0, result: 0 }
 
