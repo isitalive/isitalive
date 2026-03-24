@@ -7,9 +7,22 @@
 // ---------------------------------------------------------------------------
 
 import { verifyWithJwks } from 'hono/jwt'
-import type { JWTPayload } from 'hono/utils/jwt/types'
-import type { HonoJsonWebKey } from 'hono/utils/jwt/jws'
 import type { Env } from '../types/env'
+
+// Local minimal types — avoids relying on Hono's internal hono/utils/jwt/* paths
+export interface JWTPayload {
+  [claim: string]: unknown
+}
+
+export interface HonoJsonWebKey {
+  kid?: string
+  kty: string
+  alg?: string
+  use?: string
+  n?: string
+  e?: string
+  [prop: string]: unknown
+}
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
 const GITHUB_JWKS_URI = 'https://token.actions.githubusercontent.com/.well-known/jwks.json'
@@ -154,24 +167,43 @@ export async function verifyOidcToken(token: string, env: Env): Promise<OidcClai
   // ── Pass 2: Fetch JWKS from GitHub (network) ─────────────────────
   if (!payload) {
     try {
+      // Fetch JWKS once — use for both verification and caching
+      const res = await fetch(GITHUB_JWKS_URI)
+      if (!res.ok) {
+        throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`)
+      }
+
+      const jwksText = await res.text()
+      let keys: HonoJsonWebKey[]
+      try {
+        const parsed = JSON.parse(jwksText) as { keys?: HonoJsonWebKey[] }
+        keys = parsed.keys ?? []
+      } catch {
+        throw new Error('Failed to parse JWKS JSON')
+      }
+
       payload = await verifyWithJwks(token, {
-        jwks_uri: GITHUB_JWKS_URI,
+        keys,
         ...VERIFY_OPTIONS,
       })
 
-      // Cache the freshly-fetched JWKS keys (best-effort)
+      // Cache the freshly-fetched JWKS keys (best-effort, 1h TTL)
       try {
-        const res = await fetch(GITHUB_JWKS_URI)
-        if (res.ok) {
-          await env.CACHE_KV.put(JWKS_CACHE_KEY, await res.text())
-        }
+        await env.CACHE_KV.put(JWKS_CACHE_KEY, jwksText, { expirationTtl: 3600 })
       } catch {
         // Caching is best-effort
       }
     } catch (err: any) {
-      const message = err.message || String(err)
+      const message = (err.message || String(err)).toLowerCase()
 
-      if (message.includes('key') || message.includes('kid') || err.name === 'JwtTokenInvalid') {
+      // Narrow to key-not-found conditions only
+      const isKeyNotFoundError =
+        (message.includes('kid') && message.includes('not found')) ||
+        message.includes('no matching key') ||
+        (message.includes('jwks') && message.includes('key')) ||
+        message.includes('invalid jwt token') // Hono throws this when no key matches kid
+
+      if (isKeyNotFoundError) {
         throw new Error('No matching key found in JWKS')
       }
       throw mapError(err)
