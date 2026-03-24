@@ -283,28 +283,26 @@ export function adminOverviewPage(data: AdminOverview): string {
         pipeline_result: \`SELECT 'result_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM result_events_v2\`,
         pipeline_provider: \`SELECT 'provider_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM provider_events_v2\`,
         pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM manifest_events\`,
-        freshness: \`
-          SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN latest_ts > now() - INTERVAL '6' HOUR THEN 1 ELSE 0 END) as fresh,
-            SUM(CASE WHEN latest_ts <= now() - INTERVAL '6' HOUR AND latest_ts > now() - INTERVAL '24' HOUR THEN 1 ELSE 0 END) as aging,
-            SUM(CASE WHEN latest_ts <= now() - INTERVAL '24' HOUR THEN 1 ELSE 0 END) as stale
-          FROM (
-            SELECT project, MAX(timestamp) as latest_ts
-            FROM usage_events
-            WHERE source != 'cron' AND project != ''
-            GROUP BY project
-          )
-        \`,
+        freshness_fresh: \`SELECT project FROM usage_events WHERE source != 'cron' AND project != '' AND timestamp > now() - INTERVAL '6' HOUR GROUP BY project\`,
+        freshness_aging: \`SELECT project FROM usage_events WHERE source != 'cron' AND project != '' AND timestamp <= now() - INTERVAL '6' HOUR AND timestamp > now() - INTERVAL '24' HOUR GROUP BY project\`,
+        freshness_stale: \`SELECT project FROM usage_events WHERE source != 'cron' AND project != '' AND timestamp <= now() - INTERVAL '24' HOUR GROUP BY project\`,
       };
 
+      const queryCache = new Map();
+      const CACHE_TTL = 30000; // 30s client-side cache
+
       async function runQuery(sql) {
+        const now = Date.now();
+        const cached = queryCache.get(sql);
+        if (cached && (now - cached.ts) < CACHE_TTL) return cached.data;
         const res = await fetch('/admin/api/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sql }),
         });
-        return res.json();
+        const data = await res.json();
+        queryCache.set(sql, { data, ts: now });
+        return data;
       }
 
       function fmt(n) {
@@ -489,18 +487,24 @@ export function adminOverviewPage(data: AdminOverview): string {
 
       async function loadFreshness() {
         try {
-          const data = await runQuery(QUERIES.freshness);
-          if (data.rows && data.rows.length) {
-            const [total, fresh, aging, stale] = data.rows[0].map(v => parseInt(v) || 0);
-            document.getElementById('total-repos').textContent = fmt(total);
-            document.getElementById('total-repos-sub').textContent = 'Unique projects scored';
-            document.getElementById('fresh-count').textContent = fmt(fresh);
-            document.getElementById('fresh-sub').textContent = pct(fresh, total) + ' of index';
-            document.getElementById('aging-count').textContent = fmt(aging);
-            document.getElementById('aging-sub').textContent = pct(aging, total) + ' of index';
-            document.getElementById('stale-repos').textContent = fmt(stale);
-            document.getElementById('stale-repos-sub').textContent = pct(stale, total) + ' of index';
-          }
+          const [freshR, agingR, staleR] = await Promise.all([
+            runQuery(QUERIES.freshness_fresh),
+            runQuery(QUERIES.freshness_aging),
+            runQuery(QUERIES.freshness_stale),
+          ]);
+          const fresh = freshR.rows?.length || 0;
+          const aging = agingR.rows?.length || 0;
+          const stale = staleR.rows?.length || 0;
+          const total = fresh + aging + stale;
+
+          document.getElementById('total-repos').textContent = fmt(total);
+          document.getElementById('total-repos-sub').textContent = 'Unique projects scored';
+          document.getElementById('fresh-count').textContent = fmt(fresh);
+          document.getElementById('fresh-sub').textContent = pct(fresh, total) + ' of index';
+          document.getElementById('aging-count').textContent = fmt(aging);
+          document.getElementById('aging-sub').textContent = pct(aging, total) + ' of index';
+          document.getElementById('stale-repos').textContent = fmt(stale);
+          document.getElementById('stale-repos-sub').textContent = pct(stale, total) + ' of index';
           document.querySelectorAll('.freshness-cards .card').forEach(markLoaded);
         } catch (e) {
           console.error('Freshness query failed:', e);
