@@ -44,14 +44,16 @@
     var scoreStyle = dep.score !== null ? 'color:' + scoreColor(dep.score) : 'color:var(--text-muted)';
     var verdictLabel = dep.verdict.charAt(0).toUpperCase() + dep.verdict.slice(1);
     var devBadge = dep.dev ? '<span class="dev-badge">dev</span>' : '';
-    var link = dep.github ? '<a href="/github/' + esc(dep.github) + '" class="dep-link" title="View health details">→</a>' : '';
     var hint = dep.unresolvedReason ? '<span class="unresolved-hint" title="' + esc(dep.unresolvedReason) + '">ⓘ</span>' : '';
+    var href = dep.github ? '/github/' + esc(dep.github) : '';
+    var hrefAttr = href ? ' data-href="' + href + '"' : '';
+    var clickable = href ? ' clickable' : '';
 
-    return '<tr class="dep-row" data-score="' + (dep.score != null ? dep.score : -1) + '" data-verdict="' + dep.verdict + '">'
+    return '<tr class="dep-row' + clickable + '"' + hrefAttr + ' data-score="' + (dep.score != null ? dep.score : -1) + '" data-verdict="' + dep.verdict + '">'
       + '<td class="dep-name"><span class="dep-name-text">' + name + '</span>' + devBadge + '<span class="dep-version">' + version + '</span></td>'
       + '<td class="dep-score" style="' + scoreStyle + '">' + scoreText + '</td>'
       + '<td class="dep-verdict"><span class="verdict-dot" style="background:' + color + '"></span><span style="color:' + color + '">' + emoji + ' ' + verdictLabel + '</span>' + hint + '</td>'
-      + '<td class="dep-action">' + link + '</td>'
+      + '<td class="dep-action">' + (href ? '<span class="dep-arrow">→</span>' : '') + '</td>'
       + '</tr>';
   }
 
@@ -164,6 +166,14 @@
     html += '</div>';
 
     container.innerHTML = html;
+
+    // Bind clickable rows
+    container.querySelectorAll('.dep-row.clickable').forEach(function (row) {
+      row.addEventListener('click', function () {
+        var href = row.getAttribute('data-href');
+        if (href) window.location.href = href;
+      });
+    });
 
     // Bind collapsible groups
     container.querySelectorAll('.deps-group-toggle').forEach(function (btn) {

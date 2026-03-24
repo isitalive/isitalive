@@ -591,11 +591,12 @@ export const componentCss = `
 
     .dep-row { transition: background 0.15s; }
     .dep-row:hover { background: var(--surface-hover); }
+    .dep-row.clickable { cursor: pointer; }
 
     .dep-row td {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
+      padding: 12px 0;
       font-size: 0.85rem;
+      vertical-align: middle;
     }
 
     .dep-name {
@@ -646,15 +647,13 @@ export const componentCss = `
 
     .dep-action { text-align: center; }
 
-    .dep-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 600;
+    .dep-arrow {
+      color: var(--text-muted);
       font-size: 1rem;
-      transition: opacity 0.2s;
+      transition: color 0.2s;
     }
 
-    .dep-link:hover { opacity: 0.7; }
+    .dep-row.clickable:hover .dep-arrow { color: var(--accent); }
 
     .unresolved-hint {
       color: var(--text-muted);
