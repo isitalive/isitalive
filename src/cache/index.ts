@@ -247,7 +247,10 @@ export class CacheManager {
       const cachedResponse = await cache.match(request);
       if (cachedResponse) {
         console.log(`⚡ Cache HIT for: ${request.url}`);
-        return cachedResponse;
+        // Return a mutable copy — caches.default.match() returns immutable
+        // headers which causes TypeError when Hono middleware (e.g.
+        // secureHeaders) tries to add/modify response headers.
+        return new Response(cachedResponse.body, cachedResponse);
       }
     } catch {
       // ignore

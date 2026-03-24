@@ -59,7 +59,7 @@ ui.get('/t/a.js', async (c) => {
   // Try edge cache first
   const cacheKey = new Request(c.req.url)
   const cached = await caches.default.match(cacheKey)
-  if (cached) return cached
+  if (cached) return new Response(cached.body, cached)
 
   const res = await fetch(CWA_SCRIPT)
   const response = new Response(res.body, res)
@@ -75,11 +75,13 @@ ui.all('/t/d', async (c) => {
   // Strip cookies — not needed for RUM
   const headers = new Headers(req.headers)
   headers.delete('cookie')
-  return fetch(`${CWA_RUM}${url.search}`, {
+  const upstream = await fetch(`${CWA_RUM}${url.search}`, {
     method: c.req.method,
     headers,
     body: c.req.method !== 'GET' ? c.req.raw.body : undefined,
   })
+  // Return a mutable copy — fetch() responses have immutable headers
+  return new Response(upstream.body, upstream)
 })
 
 

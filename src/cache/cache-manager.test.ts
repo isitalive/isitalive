@@ -367,6 +367,27 @@ describe('CacheManager', () => {
 
       expect(cached).toBeNull()
     })
+
+    it('returns a response with mutable headers (regression: immutable Cache API headers)', async () => {
+      // Cache API responses have immutable headers — Hono secureHeaders
+      // middleware must be able to modify them without throwing TypeError.
+      const req = new Request('https://isitalive.dev/api/check/github/vercel/next.js')
+      const response = new Response(JSON.stringify({ score: 92 }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+      mockCache._store.set(req.url, response)
+
+      const cm = new CacheManager(env, ctx)
+      const cached = await cm.getResponse(req, false)
+
+      expect(cached).not.toBeNull()
+      // This must not throw — it would in production if we returned the
+      // raw Cache API response without creating a mutable copy.
+      expect(() => {
+        cached!.headers.set('X-Test-Mutable', 'yes')
+      }).not.toThrow()
+      expect(cached!.headers.get('X-Test-Mutable')).toBe('yes')
+    })
   })
 
   // ═══════════════════════════════════════════════════════════════════════
