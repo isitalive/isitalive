@@ -21,8 +21,8 @@ import type { PipelineBindings } from './types'
  * Merges { domain, timestamp, id, data: { ... } } → { domain, type, timestamp, id, ... }
  */
 function flatten<T extends object>(event: { domain: string; timestamp: string; id: string; data: T }): Record<string, unknown> {
-  const { data, domain, ...envelope } = event
-  return { ...envelope, domain, type: domain, ...data }
+  const { data, ...envelope } = event
+  return { ...envelope, ...data }
 }
 
 /**

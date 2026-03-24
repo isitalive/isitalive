@@ -49,7 +49,7 @@ export async function revalidateInBackground(
     await cacheManager.put(provider, owner, repo, result)
     // Archive raw data via Pipeline
     await emitAll(env, {
-      provider: [buildProviderEvent(prov.name, owner, repo, rawData._rawResponse)],
+      provider: [buildProviderEvent(prov.name, owner, repo, rawData)],
       result: [buildResultEvent(result, 'revalidation')],
     })
   } catch {

@@ -624,7 +624,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       }),
       emitAll(c.env, {
         result: [buildResultEvent(result, 'browser')],
-        provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+        provider: [buildProviderEvent('github', owner, repo, rawData)],
       }),
     ]))
 

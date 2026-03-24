@@ -231,4 +231,19 @@ export const PRESET_QUERIES: PresetQuery[] = [
     sql: `SELECT source, COUNT(*) as count\nFROM usage_events\nGROUP BY source\nORDER BY count DESC`,
     chart: 'donut',
   },
+  {
+    label: 'Language Distribution',
+    sql: `SELECT language, COUNT(*) as count\nFROM provider_events\nWHERE language IS NOT NULL\nGROUP BY language\nORDER BY count DESC\nLIMIT 15`,
+    chart: 'bar',
+  },
+  {
+    label: 'Top Repos by Stars',
+    sql: `SELECT owner || '/' || repo as project, MAX(stars) as stars\nFROM provider_events\nGROUP BY project\nORDER BY stars DESC\nLIMIT 20`,
+    chart: 'hbar',
+  },
+  {
+    label: 'Signal Averages',
+    sql: `SELECT\n  ROUND(AVG(signal_last_commit_score), 1) as last_commit,\n  ROUND(AVG(signal_last_release_score), 1) as last_release,\n  ROUND(AVG(signal_stars_score), 1) as stars,\n  ROUND(AVG(signal_ci_score), 1) as ci,\n  ROUND(AVG(signal_bus_factor_score), 1) as bus_factor,\n  ROUND(AVG(signal_issue_staleness_score), 1) as issues,\n  ROUND(AVG(signal_pr_responsiveness_score), 1) as prs,\n  ROUND(AVG(signal_recent_contributors_score), 1) as contributors\nFROM result_events`,
+    chart: 'bar',
+  },
 ]

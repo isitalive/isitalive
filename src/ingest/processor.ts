@@ -74,7 +74,7 @@ export async function snapshotRepo(env: Env, repoSlug: string): Promise<boolean>
       // Pipeline: result + provider + usage events
       emitAll(env, {
         result: [buildResultEvent(result, 'cron-daily')],
-        provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+        provider: [buildProviderEvent('github', owner, repo, rawData)],
         usage: [createEvent('usage', {
           repo: repoSlug.toLowerCase(),
           provider: 'github',

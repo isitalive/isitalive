@@ -1,7 +1,6 @@
 {
   "fields": [
     { "name": "domain", "type": "string", "required": true },
-    { "name": "type", "type": "string", "required": true },
     { "name": "id", "type": "string", "required": true },
     { "name": "timestamp", "type": "string", "required": true },
     { "name": "manifest_hash", "type": "string", "required": true },

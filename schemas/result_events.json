@@ -1,13 +1,27 @@
 {
   "fields": [
     { "name": "domain", "type": "string", "required": true },
-    { "name": "type", "type": "string", "required": true },
     { "name": "id", "type": "string", "required": true },
     { "name": "timestamp", "type": "string", "required": true },
     { "name": "project", "type": "string", "required": true },
     { "name": "score", "type": "int32", "required": true },
     { "name": "verdict", "type": "string", "required": true },
     { "name": "source", "type": "string", "required": true },
-    { "name": "signals_json", "type": "string", "required": true }
+    { "name": "signal_last_commit_score", "type": "int32", "required": false },
+    { "name": "signal_last_commit_value", "type": "string", "required": false },
+    { "name": "signal_last_release_score", "type": "int32", "required": false },
+    { "name": "signal_last_release_value", "type": "string", "required": false },
+    { "name": "signal_issue_staleness_score", "type": "int32", "required": false },
+    { "name": "signal_issue_staleness_value", "type": "string", "required": false },
+    { "name": "signal_pr_responsiveness_score", "type": "int32", "required": false },
+    { "name": "signal_pr_responsiveness_value", "type": "string", "required": false },
+    { "name": "signal_recent_contributors_score", "type": "int32", "required": false },
+    { "name": "signal_recent_contributors_value", "type": "string", "required": false },
+    { "name": "signal_stars_score", "type": "int32", "required": false },
+    { "name": "signal_stars_value", "type": "string", "required": false },
+    { "name": "signal_ci_score", "type": "int32", "required": false },
+    { "name": "signal_ci_value", "type": "string", "required": false },
+    { "name": "signal_bus_factor_score", "type": "int32", "required": false },
+    { "name": "signal_bus_factor_value", "type": "string", "required": false }
   ]
 }
