@@ -6,7 +6,7 @@
 // with RS256 signature validation and standard claim checks (exp, nbf, iss, aud).
 // ---------------------------------------------------------------------------
 
-import { verifyWithJwks } from 'hono/jwt'
+import { verifyWithJwks, decode } from 'hono/jwt'
 import type { Env } from '../types/env'
 
 // Local minimal types — avoids relying on Hono's internal hono/utils/jwt/* paths
@@ -30,6 +30,10 @@ const EXPECTED_AUDIENCE = 'https://isitalive.dev'
 
 // KV cache key for JWKS (used as pre-loaded keys to avoid network round-trip)
 const JWKS_CACHE_KEY = 'github:oidc:jwks'
+
+// KV cooldown key — prevents repeated JWKS refetches on unknown kids
+const JWKS_REFETCH_COOLDOWN_KEY = 'github:oidc:jwks:cooldown'
+const JWKS_REFETCH_COOLDOWN_S = 60 // At most one refetch per 60 seconds
 
 /** Required OIDC claims beyond the standard JWT fields */
 const REQUIRED_CLAIMS = [
@@ -95,6 +99,19 @@ async function getCachedJwks(env: Env): Promise<HonoJsonWebKey[] | undefined> {
 }
 
 /**
+ * Safely extract the kid from a JWT header without full verification.
+ * Returns undefined if the token is malformed.
+ */
+function extractKid(token: string): string | undefined {
+  try {
+    const { header } = decode(token)
+    return header.kid
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Map Hono JWT error messages to our domain errors for backward compat.
  */
 function mapError(err: any): Error {
@@ -125,9 +142,10 @@ function mapError(err: any): Error {
 /**
  * Verify a GitHub Actions OIDC token and extract claims.
  *
- * Two-pass verification strategy:
- * 1. Try with cached JWKS keys from KV (fast path, no network)
- * 2. If kid not found in cache, fetch from GitHub's JWKS endpoint
+ * Strategy:
+ * 1. Decode JWT header to extract kid (rejects malformed tokens early)
+ * 2. Try verification with cached JWKS keys from KV (fast path, no network)
+ * 3. If kid not in cache, fetch JWKS from GitHub (rate-limited by cooldown)
  *
  * Hono's verifyWithJwks() handles:
  * - Key selection by kid
@@ -135,80 +153,85 @@ function mapError(err: any): Error {
  * - Standard claim validation (exp, nbf, iat, iss, aud)
  */
 export async function verifyOidcToken(token: string, env: Env): Promise<OidcClaims> {
-  const cachedKeys = await getCachedJwks(env)
+  // Pre-decode header to extract kid — rejects garbage tokens before any JWKS work
+  const kid = extractKid(token)
+  if (!kid) {
+    throw new Error('OIDC verification failed: missing or invalid JWT header (no kid)')
+  }
 
-  let payload: JWTPayload | undefined
+  const cachedKeys = await getCachedJwks(env)
 
   // ── Pass 1: Try cached keys (no network) ──────────────────────────
   if (cachedKeys && cachedKeys.length > 0) {
-    try {
-      payload = await verifyWithJwks(token, {
-        keys: cachedKeys,
-        ...VERIFY_OPTIONS,
-      })
-    } catch (err: any) {
-      // If the error is "kid not found" or "invalid token" (no matching key),
-      // fall through to pass 2. All other errors (expired, bad sig) are real.
-      const message = err.message || String(err)
-      const isKeyMissing = err.name === 'JwtTokenInvalid'
-        && !message.includes('expired')
-        && !message.includes('signature')
-        && !message.includes('issuer')
-        && !message.includes('audience')
-        && !message.includes('not before')
+    // Check if kid exists in cache before calling verifyWithJwks
+    const kidInCache = cachedKeys.some(k => k.kid === kid)
 
-      if (!isKeyMissing) {
+    if (kidInCache) {
+      try {
+        const payload = await verifyWithJwks(token, {
+          keys: cachedKeys,
+          ...VERIFY_OPTIONS,
+        })
+        return extractClaims(payload)
+      } catch (err: any) {
+        // Real verification errors (expired, bad sig, wrong issuer) — don't retry
         throw mapError(err)
       }
-      // Fall through to pass 2 for JWKS refetch
     }
+    // kid not in cache — fall through to pass 2
   }
 
-  // ── Pass 2: Fetch JWKS from GitHub (network) ─────────────────────
-  if (!payload) {
+  // ── Pass 2: Fetch JWKS from GitHub (network, rate-limited) ────────
+  // Cooldown check: prevent repeated fetches from attacker-controlled kid values
+  const cooldown = await env.CACHE_KV.get(JWKS_REFETCH_COOLDOWN_KEY)
+  if (cooldown) {
+    throw new Error('No matching key found in JWKS')
+  }
+
+  try {
+    // Set cooldown before fetching (prevents parallel stampede)
+    await env.CACHE_KV.put(JWKS_REFETCH_COOLDOWN_KEY, '1', { expirationTtl: JWKS_REFETCH_COOLDOWN_S })
+
+    const res = await fetch(GITHUB_JWKS_URI)
+    if (!res.ok) {
+      throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`)
+    }
+
+    const jwksText = await res.text()
+    let keys: HonoJsonWebKey[]
     try {
-      // Fetch JWKS once — use for both verification and caching
-      const res = await fetch(GITHUB_JWKS_URI)
-      if (!res.ok) {
-        throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`)
-      }
-
-      const jwksText = await res.text()
-      let keys: HonoJsonWebKey[]
-      try {
-        const parsed = JSON.parse(jwksText) as { keys?: HonoJsonWebKey[] }
-        keys = parsed.keys ?? []
-      } catch {
-        throw new Error('Failed to parse JWKS JSON')
-      }
-
-      payload = await verifyWithJwks(token, {
-        keys,
-        ...VERIFY_OPTIONS,
-      })
-
-      // Cache the freshly-fetched JWKS keys (best-effort, 1h TTL)
-      try {
-        await env.CACHE_KV.put(JWKS_CACHE_KEY, jwksText, { expirationTtl: 3600 })
-      } catch {
-        // Caching is best-effort
-      }
-    } catch (err: any) {
-      const message = (err.message || String(err)).toLowerCase()
-
-      // Narrow to key-not-found conditions only
-      const isKeyNotFoundError =
-        (message.includes('kid') && message.includes('not found')) ||
-        message.includes('no matching key') ||
-        (message.includes('jwks') && message.includes('key')) ||
-        message.includes('invalid jwt token') // Hono throws this when no key matches kid
-
-      if (isKeyNotFoundError) {
-        throw new Error('No matching key found in JWKS')
-      }
-      throw mapError(err)
+      const parsed = JSON.parse(jwksText) as { keys?: HonoJsonWebKey[] }
+      keys = parsed.keys ?? []
+    } catch {
+      throw new Error('Failed to parse JWKS JSON')
     }
-  }
 
-  return extractClaims(payload)
+    // Cache the freshly-fetched JWKS keys (best-effort, 1h TTL)
+    try {
+      await env.CACHE_KV.put(JWKS_CACHE_KEY, jwksText, { expirationTtl: 3600 })
+    } catch {
+      // Caching is best-effort
+    }
+
+    const payload = await verifyWithJwks(token, {
+      keys,
+      ...VERIFY_OPTIONS,
+    })
+
+    return extractClaims(payload)
+  } catch (err: any) {
+    const message = (err.message || String(err)).toLowerCase()
+
+    // Narrow to key-not-found conditions only
+    const isKeyNotFoundError =
+      (message.includes('kid') && message.includes('not found')) ||
+      message.includes('no matching key') ||
+      (message.includes('jwks') && message.includes('key')) ||
+      message.includes('invalid jwt token') // Hono throws this when no key matches kid
+
+    if (isKeyNotFoundError) {
+      throw new Error('No matching key found in JWKS')
+    }
+    throw mapError(err)
+  }
 }
