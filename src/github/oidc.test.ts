@@ -199,8 +199,11 @@ describe('verifyOidcToken', () => {
     const claims = await verifyOidcToken(jwt, env)
 
     expect(claims.repository).toBe('vercel/next.js')
-    // Called once: we fetch JWKS ourselves for both verification and caching
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+    // Verify the correct JWKS URI is used (not .json — GitHub returns 404 for that)
+    expect(vi.mocked(globalThis.fetch).mock.calls[0][0]).toBe(
+      'https://token.actions.githubusercontent.com/.well-known/jwks',
+    )
   })
 
   it('rejects a token with missing kid even after JWKS refetch', async () => {

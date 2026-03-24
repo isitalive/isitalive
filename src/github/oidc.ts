@@ -25,7 +25,7 @@ export interface HonoJsonWebKey {
 }
 
 const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
-const GITHUB_JWKS_URI = 'https://token.actions.githubusercontent.com/.well-known/jwks.json'
+const GITHUB_JWKS_URI = 'https://token.actions.githubusercontent.com/.well-known/jwks'
 const EXPECTED_AUDIENCE = 'https://isitalive.dev'
 
 // KV cache key for JWKS (used as pre-loaded keys to avoid network round-trip)
