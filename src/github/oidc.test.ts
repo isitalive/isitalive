@@ -199,8 +199,8 @@ describe('verifyOidcToken', () => {
     const claims = await verifyOidcToken(jwt, env)
 
     expect(claims.repository).toBe('vercel/next.js')
-    // Called twice: once by verifyWithJwks (JWKS fetch), once for KV caching
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+    // Called once: we fetch JWKS ourselves for both verification and caching
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('rejects a token with missing kid even after JWKS refetch', async () => {
