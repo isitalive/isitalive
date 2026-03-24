@@ -51,8 +51,9 @@ export async function listPullRequestFiles(
   const files: PullRequestFile[] = [];
   let page = 1;
   const perPage = 100;
+  const maxPages = 10; // Safety: cap at 1,000 files to prevent runaway API calls
 
-  while (true) {
+  while (page <= maxPages) {
     const batch = await ghFetch<PullRequestFile[]>(
       `/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=${perPage}&page=${page}`,
       { token },
@@ -228,8 +229,9 @@ export async function findPRComment(
 ): Promise<IssueComment | null> {
   let page = 1;
   const perPage = 100;
+  const maxPages = 5; // Safety: cap at 500 comments to prevent runaway API calls
 
-  while (true) {
+  while (page <= maxPages) {
     const batch = await ghFetch<IssueComment[]>(
       `/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=${perPage}&page=${page}`,
       { token },
