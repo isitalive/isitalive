@@ -337,9 +337,9 @@ export function adminOverviewPage(data: AdminOverview): string {
           }
 
           const l1 = map['l1-hit'] || 0;
-          const l2 = map['l2-hit'] || 0;
-          const stale = map['l2-stale'] || 0;
-          const miss = map['l3-miss'] || 0;
+          const l2 = (map['l2-hit'] || 0) + (map['hit'] || 0) + (map['kv-hit'] || 0);
+          const stale = (map['l2-stale'] || 0) + (map['stale'] || 0);
+          const miss = (map['l3-miss'] || 0) + (map['miss'] || 0);
 
           document.getElementById('l1-pct').textContent = pct(l1, total);
           document.getElementById('l1-count').textContent = fmt(l1) + ' requests';
@@ -385,7 +385,7 @@ export function adminOverviewPage(data: AdminOverview): string {
             for (const row of cacheData.rows) {
               const count = parseInt(row[1]);
               cacheTotal += count;
-              if (row[0] !== 'l3-miss') hits += count;
+              if (row[0] !== 'l3-miss' && row[0] !== 'miss') hits += count;
             }
             document.getElementById('hit-rate').textContent = pct(hits, cacheTotal);
             document.getElementById('hit-rate').style.color = 'var(--green)';
