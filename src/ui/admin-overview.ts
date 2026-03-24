@@ -334,7 +334,7 @@ export function adminOverviewPage(data: AdminOverview): string {
           }
 
           const l1 = map['l1-hit'] || 0;
-          const l2 = map['hit'] || 0;
+          const l2 = (map['hit'] || 0) + (map['kv-hit'] || 0);
           const stale = map['stale'] || 0;
           const miss = map['miss'] || 0;
 
