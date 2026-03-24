@@ -250,12 +250,14 @@ ui.get('/_data/changelog', (c) => {
 
 // Score history data — JSON for client-side sparkline chart
 ui.get('/_data/history/:provider/:owner/:repo', async (c) => {
-  const { provider, owner, repo } = c.req.param()
+  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
 
-  if (provider !== 'github' || !isValidParam(owner) || !isValidParam(repo)) {
+  if (provider !== 'github' || !isValidParam(rawOwner) || !isValidParam(rawRepo)) {
     return c.json({ history: [] }, 400)
   }
 
+  const owner = rawOwner.toLowerCase()
+  const repo = rawRepo.toLowerCase()
   const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
@@ -326,16 +328,16 @@ ui.post('/_data/waitlist', async (c) => {
 // Dependency health data — JSON for client-side hydration on result pages
 // Discovers manifests at repo root, parses + deduplicates deps, scores them.
 ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
-  const { provider, owner, repo } = c.req.param()
+  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
 
-  if (provider !== 'github' || !isValidParam(owner) || !isValidParam(repo)) {
+  if (provider !== 'github' || !isValidParam(rawOwner) || !isValidParam(rawRepo)) {
     return c.json({ manifests: [], error: 'Invalid parameters' }, 400)
   }
 
-  // Check for cached deps result first (lowercase to match GitHub's case-insensitive slugs)
-  const normalizedOwner = owner.toLowerCase()
-  const normalizedRepo = repo.toLowerCase()
-  const depsCacheKey = `deps:github:${normalizedOwner}/${normalizedRepo}`
+  // Normalize to lowercase — GitHub is case-insensitive
+  const owner = rawOwner.toLowerCase()
+  const repo = rawRepo.toLowerCase()
+  const depsCacheKey = `deps:github:${owner}/${repo}`
   const cachedDeps = await c.env.CACHE_KV.get(depsCacheKey)
   if (cachedDeps) {
     try {
@@ -486,7 +488,7 @@ ui.post('/_check', verifyTurnstile, async (c) => {
 
   const parts = path.split('/')
   if (parts.length >= 2) {
-    return c.redirect(`/github/${parts[0]}/${parts[1]}`)
+    return c.redirect(`/github/${parts[0].toLowerCase()}/${parts[1].toLowerCase()}`)
   }
 
   return c.redirect('/')
@@ -718,21 +720,30 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
   return c.redirect(`/audit/${contentHash}`)
 }
 
-// Shortcut: /owner/repo → redirect to canonical /github/owner/repo
+// Shortcut: /owner/repo → redirect to canonical /github/owner/repo (always lowercase)
 ui.get('/:owner/:repo', async (c) => {
   const { owner, repo } = c.req.param()
   if (!isValidParam(owner) || !isValidParam(repo)) {
     return c.html(errorPage('Invalid repository path.'), 400)
   }
-  return c.redirect(`/github/${owner}/${repo}`, 301)
+  return c.redirect(`/github/${owner.toLowerCase()}/${repo.toLowerCase()}`, 301)
 })
 
 // Canonical: /github/owner/repo → renders result page
 ui.get('/:provider/:owner/:repo', async (c) => {
-  const { provider, owner, repo } = c.req.param()
-  if (!isValidParam(owner) || !isValidParam(repo)) {
+  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
+  if (!isValidParam(rawOwner) || !isValidParam(rawRepo)) {
     return c.html(errorPage('Invalid repository path.'), 400)
   }
+
+  const owner = rawOwner.toLowerCase()
+  const repo = rawRepo.toLowerCase()
+
+  // 301 redirect non-lowercase URLs to canonical lowercase form
+  if (rawOwner !== owner || rawRepo !== repo) {
+    return c.redirect(`/${provider}/${owner}/${repo}`, 301)
+  }
+
   return handleCheck(c, provider, owner, repo)
 })
 

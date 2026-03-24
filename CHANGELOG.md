@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.11.0] - 2026-03-23
+
+### Added
+
+- **Result page rework** — 2-column dashboard grid with stacked dep count chips, slim 30-day score history bar chart with hover tooltips, collapsible Embed & API section, install CTA, and skeleton shimmer loading
+- **Pricing page** with tier cards and Turnstile-protected waitlist email collection (constant-time response, SHA-256 hashed KV keys)
+- **ADR-007: GTM & Billing** — Go-to-market strategy and billing architecture
+- CF Web Analytics proxy — beacon and RUM served from own domain (`/t/a.js`, `/t/d`) to bypass ad blocker filter lists
+- `_headers` file build step for static asset security headers (CSP)
+- Waitlist endpoint tests (constant response, KV hashing)
+- `secureHeaders` and ETag test coverage
+
+### Changed
+
+- **Migrated to Hono built-in helpers** — replaced custom security headers with `secureHeaders`, custom ETag with `etag`, manual cookie handling with `getCookie`/`setCookie`/`deleteCookie`, custom JWT with `verifyWithJwks`/`sign`, and boilerplate middleware with `createMiddleware`
+- **Repo names normalized to lowercase** at all route entry points (`check.ts`, `badge.ts`, `ui.ts`) — prevents duplicate cache entries, mixed-case display in recent queries, and inconsistent URLs; non-lowercase UI URLs now 301-redirect to canonical lowercase form
+- Badge endpoint exempted from rate limiting
+
+### Fixed
+
+- Mobile hamburger menu not toggling nav links on small screens
+- Mobile nav items misaligned and nav background not opaque on scroll
+- Pricing card centering, container width, and form sizing on mobile
+- Turnstile form submission racing with token after back-navigation — now gates on fresh token
+- Mixed-case repo names in recent query chips (e.g. `BurntSushi/toml` displayed with original GitHub casing)
+
 ## [0.10.0] - 2026-03-22
 
 ### Added

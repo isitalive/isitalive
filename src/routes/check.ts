@@ -49,12 +49,16 @@ function isValidParam(value: string): boolean {
 
 check.get('/:provider/:owner/:repo', async (c) => {
   const startTime = Date.now()
-  const { provider, owner, repo } = c.req.param()
+  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
 
   // Validate path params — blocks XSS / path-traversal payloads
-  if (!isValidParam(owner) || !isValidParam(repo)) {
+  if (!isValidParam(rawOwner) || !isValidParam(rawRepo)) {
     return c.json({ error: 'Invalid owner or repo name' }, 400)
   }
+
+  // Normalize to lowercase — GitHub is case-insensitive
+  const owner = rawOwner.toLowerCase()
+  const repo = rawRepo.toLowerCase()
 
   // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
   // Only use response-cache fast path for anonymous requests.

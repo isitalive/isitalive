@@ -53,7 +53,11 @@ function generateSvg(score: number, verdict: Verdict): string {
 
 
 badge.get('/:provider/:owner/:repo', async (c) => {
-  const { provider, owner, repo } = c.req.param();
+  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param();
+
+  // Normalize to lowercase — GitHub is case-insensitive
+  const owner = rawOwner.toLowerCase();
+  const repo = rawRepo.toLowerCase();
 
   if (!Object.hasOwn(providers, provider)) {
     return c.text('Unsupported provider', 400);
