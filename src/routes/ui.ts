@@ -106,6 +106,7 @@ ui.get('/sitemap.xml', async (c) => {
   const staticPages = [
     '',
     '/trending',
+    '/pricing',
     '/api',
     '/methodology',
     '/changelog',
@@ -289,9 +290,11 @@ ui.post('/_data/waitlist', async (c) => {
     return c.json(ok)
   }
 
-  // Verify Turnstile token (skip in local dev)
+  // Verify Turnstile token (skip in local dev when no secret configured)
   const secretKey = c.env.TURNSTILE_SECRET_KEY
-  if (secretKey && turnstileToken) {
+  if (secretKey) {
+    // Token required when Turnstile is configured — silent reject if missing
+    if (!turnstileToken) return c.json(ok)
     const verify = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
