@@ -77,12 +77,16 @@
     // No manifests found — hide entirely
     if (!data.manifests || data.manifests.length === 0) {
       container.style.display = 'none';
+      var summaryEl = document.getElementById('depSummaryContainer');
+      if (summaryEl) summaryEl.style.display = 'none';
       return;
     }
 
     // No deps parsed (empty manifest)
     if (!data.dependencies || data.dependencies.length === 0) {
       container.innerHTML = '';
+      var summaryEl = document.getElementById('depSummaryContainer');
+      if (summaryEl) summaryEl.style.display = 'none';
       return;
     }
 
@@ -251,6 +255,8 @@
         // Non-critical — hide the shimmer silently
         var shimmer = document.getElementById('depsShimmer');
         if (shimmer) shimmer.style.display = 'none';
+        var summaryEl = document.getElementById('depSummaryContainer');
+        if (summaryEl) summaryEl.style.display = 'none';
       });
   }
 
