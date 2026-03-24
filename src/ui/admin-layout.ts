@@ -7,7 +7,7 @@
 
 export interface AdminLayoutOpts {
   title: string
-  activePage: 'overview' | 'keys' | 'query' | 'jobs'
+  activePage: 'dashboard' | 'keys' | 'query' | 'jobs'
   content: string
   /** Extra <script> tags to append before </body> */
   scripts?: string
@@ -19,7 +19,7 @@ export function adminLayout(opts: AdminLayoutOpts): string {
   const { title, activePage, content, scripts = '', styles = '' } = opts
 
   const navItems = [
-    { id: 'overview', label: '📊 Overview', href: '/admin' },
+    { id: 'dashboard', label: '📊 Dashboard', href: '/admin' },
     { id: 'keys', label: '🔑 API Keys', href: '/admin/keys' },
     { id: 'query', label: '🔍 Query Console', href: '/admin/query' },
     { id: 'jobs', label: '⚡ Jobs', href: '/admin/jobs' },
