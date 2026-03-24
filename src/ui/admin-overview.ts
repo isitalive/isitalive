@@ -257,6 +257,7 @@ export function adminOverviewPage(data: AdminOverview): string {
           FROM usage_events
           WHERE timestamp > (now() - INTERVAL '24' HOUR)
             AND cache_status != 'n/a'
+            AND source != 'cron'
           GROUP BY cache_status
         \`,
         volume: \`
@@ -267,6 +268,7 @@ export function adminOverviewPage(data: AdminOverview): string {
           FROM usage_events
           WHERE timestamp > (now() - INTERVAL '24' HOUR)
             AND cache_status != 'n/a'
+            AND source != 'cron'
         \`,
         source: \`
           SELECT source, COUNT(*) as count
