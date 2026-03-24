@@ -359,6 +359,7 @@ export const componentCss = `
         gap: 0;
         border-top: 1px solid var(--border);
         padding-top: 8px;
+        padding-bottom: 4px;
         margin-top: 4px;
       }
       .site-nav-links-right { gap: 0; }
@@ -463,7 +464,7 @@ export const componentCss = `
 
     @media (max-width: 480px) {
       .site-footer { padding: 40px 20px 32px; }
-      .footer-links { gap: 24px; flex-wrap: wrap; }
+      .footer-links { gap: 20px; flex-direction: column; }
       .footer-bottom { flex-direction: column; gap: 4px; text-align: center; }
     }
 
