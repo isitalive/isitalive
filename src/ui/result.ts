@@ -296,16 +296,23 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       margin-top: 4px;
     }
 
+    .verdict-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
     .verdict-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       background: ${color}18;
       border: 1px solid ${color}30;
       color: ${color};
-      padding: 8px 20px;
+      padding: 6px 16px;
       border-radius: 4px;
-      font-size: 0.9rem;
+      font-size: 0.82rem;
       font-weight: 600;
     }
 
@@ -539,9 +546,9 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
 
     /* ── Trend ──────────────────────────── */
     .trend-pill {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 4px 14px;
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 16px;
       border: 1px solid;
       border-radius: 4px;
       font-size: 0.78rem;
@@ -602,7 +609,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
         </div>
       </div>
 
-      <div>
+      <div class="verdict-row">
         <span class="verdict-badge">${emoji} ${label}</span>
         ${trendHtml}
       </div>
