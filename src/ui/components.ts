@@ -370,12 +370,18 @@ export const componentCss = `
     .nav-hamburger:hover { color: var(--text-primary); border-color: var(--text-muted); }
 
     @media (max-width: 640px) {
-      .site-nav-outer { padding: 12px 16px 0; }
+      .site-nav-outer {
+        padding: 12px 16px 0;
+        -webkit-mask-image: none;
+        mask-image: none;
+      }
       .site-nav {
         flex-wrap: wrap;
         border-radius: 6px;
         padding: 10px 14px;
         gap: 4px;
+        background: var(--bg-primary);
+        border-color: var(--border);
       }
       .site-nav-brand { margin-right: auto; font-size: 0.72rem; }
       .site-nav-divider { display: none; }
@@ -386,6 +392,7 @@ export const componentCss = `
         display: none;
         width: 100%;
         flex-direction: column;
+        align-items: flex-start;
         gap: 0;
       }
       .site-nav-links-left {
@@ -394,7 +401,7 @@ export const componentCss = `
         padding-top: 8px;
         margin-top: 4px;
       }
-      .site-nav-links-right { order: 4; }
+      .site-nav-links-right { order: 4; margin-left: 0; }
 
       .site-nav.open .site-nav-links-left,
       .site-nav.open .site-nav-links-right {
