@@ -1,12 +1,32 @@
 {
   "fields": [
     { "name": "domain", "type": "string", "required": true },
-    { "name": "type", "type": "string", "required": true },
     { "name": "id", "type": "string", "required": true },
     { "name": "timestamp", "type": "string", "required": true },
     { "name": "provider", "type": "string", "required": true },
     { "name": "owner", "type": "string", "required": true },
     { "name": "repo", "type": "string", "required": true },
-    { "name": "raw_json", "type": "string", "required": true }
+    { "name": "archived", "type": "bool", "required": true },
+    { "name": "description", "type": "string", "required": false },
+    { "name": "stars", "type": "int32", "required": true },
+    { "name": "forks", "type": "int32", "required": true },
+    { "name": "default_branch", "type": "string", "required": false },
+    { "name": "license", "type": "string", "required": false },
+    { "name": "homepage_url", "type": "string", "required": false },
+    { "name": "language", "type": "string", "required": false },
+    { "name": "language_color", "type": "string", "required": false },
+    { "name": "last_commit_date", "type": "string", "required": false },
+    { "name": "last_release_date", "type": "string", "required": false },
+    { "name": "issue_staleness_median_days", "type": "int32", "required": false },
+    { "name": "pr_responsiveness_median_days", "type": "int32", "required": false },
+    { "name": "open_issue_count", "type": "int32", "required": true },
+    { "name": "closed_issue_count", "type": "int32", "required": true },
+    { "name": "open_pr_count", "type": "int32", "required": true },
+    { "name": "recent_contributor_count", "type": "int32", "required": true },
+    { "name": "top_contributor_commit_share", "type": "float64", "required": true },
+    { "name": "has_ci", "type": "bool", "required": true },
+    { "name": "last_ci_run_date", "type": "string", "required": false },
+    { "name": "ci_run_success_rate", "type": "float64", "required": false },
+    { "name": "ci_run_count", "type": "int32", "required": true }
   ]
 }

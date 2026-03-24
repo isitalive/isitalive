@@ -162,7 +162,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     // Always emit result/provider events on cache miss (powers trending + data freshness)
     const resultEvents = {
       result: [buildResultEvent(result, 'api')],
-      provider: [buildProviderEvent('github', owner, repo, rawData._rawResponse)],
+      provider: [buildProviderEvent('github', owner, repo, rawData)],
     }
 
     // Usage events only for authenticated requests (billing/metering)
