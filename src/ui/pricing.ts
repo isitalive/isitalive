@@ -116,7 +116,7 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
     .container {
       position: relative;
       z-index: 1;
-      max-width: 1100px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -217,10 +217,10 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 10px 20px;
+      padding: 8px 16px;
       border-radius: 6px;
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       text-decoration: none;
       transition: all 0.2s;
       border: none;
@@ -245,13 +245,18 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
     .paid-tiers-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
+      gap: 16px;
       margin-bottom: 24px;
     }
 
     .paid-tier {
       border-style: dashed;
       margin-bottom: 0;
+      padding: 28px 24px;
+    }
+
+    .paid-tier .waitlist-input-row {
+      flex-direction: column;
     }
 
     /* Free tier features inline */
@@ -269,12 +274,13 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
 
     .waitlist-email {
       flex: 1;
-      padding: 10px 14px;
+      min-width: 0;
+      padding: 8px 12px;
       border-radius: 6px;
       border: 1px solid var(--border);
       background: var(--bg-primary);
       color: var(--text-primary);
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       font-family: inherit;
       outline: none;
       transition: border-color 0.2s;
@@ -312,8 +318,15 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
     .sponsors-section a:hover { color: var(--text-primary); }
 
     /* ── Responsive ──────────────────────── */
-    @media (max-width: 900px) {
-      .paid-tiers-grid { grid-template-columns: 1fr; }
+    .waitlist-btn {
+      font-family: inherit;
+      font-size: 0.78rem;
+      padding: 8px 14px;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+      .paid-tiers-grid { grid-template-columns: 1fr; max-width: 480px; margin-left: auto; margin-right: auto; }
       .tier-card.featured .tier-features { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 640px) {
