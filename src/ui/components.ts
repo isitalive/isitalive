@@ -127,6 +127,16 @@ export const themeScript = `
       document.addEventListener('DOMContentLoaded', function() {
         var btn = document.getElementById('themeToggle');
         if (btn) btn.addEventListener('click', cycle);
+
+        // Hamburger menu toggle
+        var ham = document.getElementById('navHamburger');
+        var nav = document.getElementById('siteNav');
+        if (ham && nav) {
+          ham.addEventListener('click', function() {
+            nav.classList.toggle('open');
+            ham.textContent = nav.classList.contains('open') ? '\u2715' : '\u2630';
+          });
+        }
       });
     })();
   </script>
@@ -342,6 +352,23 @@ export const componentCss = `
       .theme-toggle { padding: 5px 8px; }
     }
 
+    /* ── Hamburger toggle (hidden on desktop) ── */
+    .nav-hamburger {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      flex-shrink: 0;
+      font-family: inherit;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .nav-hamburger:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
     @media (max-width: 640px) {
       .site-nav-outer { padding: 12px 16px 0; }
       .site-nav {
@@ -352,18 +379,31 @@ export const componentCss = `
       }
       .site-nav-brand { margin-right: auto; font-size: 0.72rem; }
       .site-nav-divider { display: none; }
+      .nav-hamburger { display: inline-flex; align-items: center; }
+
+      .site-nav-links-left,
+      .site-nav-links-right {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        gap: 0;
+      }
       .site-nav-links-left {
         order: 3;
-        width: 100%;
-        justify-content: flex-start;
-        gap: 0;
         border-top: 1px solid var(--border);
         padding-top: 8px;
-        padding-bottom: 4px;
         margin-top: 4px;
       }
-      .site-nav-links-right { gap: 0; }
-      .site-nav-link { font-size: 0.72rem; padding: 4px 8px; }
+      .site-nav-links-right { order: 4; }
+
+      .site-nav.open .site-nav-links-left,
+      .site-nav.open .site-nav-links-right {
+        display: flex;
+      }
+
+      .site-nav-link { font-size: 0.82rem; padding: 8px 8px; }
+      .site-nav-github { width: 34px; height: 34px; margin-left: 0; }
+      .theme-toggle { margin-left: 0; margin-top: 4px; margin-bottom: 4px; }
     }
 
     /* ── Footer ─────────────────────────────── */
@@ -885,9 +925,10 @@ const githubSvg = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.5
 /** Navbar HTML — clean minimal bar with theme toggle */
 export const navbarHtml = `
   <div class="site-nav-outer">
-    <nav class="site-nav">
+    <nav class="site-nav" id="siteNav">
       <a href="/" class="site-nav-brand"><span class="brand-dot"></span>Is It Alive</a>
       <span class="site-nav-divider"></span>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Toggle menu">☰</button>
       <div class="site-nav-links-left">
         <a href="/trending" class="site-nav-link">Trending</a>
         <a href="/pricing" class="site-nav-link">Pricing</a>
