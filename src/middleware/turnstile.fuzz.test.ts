@@ -1,26 +1,19 @@
 // ---------------------------------------------------------------------------
-// Fuzz tests for XSS escaping in turnstile error templates
+// Fuzz tests for XSS escaping — shared escapeHtml utility
 //
-// The escapeHtml function must neutralize any HTML special characters
-// so that user-controlled strings can never break out of the template.
+// Tests the REAL escapeHtml implementation from utils/html.ts to ensure
+// that arbitrary strings can never produce raw HTML metacharacters.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-
-// Re-implement escapeHtml here for direct testing — it's a private function
-// in turnstile.ts, but the invariant we're testing is the contract itself.
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../utils/html'
 
 describe('escapeHtml XSS prevention', () => {
   // ─── Property-based: output never contains raw HTML metacharacters ─────
   test.prop([fc.string({ maxLength: 500 })])('output never contains unescaped < or >', (input) => {
     const result = escapeHtml(input)
-    // After escaping, no raw < or > should remain
-    expect(result).not.toMatch(/(?<!&lt|&gt|&amp|&quot)[<>]/)
-    // More precisely: the only < and > should be part of &lt; and &gt;
+    // After escaping, strip known entities — nothing raw should remain
     const withoutEntities = result
       .replace(/&lt;/g, '')
       .replace(/&gt;/g, '')
@@ -63,14 +56,6 @@ describe('escapeHtml XSS prevention', () => {
   for (const payload of xssPayloads) {
     it(`neutralizes XSS payload: ${payload.slice(0, 50)}`, () => {
       const result = escapeHtml(payload)
-      expect(result).not.toContain('<script')
-      expect(result).not.toContain('<img')
-      expect(result).not.toContain('<svg')
-      expect(result).not.toContain('<iframe')
-      expect(result).not.toContain('<div')
-      expect(result).not.toContain('<a ')
-      expect(result).not.toContain('<math')
-      expect(result).not.toContain('<textarea')
       // Should not contain any raw < at all
       const stripped = result.replace(/&lt;/g, '').replace(/&gt;/g, '')
       expect(stripped).not.toContain('<')
@@ -89,7 +74,6 @@ describe('escapeHtml XSS prevention', () => {
   test.prop([fc.string({ maxLength: 200 })])('double-escape does not produce raw metacharacters', (input) => {
     const once = escapeHtml(input)
     const twice = escapeHtml(once)
-    // After double-escaping, still no raw < > "
     const stripped = twice
       .replace(/&(amp|lt|gt|quot);/g, '')
     expect(stripped).not.toContain('<')

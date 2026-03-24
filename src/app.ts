@@ -103,8 +103,15 @@ app.get('/.well-known/ai-plugin.json', (c) => {
 
 app.get('/health', (c) => c.json({ status: 'ok', version }));
 
-// Global error handler — structured response for unhandled exceptions
+// Global error handler — content-negotiated response for unhandled exceptions
 app.onError((err, c) => {
   console.error('Unhandled error:', err);
+  const wantsHtml = (c.req.header('Accept') || '').includes('text/html')
+  if (wantsHtml) {
+    return c.html(
+      '<html><body style="font-family:Inter,sans-serif;background:#0a0a0f;color:#e8e8ed;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0"><div style="text-align:center"><h1>Something went wrong</h1><p style="color:#8b8b9e">Please try again later.</p><a href="/" style="color:#6366f1">← Back to home</a></div></body></html>',
+      500,
+    )
+  }
   return c.json({ error: 'Internal server error' }, 500);
 });

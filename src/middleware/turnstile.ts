@@ -68,10 +68,7 @@ export async function verifyTurnstile(
   return next();
 }
 
-/** Escape HTML entities to prevent XSS in error templates */
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '../utils/html'
 
 function errorHtml(message: string): string {
   const safe = escapeHtml(message)
