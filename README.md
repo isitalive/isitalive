@@ -23,3 +23,4 @@ curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
 ## License
 
 [AGPL-3.0](LICENSE)
+
