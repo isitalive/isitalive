@@ -85,3 +85,109 @@ describe('HTTP surface area hardening', () => {
     expect(send).toHaveBeenCalledOnce();
   });
 });
+
+describe('secureHeaders middleware', () => {
+  it('sets X-Frame-Options to DENY', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      env,
+      executionCtx,
+    );
+
+    expect(res.headers.get('X-Frame-Options')).toBe('DENY');
+  });
+
+  it('sets Referrer-Policy', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      env,
+      executionCtx,
+    );
+
+    expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('sets X-Content-Type-Options to nosniff', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      env,
+      executionCtx,
+    );
+
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('sets Content-Security-Policy with expected directives', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      env,
+      executionCtx,
+    );
+
+    const csp = res.headers.get('Content-Security-Policy');
+    expect(csp).toBeTruthy();
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain('https://challenges.cloudflare.com');
+  });
+
+  it('sets Permissions-Policy restricting camera/microphone/geolocation', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      env,
+      executionCtx,
+    );
+
+    const pp = res.headers.get('Permissions-Policy');
+    expect(pp).toBeTruthy();
+    expect(pp).toContain('camera=none');
+    expect(pp).toContain('microphone=none');
+    expect(pp).toContain('geolocation=none');
+  });
+});
+
+describe('ETag conditional caching', () => {
+  it('returns an ETag header on /openapi.json', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/openapi.json'),
+      env,
+      executionCtx,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('ETag')).toBeTruthy();
+  });
+
+  it('returns 304 when If-None-Match matches the ETag', async () => {
+    // First request — get the ETag
+    const first = await app.fetch(
+      new Request('https://isitalive.dev/openapi.json'),
+      env,
+      executionCtx,
+    );
+    const etag = first.headers.get('ETag');
+    expect(etag).toBeTruthy();
+
+    // Second request with If-None-Match
+    const second = await app.fetch(
+      new Request('https://isitalive.dev/openapi.json', {
+        headers: { 'If-None-Match': etag! },
+      }),
+      env,
+      executionCtx,
+    );
+
+    expect(second.status).toBe(304);
+  });
+
+  it('returns an ETag header on /llms.txt', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/llms.txt'),
+      env,
+      executionCtx,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('ETag')).toBeTruthy();
+  });
+});
