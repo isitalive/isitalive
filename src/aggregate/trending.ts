@@ -12,21 +12,31 @@ import { TRENDING_KEY } from '../state/keys'
 /** Trending repo entry (cached in KV, consumed by UI) */
 export interface TrendingRepo {
   repo: string
-  avgScore: number
-  lastVerdict: string
+  score: number
+  verdict: string
 }
 
 const TRENDING_SQL = `
 SELECT
-  repo,
-  COUNT(*) as checks,
-  AVG(score) as avg_score,
-  MAX(verdict) as last_verdict
-FROM usage_events
-WHERE timestamp > NOW() - INTERVAL '24 hours'
-  AND repo != ''
-GROUP BY repo
-ORDER BY checks DESC
+  t.repo,
+  t.checks,
+  latest.score,
+  latest.verdict
+FROM (
+  SELECT repo, COUNT(*) as checks
+  FROM usage_events
+  WHERE timestamp > NOW() - INTERVAL '24 hours'
+    AND repo != ''
+  GROUP BY repo
+) t
+JOIN (
+  SELECT repo, score, verdict,
+         ROW_NUMBER() OVER (PARTITION BY repo ORDER BY timestamp DESC) as rn
+  FROM usage_events
+  WHERE timestamp > NOW() - INTERVAL '24 hours'
+    AND repo != ''
+) latest ON t.repo = latest.repo AND latest.rn = 1
+ORDER BY t.checks DESC
 LIMIT 250
 `
 
@@ -46,8 +56,8 @@ export async function refreshTrending(env: Env): Promise<TrendingRepo[]> {
   const trending: TrendingRepo[] = result.rows.map(row => ({
     repo: String(row[0]),
     // row[1] = checks — used for ORDER BY but not exposed in API
-    avgScore: Math.round(Number(row[2])),
-    lastVerdict: String(row[3]),
+    score: Math.round(Number(row[2])),
+    verdict: String(row[3]),
   }))
 
   await env.CACHE_KV.put(TRENDING_KEY, JSON.stringify(trending), {

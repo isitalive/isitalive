@@ -236,7 +236,7 @@ export function trendingPage(analyticsToken?: string): string {
     }
 
     function renderCard(r, i) {
-      var verdict = normalizeVerdict(r.lastVerdict);
+      var verdict = normalizeVerdict(r.verdict);
       const color = VERDICT_COLORS[verdict] || '#6b7280';
       return '<a href="/github/' + r.repo + '" class="repo-card" id="trending-' + (i+1) + '">'
         + '<span class="repo-rank">#' + (i+1) + '</span>'
@@ -244,7 +244,7 @@ export function trendingPage(analyticsToken?: string): string {
         + '<div class="repo-name">' + r.repo + '</div>'
         + '</div>'
         + '<span class="repo-verdict" style="background:' + color + '20;color:' + color + '">' + verdictLabel(verdict) + '</span>'
-        + '<span class="repo-score" style="color:' + color + '">' + r.avgScore + '</span>'
+        + '<span class="repo-score" style="color:' + color + '">' + r.score + '</span>'
         + '</a>';
     }
 
