@@ -76,7 +76,7 @@ pipeline = "e1e5011bcbf84d9d9747d3c083af3688"
 
 [[pipelines]]
 binding = "RESULT_PIPELINE"
-pipeline = "335c2069b125473a884ca6f6e988f7e4"
+pipeline = "11f72a89892e4f10808b2f2732371c26"
 
 [[pipelines]]
 binding = "USAGE_PIPELINE"
