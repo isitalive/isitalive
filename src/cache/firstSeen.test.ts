@@ -14,13 +14,26 @@ function createMockKV() {
 }
 
 describe('trackFirstSeen', () => {
-  it('writes to KV without calling get() first', async () => {
+  it('calls get() then conditionally put()', async () => {
     const kv = createMockKV()
     await trackFirstSeen(kv, 'github', 'vercel', 'next.js')
 
-    // Should call put() but NOT get()
+    // Should check first, then write
+    expect(kv.get).toHaveBeenCalledOnce()
     expect(kv.put).toHaveBeenCalledOnce()
-    expect(kv.get).not.toHaveBeenCalled()
+  })
+
+  it('does not overwrite an existing first-seen timestamp', async () => {
+    const kv = createMockKV()
+    const originalTs = '2024-01-01T00:00:00.000Z'
+    kv._store.set('isitalive:first-seen:github/vercel/next.js', originalTs)
+
+    await trackFirstSeen(kv, 'github', 'vercel', 'next.js')
+
+    // Should read but NOT write (existing value preserved)
+    expect(kv.get).toHaveBeenCalledOnce()
+    expect(kv.put).not.toHaveBeenCalled()
+    expect(kv._store.get('isitalive:first-seen:github/vercel/next.js')).toBe(originalTs)
   })
 
   it('stores an ISO-8601 timestamp', async () => {

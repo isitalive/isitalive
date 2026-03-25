@@ -31,6 +31,21 @@ describe('isValidParam', () => {
     expect(isValidParam('a'.repeat(100))).toBe(true)
   })
 
+  // ── Dot-segment rejection ────────────────────────────────────────────
+  it('rejects single dot (path traversal)', () => {
+    expect(isValidParam('.')).toBe(false)
+  })
+
+  it('rejects double dot (path traversal)', () => {
+    expect(isValidParam('..')).toBe(false)
+  })
+
+  it('accepts dot-prefixed names (e.g. .github)', () => {
+    // GitHub repos can start with dots, just not exactly "." or ".."
+    expect(isValidParam('.github')).toBe(true)
+    expect(isValidParam('.dotfiles')).toBe(true)
+  })
+
   // ── Invalid inputs ────────────────────────────────────────────────────
   it('rejects empty string', () => {
     expect(isValidParam('')).toBe(false)
