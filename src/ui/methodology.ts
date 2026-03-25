@@ -57,8 +57,65 @@ export function methodologyPage(analyticsToken?: string): string {
     .intro {
       color: var(--text-secondary);
       font-size: 0.95rem;
-      margin-bottom: 40px;
+      margin-bottom: 32px;
       max-width: 100%;
+    }
+
+    /* ── Weight visualization bar ─────────────────────────────────────── */
+    .weight-bar-container {
+      margin-bottom: 40px;
+    }
+    .weight-bar-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .weight-bar {
+      display: flex;
+      border-radius: 8px;
+      overflow: hidden;
+      height: 32px;
+      gap: 2px;
+    }
+    .weight-bar-segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #fff;
+      transition: opacity 0.2s;
+      cursor: default;
+      position: relative;
+    }
+    .weight-bar-segment:hover { opacity: 0.85; }
+    .weight-bar-segment .seg-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0 4px;
+    }
+    .weight-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      margin-top: 12px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .weight-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .weight-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
     }
 
     h2 {
@@ -159,7 +216,7 @@ export function methodologyPage(analyticsToken?: string): string {
       border-left: 3px solid var(--accent);
       border-radius: 6px;
       padding: 16px 20px;
-      margin: 24px 0;
+      margin: 16px 0;
       font-size: 0.85rem;
       color: var(--text-secondary);
     }
@@ -172,12 +229,33 @@ export function methodologyPage(analyticsToken?: string): string {
       margin-top: 4px;
     }
 
+    .example-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .example-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .example-link:hover { border-color: var(--accent); color: var(--text-primary); }
+
     @media (max-width: 640px) {
       h1 { font-size: 1.5rem; }
       .signal-card { padding: 18px; }
       .verdict-section { grid-template-columns: repeat(2, 1fr); }
       .scoring-table { display: block; overflow-x: auto; }
       .note-box { padding: 12px 16px; }
+      .weight-bar-segment .seg-label { font-size: 0.55rem; }
     }
   </style>
 </head>
@@ -187,7 +265,32 @@ export function methodologyPage(analyticsToken?: string): string {
 
   <div class="container">
     <h1>How We Score</h1>
-    <p class="intro">Every project is evaluated across 8 weighted signals pulled from the GitHub GraphQL API. The signals are combined into a single score from 0 to 100, then mapped to a human-readable verdict.</p>
+    <p class="intro">Every project is evaluated across 8 weighted signals pulled from the GitHub API. The signals are combined into a single score from 0 to 100, then mapped to a human-readable verdict.</p>
+
+    <!-- Weight visualization bar -->
+    <div class="weight-bar-container">
+      <div class="weight-bar-label">Signal Weights</div>
+      <div class="weight-bar">
+        <div class="weight-bar-segment" style="flex: 25; background: #6366f1;" title="Last Commit — 25%"><span class="seg-label">Commit 25%</span></div>
+        <div class="weight-bar-segment" style="flex: 15; background: #8b5cf6;" title="Last Release — 15%"><span class="seg-label">Release 15%</span></div>
+        <div class="weight-bar-segment" style="flex: 15; background: #a855f7;" title="PR Responsiveness — 15%"><span class="seg-label">PRs 15%</span></div>
+        <div class="weight-bar-segment" style="flex: 10; background: #d946ef;" title="Issue Staleness — 10%"><span class="seg-label">Issues 10%</span></div>
+        <div class="weight-bar-segment" style="flex: 10; background: #ec4899;" title="Recent Contributors — 10%"><span class="seg-label">Contribs 10%</span></div>
+        <div class="weight-bar-segment" style="flex: 10; background: #f43f5e;" title="Bus Factor — 10%"><span class="seg-label">Bus 10%</span></div>
+        <div class="weight-bar-segment" style="flex: 10; background: #f97316;" title="CI/CD Activity — 10%"><span class="seg-label">CI/CD 10%</span></div>
+        <div class="weight-bar-segment" style="flex: 5; background: #64748b;" title="Stars — 5%"><span class="seg-label">Stars 5%</span></div>
+      </div>
+      <div class="weight-legend">
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#6366f1"></span>Last Commit</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#8b5cf6"></span>Last Release</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#a855f7"></span>PR Responsiveness</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#d946ef"></span>Issue Staleness</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#ec4899"></span>Recent Contributors</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#f43f5e"></span>Bus Factor</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#f97316"></span>CI/CD Activity</span>
+        <span class="weight-legend-item"><span class="weight-legend-dot" style="background:#64748b"></span>Stars</span>
+      </div>
+    </div>
 
     <h2>Signals</h2>
 
@@ -199,13 +302,15 @@ export function methodologyPage(analyticsToken?: string): string {
       <p>How recently the default branch received a commit. This is the strongest indicator that someone is actively working on the project.</p>
       <table class="scoring-table">
         <tr><th>Recency</th><th>Score</th></tr>
-        <tr><td>Within 7 days</td><td>100</td></tr>
-        <tr><td>Within 30 days</td><td>80</td></tr>
-        <tr><td>Within 90 days</td><td>60</td></tr>
-        <tr><td>Within 180 days</td><td>40</td></tr>
-        <tr><td>Within 1 year</td><td>20</td></tr>
+        <tr><td>Within 30 days</td><td>100</td></tr>
+        <tr><td>Within 90 days</td><td>75</td></tr>
+        <tr><td>Within 180 days</td><td>50</td></tr>
+        <tr><td>Within 1 year</td><td>25</td></tr>
         <tr><td>Over 1 year ago</td><td>0</td></tr>
       </table>
+      <div class="note-box">
+        <strong>Stability override:</strong> Projects with no open issues, no open PRs, and 10+ closed issues score 100 even if the last commit was over a year ago. This recognizes "finished" utility packages that are stable, not abandoned.
+      </div>
       <p class="data-source">Source: defaultBranchRef.target.history</p>
     </div>
 
@@ -217,10 +322,9 @@ export function methodologyPage(analyticsToken?: string): string {
       <p>When the most recent release or tag was published. Regular releases indicate a project that ships to users, not just commits to main.</p>
       <table class="scoring-table">
         <tr><th>Recency</th><th>Score</th></tr>
-        <tr><td>Within 30 days</td><td>100</td></tr>
-        <tr><td>Within 90 days</td><td>75</td></tr>
-        <tr><td>Within 180 days</td><td>50</td></tr>
-        <tr><td>Within 1 year</td><td>25</td></tr>
+        <tr><td>Within 90 days</td><td>100</td></tr>
+        <tr><td>Within 180 days</td><td>75</td></tr>
+        <tr><td>Within 1 year</td><td>50</td></tr>
         <tr><td>Over 1 year ago</td><td>0</td></tr>
       </table>
       <p class="data-source">Source: releases(last: 1)</p>
@@ -234,12 +338,14 @@ export function methodologyPage(analyticsToken?: string): string {
       <p>Median age of recently updated pull requests. Fast PR turnaround means the maintainers are engaged and the contribution workflow is healthy.</p>
       <table class="scoring-table">
         <tr><th>Median PR Age</th><th>Score</th></tr>
-        <tr><td>Under 3 days</td><td>100</td></tr>
-        <tr><td>Under 7 days</td><td>75</td></tr>
-        <tr><td>Under 30 days</td><td>50</td></tr>
-        <tr><td>Under 90 days</td><td>25</td></tr>
-        <tr><td>Over 90 days</td><td>0</td></tr>
+        <tr><td>Under 7 days</td><td>100</td></tr>
+        <tr><td>Under 30 days</td><td>75</td></tr>
+        <tr><td>Under 90 days</td><td>50</td></tr>
+        <tr><td>Over 90 days</td><td>25</td></tr>
       </table>
+      <div class="note-box">
+        <strong>Inbox zero:</strong> If there are no open PRs and the project has a history of closed issues, the score is 100 — the maintainers are on top of it. If there are no issues at all, the score defaults to 75.
+      </div>
       <p class="data-source">Source: pullRequests(first: 50, orderBy: UPDATED_AT)</p>
     </div>
 
@@ -254,9 +360,11 @@ export function methodologyPage(analyticsToken?: string): string {
         <tr><td>Under 7 days</td><td>100</td></tr>
         <tr><td>Under 30 days</td><td>75</td></tr>
         <tr><td>Under 90 days</td><td>50</td></tr>
-        <tr><td>Under 180 days</td><td>25</td></tr>
-        <tr><td>Over 180 days</td><td>0</td></tr>
+        <tr><td>Over 90 days</td><td>25</td></tr>
       </table>
+      <div class="note-box">
+        <strong>Inbox zero:</strong> No open issues + a history of closed issues = score 100. No issues at all = 75. The system differentiates "inbox zero hero" from "ghost town."
+      </div>
       <p class="data-source">Source: issues(first: 50, states: OPEN, orderBy: UPDATED_AT)</p>
     </div>
 
@@ -268,10 +376,9 @@ export function methodologyPage(analyticsToken?: string): string {
       <p>Number of unique authors who committed in the last 90 days. More contributors means the project isn't dependent on a single person's availability.</p>
       <table class="scoring-table">
         <tr><th>Contributors (90d)</th><th>Score</th></tr>
-        <tr><td>10 or more</td><td>100</td></tr>
-        <tr><td>5 – 9</td><td>75</td></tr>
-        <tr><td>2 – 4</td><td>50</td></tr>
-        <tr><td>1</td><td>25</td></tr>
+        <tr><td>6 or more</td><td>100</td></tr>
+        <tr><td>2 – 5</td><td>75</td></tr>
+        <tr><td>1</td><td>50</td></tr>
         <tr><td>0</td><td>0</td></tr>
       </table>
       <p class="data-source">Source: defaultBranchRef.target.history (since: 90d ago)</p>
@@ -287,28 +394,13 @@ export function methodologyPage(analyticsToken?: string): string {
         <tr><th>Top Contributor %</th><th>Score</th></tr>
         <tr><td>Under 50%</td><td>100</td></tr>
         <tr><td>50% – 70%</td><td>75</td></tr>
-        <tr><td>70% – 85%</td><td>50</td></tr>
-        <tr><td>85% – 95%</td><td>25</td></tr>
-        <tr><td>Over 95%</td><td>0</td></tr>
+        <tr><td>70% – 90%</td><td>50</td></tr>
+        <tr><td>Over 90%</td><td>25</td></tr>
       </table>
-      <p class="data-source">Source: Calculated from commit author distribution</p>
-    </div>
-
-    <div class="signal-card">
-      <div class="signal-card-header">
-        <span class="signal-card-title">Stars</span>
-        <span class="signal-card-weight">5%</span>
+      <div class="note-box">
+        <strong>Solo-maintainer forgiveness:</strong> Small projects (under 1,000 stars) with a single dominant contributor score 85 instead of 25. Solo maintainers are normal for small packages — it's only a risk signal for widely-depended-upon projects.
       </div>
-      <p>GitHub star count as a proxy for community interest. Low weight because stars are a vanity metric — popular ≠ maintained.</p>
-      <table class="scoring-table">
-        <tr><th>Stars</th><th>Score</th></tr>
-        <tr><td>1,000+</td><td>100</td></tr>
-        <tr><td>500 – 999</td><td>75</td></tr>
-        <tr><td>100 – 499</td><td>50</td></tr>
-        <tr><td>10 – 99</td><td>25</td></tr>
-        <tr><td>Under 10</td><td>0</td></tr>
-      </table>
-      <p class="data-source">Source: stargazerCount</p>
+      <p class="data-source">Source: Calculated from commit author distribution</p>
     </div>
 
     <div class="signal-card">
@@ -325,6 +417,22 @@ export function methodologyPage(analyticsToken?: string): string {
         <tr><td>90%+ success rate</td><td>20</td></tr>
       </table>
       <p class="data-source">Source: object(expression: ".github/workflows") + REST /actions/runs</p>
+    </div>
+
+    <div class="signal-card">
+      <div class="signal-card-header">
+        <span class="signal-card-title">Stars</span>
+        <span class="signal-card-weight">5%</span>
+      </div>
+      <p>GitHub star count as a proxy for community interest. Low weight because stars are a vanity metric — popular ≠ maintained.</p>
+      <table class="scoring-table">
+        <tr><th>Stars</th><th>Score</th></tr>
+        <tr><td>1,000+</td><td>100</td></tr>
+        <tr><td>100 – 999</td><td>75</td></tr>
+        <tr><td>10 – 99</td><td>50</td></tr>
+        <tr><td>Under 10</td><td>25</td></tr>
+      </table>
+      <p class="data-source">Source: stargazerCount</p>
     </div>
 
     <h2>Verdicts</h2>
@@ -356,6 +464,13 @@ export function methodologyPage(analyticsToken?: string): string {
         <div class="name" style="color: #6b7280">Unmaintained</div>
         <div class="range">0 – 19</div>
       </div>
+    </div>
+
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 20px;">See for yourself:</p>
+    <div class="example-links">
+      <a class="example-link" href="/github/vercel/next.js">🟢 vercel/next.js</a>
+      <a class="example-link" href="/github/honojs/hono">🟡 honojs/hono</a>
+      <a class="example-link" href="/github/lodash/lodash">🟠 lodash/lodash</a>
     </div>
 
     <h2>Overrides</h2>
