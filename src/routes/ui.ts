@@ -42,9 +42,6 @@ import { isValidParam } from '../utils/validate'
 // Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
 
-// Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
-const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
-
 const ui = new Hono<{ Bindings: Env }>()
 
 /** Suppress Turnstile + CF Web Analytics on local dev */
