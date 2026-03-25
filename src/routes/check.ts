@@ -7,6 +7,7 @@ import type { Env } from '../scoring/types'
 import { providers, revalidateInBackground } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
 import { CacheManager, cacheControlHeaders, TIERS, type Tier, trackFirstSeen } from '../cache/index'
+import { isValidParam } from '../utils/validate'
 import { buildResultEvent } from '../events/result'
 import { buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildProviderEvent } from '../events/provider'
@@ -42,10 +43,7 @@ function cacheMeta(
   }
 }
 
-/** Validate path params — only allow valid GitHub-style identifiers */
-function isValidParam(value: string): boolean {
-  return /^[a-zA-Z0-9._-]+$/.test(value) && value.length <= 100
-}
+
 
 check.get('/:provider/:owner/:repo', async (c) => {
   const startTime = Date.now()
