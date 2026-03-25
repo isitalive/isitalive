@@ -110,8 +110,6 @@ export interface RawProjectData {
   /** Number of workflow runs in last 30 days */
   ciRunCount: number;
 
-  /** Raw API response for archiving — not used in scoring */
-  _rawResponse?: any;
 }
 
 // ---------------------------------------------------------------------------

@@ -37,6 +37,10 @@ import { resolveAll } from '../audit/resolver'
 import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
+import { isValidParam } from '../utils/validate'
+
+// Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
+const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
 
 // Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
@@ -59,17 +63,22 @@ const CWA_SCRIPT = 'https://static.cloudflareinsights.com/beacon.min.js'
 const CWA_RUM = 'https://cloudflareinsights.com/cdn-cgi/rum'
 
 ui.get('/t/a.js', async (c) => {
-  // Try edge cache first
-  const cacheKey = new Request(c.req.url)
-  const cached = await caches.default.match(cacheKey)
-  if (cached) return new Response(cached.body, cached)
+  try {
+    // Try edge cache first
+    const cacheKey = new Request(c.req.url)
+    const cached = await caches.default.match(cacheKey)
+    if (cached) return new Response(cached.body, cached)
 
-  const res = await fetch(CWA_SCRIPT)
-  const response = new Response(res.body, res)
-  response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400')
-  response.headers.set('Content-Type', 'application/javascript')
-  c.executionCtx.waitUntil(caches.default.put(cacheKey, response.clone()))
-  return response
+    const res = await fetch(CWA_SCRIPT)
+    const response = new Response(res.body, res)
+    response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+    response.headers.set('Content-Type', 'application/javascript')
+    c.executionCtx.waitUntil(caches.default.put(cacheKey, response.clone()))
+    return response
+  } catch {
+    // Upstream down — return empty script to avoid breaking the page
+    return new Response(null, { status: 204 })
+  }
 })
 
 ui.all('/t/d', async (c) => {
@@ -425,7 +434,9 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
     return c.json(empty)
   }
 
-  // Deduplicate deps by name (keep first occurrence)
+  // Cross-manifest deduplication: each individual manifest is already deduped
+  // by parseManifest(), but the same dep can appear in multiple manifests
+  // (e.g. a monorepo with both package.json and go.mod listing overlapping deps).
   const seen = new Set<string>()
   allDeps = allDeps.filter((d) => {
     if (seen.has(d.name)) return false
@@ -777,12 +788,6 @@ ui.get('/:provider/:owner/:repo', async (c) => {
   return handleCheck(c, provider, owner, repo)
 })
 
-/**
- * Validate URL path params — only allow valid GitHub-style identifiers.
- * Blocks XSS / path-traversal payloads in owner/repo params.
- */
-function isValidParam(value: string): boolean {
-  return /^[a-zA-Z0-9._-]+$/.test(value) && value.length <= 100
-}
+
 
 export { ui }

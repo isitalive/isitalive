@@ -183,8 +183,14 @@ export class GitHubProvider implements Provider {
 
     if (hasCi) {
       try {
+        // Fetch recent CI runs. Use per_page=10 for success rate sampling
+        // (the 10% weight CI signal doesn't need many data points for rate),
+        // but use the API's created filter + total_count to get the true
+        // 30-day run count for scoring thresholds (≥30, ≥10, ≥3, ≥1).
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const createdFilter = `>=${thirtyDaysAgo.toISOString().split('T')[0]}`;
         const runsRes = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=30&status=completed`,
+          `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=10&status=completed&created=${encodeURIComponent(createdFilter)}`,
           {
             headers: {
               'Authorization': `bearer ${token}`,
@@ -197,23 +203,16 @@ export class GitHubProvider implements Provider {
           const runsJson = await runsRes.json() as any;
           const runs: any[] = runsJson.workflow_runs ?? [];
 
-          // Filter to last 30 days
-          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          const recentRuns = runs.filter(
-            (run: any) => new Date(run.created_at) >= thirtyDaysAgo,
-          );
-
-          ciRunCount = recentRuns.length;
+          // Use API's total_count for accurate 30-day run count
+          ciRunCount = runsJson.total_count ?? runs.length;
 
           if (runs.length > 0) {
             lastCiRunDate = runs[0].created_at ?? null;
-          }
 
-          if (recentRuns.length > 0) {
-            const successful = recentRuns.filter(
+            const successful = runs.filter(
               (run: any) => run.conclusion === 'success',
             ).length;
-            ciRunSuccessRate = successful / recentRuns.length;
+            ciRunSuccessRate = successful / runs.length;
           }
         }
       } catch {
@@ -246,7 +245,6 @@ export class GitHubProvider implements Provider {
       lastCiRunDate,
       ciRunSuccessRate,
       ciRunCount,
-      _rawResponse: json.data,
     };
   }
 }

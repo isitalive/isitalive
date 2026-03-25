@@ -321,6 +321,10 @@ const FIRST_SEEN_PREFIX = 'isitalive:first-seen:';
 
 /**
  * Record the first time we ever saw a repo (idempotent — only writes once).
+ *
+ * Uses a read-before-write pattern to preserve the original "first seen"
+ * timestamp. The KV read ($0.50/M) only happens on cache misses, so the
+ * cost is acceptable for data accuracy.
  */
 export async function trackFirstSeen(
   kv: KVNamespace,
@@ -331,7 +335,7 @@ export async function trackFirstSeen(
   const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
   const existing = await kv.get(key);
   if (!existing) {
-    await kv.put(key, new Date().toISOString());
+    await kv.put(key, new Date().toISOString(), { expirationTtl: 365 * 24 * 60 * 60 });
   }
 }
 

@@ -15,28 +15,20 @@ export interface TrendingRepo {
   score: number
   verdict: string
 }
-
+// R2 SQL limitations: no JOINs, no subqueries in FROM clause.
+// Use flat GROUP BY with MAX() for latest score/verdict approximation.
+// This is accurate enough since scores rarely change within 24h.
 const TRENDING_SQL = `
 SELECT
-  t.repo,
-  t.checks,
-  latest.score,
-  latest.verdict
-FROM (
-  SELECT repo, COUNT(*) as checks
-  FROM usage_events
-  WHERE timestamp > NOW() - INTERVAL '24 hours'
-    AND repo != ''
-  GROUP BY repo
-) t
-JOIN (
-  SELECT repo, score, verdict,
-         ROW_NUMBER() OVER (PARTITION BY repo ORDER BY timestamp DESC) as rn
-  FROM usage_events
-  WHERE timestamp > NOW() - INTERVAL '24 hours'
-    AND repo != ''
-) latest ON t.repo = latest.repo AND latest.rn = 1
-ORDER BY t.checks DESC
+  project,
+  COUNT(*) as checks,
+  MAX(score) as score,
+  MAX(verdict) as verdict
+FROM result_events_v2
+WHERE timestamp > NOW() - INTERVAL '24 hours'
+  AND project != ''
+GROUP BY project
+ORDER BY checks DESC
 LIMIT 250
 `
 

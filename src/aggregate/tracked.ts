@@ -23,13 +23,13 @@ export type TrackedIndex = Record<string, TrackedRepo>
 
 const TRACKED_SQL = `
 SELECT
-  repo,
+  project,
   MAX(timestamp) as last_seen,
   COUNT(*) as request_count
-FROM usage_events
+FROM result_events_v2
 WHERE timestamp > NOW() - INTERVAL '90 days'
-  AND repo != ''
-GROUP BY repo
+  AND project != ''
+GROUP BY project
 ORDER BY request_count DESC
 `
 

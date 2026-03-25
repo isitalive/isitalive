@@ -9,11 +9,11 @@ import { queryR2SQL } from '../admin/r2sql'
 import { SITEMAP_KEY } from '../state/keys'
 
 const SITEMAP_SQL = `
-SELECT repo
-FROM usage_events
+SELECT project
+FROM result_events_v2
 WHERE timestamp > NOW() - INTERVAL '90 days'
-  AND repo != ''
-GROUP BY repo
+  AND project != ''
+GROUP BY project
 ORDER BY COUNT(*) DESC
 LIMIT 5000
 `
