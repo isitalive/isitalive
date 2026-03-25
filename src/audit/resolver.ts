@@ -29,12 +29,24 @@ const RESOLVE_CACHE_TTL = 7 * 24 * 60 * 60; // 7 days
 /**
  * Resolve an array of parsed deps to GitHub repos.
  * Uses KV cache for previously resolved packages.
+ *
+ * Batches in groups of 20 to avoid overwhelming external registries
+ * (npm, vanity URL hosts) with too many concurrent requests.
  */
 export async function resolveAll(
   deps: ParsedDep[],
   env: Env,
 ): Promise<ResolvedDep[]> {
-  return Promise.all(deps.map((d) => resolveSingle(d, env)));
+  const BATCH_SIZE = 20
+  const results: ResolvedDep[] = []
+
+  for (let i = 0; i < deps.length; i += BATCH_SIZE) {
+    const batch = deps.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.all(batch.map((d) => resolveSingle(d, env)))
+    results.push(...batchResults)
+  }
+
+  return results
 }
 
 async function resolveSingle(dep: ParsedDep, env: Env): Promise<ResolvedDep> {

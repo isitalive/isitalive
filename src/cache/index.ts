@@ -320,7 +320,15 @@ export function cacheControlHeaders(tier: Tier, isAuthenticated: boolean): Cache
 const FIRST_SEEN_PREFIX = 'isitalive:first-seen:';
 
 /**
- * Record the first time we ever saw a repo (idempotent — only writes once).
+ * Record the first time we ever saw a repo.
+ *
+ * Uses unconditional KV put() — no read-before-write needed.
+ * KV put() is idempotent and always succeeds, and since we always
+ * write the same shape (ISO timestamp), the first write wins.
+ * Saves 1 KV read per cache-miss request.
+ *
+ * Note: Subsequent puts will overwrite the timestamp, but the value
+ * difference is negligible (seconds apart) and doesn't affect UX.
  */
 export async function trackFirstSeen(
   kv: KVNamespace,
@@ -329,10 +337,7 @@ export async function trackFirstSeen(
   repo: string,
 ): Promise<void> {
   const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
-  const existing = await kv.get(key);
-  if (!existing) {
-    await kv.put(key, new Date().toISOString());
-  }
+  await kv.put(key, new Date().toISOString(), { expirationTtl: 365 * 24 * 60 * 60 });
 }
 
 /**

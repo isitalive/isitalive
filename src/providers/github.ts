@@ -184,7 +184,7 @@ export class GitHubProvider implements Provider {
     if (hasCi) {
       try {
         const runsRes = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=30&status=completed`,
+          `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=10&status=completed`,
           {
             headers: {
               'Authorization': `bearer ${token}`,
@@ -246,7 +246,6 @@ export class GitHubProvider implements Provider {
       lastCiRunDate,
       ciRunSuccessRate,
       ciRunCount,
-      _rawResponse: json.data,
     };
   }
 }
