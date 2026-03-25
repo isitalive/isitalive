@@ -18,24 +18,24 @@ export interface TrendingRepo {
 
 const TRENDING_SQL = `
 SELECT
-  t.repo,
+  t.project,
   t.checks,
   latest.score,
   latest.verdict
 FROM (
-  SELECT repo, COUNT(*) as checks
-  FROM usage_events
+  SELECT project, COUNT(*) as checks
+  FROM result_events_v2
   WHERE timestamp > NOW() - INTERVAL '24 hours'
-    AND repo != ''
-  GROUP BY repo
+    AND project != ''
+  GROUP BY project
 ) t
 JOIN (
-  SELECT repo, score, verdict,
-         ROW_NUMBER() OVER (PARTITION BY repo ORDER BY timestamp DESC) as rn
-  FROM usage_events
+  SELECT project, score, verdict,
+         ROW_NUMBER() OVER (PARTITION BY project ORDER BY timestamp DESC) as rn
+  FROM result_events_v2
   WHERE timestamp > NOW() - INTERVAL '24 hours'
-    AND repo != ''
-) latest ON t.repo = latest.repo AND latest.rn = 1
+    AND project != ''
+) latest ON t.project = latest.project AND latest.rn = 1
 ORDER BY t.checks DESC
 LIMIT 250
 `
