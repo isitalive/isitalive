@@ -20,14 +20,14 @@ export interface TrendingRepo {
 // This is accurate enough since scores rarely change within 24h.
 const TRENDING_SQL = `
 SELECT
-  project,
+  repo,
   COUNT(*) as checks,
   MAX(score) as score,
   MAX(verdict) as verdict
-FROM result_events_v2
+FROM usage_events
 WHERE timestamp > NOW() - INTERVAL '24 hours'
-  AND project != ''
-GROUP BY project
+  AND repo != ''
+GROUP BY repo
 ORDER BY checks DESC
 LIMIT 250
 `
