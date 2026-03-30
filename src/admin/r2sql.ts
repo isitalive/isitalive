@@ -16,6 +16,8 @@ export interface QueryResult {
   error?: string
 }
 
+const R2_SQL_TIMEOUT_MS = 20_000
+
 /** SQL statements we refuse to proxy */
 const BLOCKED_PATTERNS = [
   /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|REPLACE|MERGE)\b/i,
@@ -64,6 +66,24 @@ export function validateReadOnly(sql: string): string | null {
 }
 
 /**
+ * Rewrite trivial "GROUP BY same selected column" queries to DISTINCT.
+ * This keeps semantics for dedupe-style queries while avoiding heavier grouping.
+ */
+export function optimizeReadQuery(sql: string): string {
+  const trimmed = sql.trim().replace(/\s*;?\s*$/, '')
+  const simpleDistinctMatch = trimmed.match(
+    /^SELECT\s+([a-z_][a-z0-9_\.]*)\s+FROM\s+([\s\S]+?)\s+GROUP\s+BY\s+\1$/i,
+  )
+
+  if (!simpleDistinctMatch) {
+    return sql
+  }
+
+  const [, column, fromAndWhere] = simpleDistinctMatch
+  return `SELECT DISTINCT ${column}\nFROM ${fromAndWhere}`
+}
+
+/**
  * Execute a read-only SQL query against R2 SQL API.
  */
 export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
@@ -74,6 +94,8 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
   if (error) {
     return { columns: [], rows: [], rowCount: 0, timing: 0, error }
   }
+
+  sql = optimizeReadQuery(sql)
 
   // Auto-limit queries that don't already specify a LIMIT to prevent
   // unbounded result sets from exhausting Worker memory.
@@ -119,8 +141,8 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query: sql }),
-        timeoutMs: 10_000,
-        timeoutMessage: 'R2 SQL request timed out after 10000ms',
+        timeoutMs: R2_SQL_TIMEOUT_MS,
+        timeoutMessage: `R2 SQL request timed out after ${R2_SQL_TIMEOUT_MS}ms`,
       },
     )
 

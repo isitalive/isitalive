@@ -283,9 +283,9 @@ export function adminOverviewPage(data: AdminOverview): string {
         pipeline_result: \`SELECT 'result_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM result_events_v2\`,
         pipeline_provider: \`SELECT 'provider_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM provider_events_v2\`,
         pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM manifest_events\`,
-        freshness_fresh: \`SELECT repo FROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR GROUP BY repo\`,
-        freshness_aging: \`SELECT repo FROM usage_events WHERE repo != '' AND timestamp <= now() - INTERVAL '6' HOUR AND timestamp > now() - INTERVAL '24' HOUR GROUP BY repo\`,
-        freshness_stale: \`SELECT repo FROM usage_events WHERE repo != '' AND timestamp <= now() - INTERVAL '24' HOUR GROUP BY repo\`,
+        freshness_fresh: \`SELECT COUNT(DISTINCT repo) as count FROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR\`,
+        freshness_aging: \`SELECT COUNT(DISTINCT repo) as count FROM usage_events WHERE repo != '' AND timestamp <= now() - INTERVAL '6' HOUR AND timestamp > now() - INTERVAL '24' HOUR\`,
+        freshness_stale: \`SELECT COUNT(DISTINCT repo) as count FROM usage_events WHERE repo != '' AND timestamp <= now() - INTERVAL '24' HOUR\`,
       };
 
       const queryCache = new Map();
@@ -492,9 +492,9 @@ export function adminOverviewPage(data: AdminOverview): string {
             runQuery(QUERIES.freshness_aging),
             runQuery(QUERIES.freshness_stale),
           ]);
-          const fresh = freshR.rows?.length || 0;
-          const aging = agingR.rows?.length || 0;
-          const stale = staleR.rows?.length || 0;
+          const fresh = parseInt(freshR.rows?.[0]?.[0] || 0);
+          const aging = parseInt(agingR.rows?.[0]?.[0] || 0);
+          const stale = parseInt(staleR.rows?.[0]?.[0] || 0);
           const total = fresh + aging + stale;
 
           document.getElementById('total-repos').textContent = fmt(total);

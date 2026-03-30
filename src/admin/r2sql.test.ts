@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { validateReadOnly, queryR2SQL, PRESET_QUERIES } from './r2sql'
+import { validateReadOnly, queryR2SQL, PRESET_QUERIES, optimizeReadQuery } from './r2sql'
 
 describe('r2sql', () => {
   // ─── validateReadOnly: valid queries ────────────────────────────────
@@ -343,6 +343,49 @@ describe('r2sql', () => {
       expect(sent).toContain('LIMIT 1000')
       // Verify the LIMIT is NOT inside the comment by checking it comes after
       expect(sent.indexOf('LIMIT 1000')).toBeGreaterThan(sent.lastIndexOf('--') >= 0 ? -1 : 0)
+    })
+  })
+
+  describe('optimizeReadQuery', () => {
+    it('rewrites simple dedupe GROUP BY queries to DISTINCT', () => {
+      const sql = "SELECT repo FROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR GROUP BY repo"
+      expect(optimizeReadQuery(sql)).toBe(
+        "SELECT DISTINCT repo\nFROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR",
+      )
+    })
+
+    it('does not rewrite aggregate GROUP BY queries', () => {
+      const sql = 'SELECT repo, COUNT(*) FROM usage_events GROUP BY repo'
+      expect(optimizeReadQuery(sql)).toBe(sql)
+    })
+  })
+
+  describe('queryR2SQL: query optimization', () => {
+    function makeEnv() {
+      return {
+        CF_ACCOUNT_ID: 'test-account',
+        CF_R2_SQL_TOKEN: 'test-token',
+        CF_R2_WAREHOUSE: 'test-warehouse',
+      } as any
+    }
+
+    it('sends DISTINCT instead of GROUP BY for simple dedupe queries', async () => {
+      let sentQuery = ''
+      vi.stubGlobal('fetch', async (_url: string, init: any) => {
+        sentQuery = JSON.parse(init.body).query
+        return new Response(JSON.stringify({
+          success: true,
+          result: { schema: [{ name: 'repo' }], rows: [{ repo: 'owner/repo' }] },
+        }), { status: 200 })
+      })
+
+      await queryR2SQL(
+        makeEnv(),
+        "SELECT repo FROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR GROUP BY repo",
+      )
+
+      expect(sentQuery).toContain('SELECT DISTINCT repo')
+      expect(sentQuery).not.toContain('GROUP BY repo')
     })
   })
 })
