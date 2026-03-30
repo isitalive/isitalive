@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { scoreProject } from './engine'
 import type { RawProjectData } from './types'
+import { METHODOLOGY } from './methodology'
 
 /** Build a complete RawProjectData with sensible defaults */
 function makeProject(overrides: Partial<RawProjectData> = {}): RawProjectData {
@@ -19,16 +20,27 @@ function makeProject(overrides: Partial<RawProjectData> = {}): RawProjectData {
     lastCommitDate: new Date(Date.now() - 7 * 86400000).toISOString(),   // 7 days ago
     lastReleaseDate: new Date(Date.now() - 30 * 86400000).toISOString(), // 30 days ago
     issueStalenessMedianDays: 5,
+    issueSampleSize: 5,
+    issueSampleLimit: 50,
+    issueSamplingStrategy: 'median of the 50 most recently updated open issues',
     prResponsivenessMedianDays: 3,
+    prSampleSize: 3,
+    prSampleLimit: 20,
+    prSamplingStrategy: 'median of the 20 most recently updated open pull requests',
     openIssueCount: 10,
     closedIssueCount: 100,
     openPrCount: 5,
     recentContributorCount: 8,
+    contributorCommitSampleSize: 24,
+    contributorWindowDays: 90,
     topContributorCommitShare: 0.3,
     hasCi: true,
     lastCiRunDate: new Date(Date.now() - 2 * 86400000).toISOString(),
     ciRunSuccessRate: 0.95,
     ciRunCount: 40,
+    ciWorkflowRunSampleSize: 10,
+    ciSamplingWindowDays: 30,
+    ciDataSource: 'actions-runs',
     ...overrides,
   }
 }
@@ -60,6 +72,27 @@ describe('scoreProject', () => {
   it('includes all 8 scoring signals', () => {
     const result = scoreProject(makeProject(), 'github')
     expect(result.signals).toHaveLength(8)
+  })
+
+  it('includes methodology metadata', () => {
+    const result = scoreProject(makeProject(), 'github')
+    expect(result.methodology).toEqual(METHODOLOGY)
+  })
+
+  it('includes top score drivers ordered by impact', () => {
+    const result = scoreProject(makeProject({
+      lastCommitDate: new Date(Date.now() - 500 * 86400000).toISOString(),
+      lastReleaseDate: null,
+      prResponsivenessMedianDays: 200,
+      hasCi: false,
+      ciRunCount: 0,
+      ciRunSuccessRate: null,
+      lastCiRunDate: null,
+    }), 'github')
+
+    expect(result.drivers).toHaveLength(3)
+    expect(result.drivers[0].signal).toBe('lastCommit')
+    expect(result.drivers[0].direction).toBe('negative')
   })
 
   it('produces a project string in the expected format', () => {
@@ -159,5 +192,13 @@ describe('scoreProject', () => {
       stars: 1234,
       forks: 56,
     })
+  })
+
+  it('includes normalized metrics', () => {
+    const result = scoreProject(makeProject(), 'github')
+    expect(result.metrics).toBeDefined()
+    expect(result.metrics!.issueSampleSize).toBe(5)
+    expect(result.metrics!.prSampleLimit).toBe(20)
+    expect(result.metrics!.ciDataSource).toBe('actions-runs')
   })
 })

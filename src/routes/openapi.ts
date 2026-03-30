@@ -2,12 +2,14 @@
 // OpenAPI 3.1 specification for the Is It Alive? API
 // ---------------------------------------------------------------------------
 
+import { CACHE_STATUS_DEFINITIONS, METHODOLOGY, SIGNAL_DEFINITIONS } from '../scoring/methodology'
+
 export const openApiSpec = {
   openapi: '3.1.0',
   info: {
     title: 'Is It Alive? API',
     version: '0.7.2',
-    description: 'Check if an open-source project is actively maintained. Returns a health score (0-100), verdict, and signal breakdown based on real-time GitHub data. Also supports manifest auditing — upload a go.mod or package.json to get a scored health report for all dependencies.',
+    description: 'Check the maintenance-health of open-source GitHub projects. Returns a weighted 0-100 maintenance-health score, verdict, methodology metadata, and agent-readable evidence. This is not a security, license, or compliance verdict.',
     license: {
       name: 'AGPL-3.0',
       url: 'https://www.gnu.org/licenses/agpl-3.0.html',
@@ -50,6 +52,13 @@ export const openApiSpec = {
             description: 'Repository name (e.g. "next.js")',
             schema: { type: 'string' },
           },
+          {
+            name: 'include',
+            in: 'query',
+            required: false,
+            description: 'Optional extra sections to include. Use include=metrics to include normalized raw measurements and sampling metadata.',
+            schema: { type: 'string', enum: ['metrics'] },
+          },
         ],
         security: [{ bearerAuth: [] }, {}],
         responses: {
@@ -57,8 +66,8 @@ export const openApiSpec = {
             description: 'Project health check result',
             headers: {
               'X-Cache': {
-                description: 'Cache status: L1-HIT (edge), HIT (KV), STALE (serving stale + revalidating), MISS (fresh fetch)',
-                schema: { type: 'string', enum: ['L1-HIT', 'HIT', 'STALE', 'MISS'] },
+                description: 'Cache status header used by the route handler',
+                schema: { type: 'string', enum: ['L1-HIT', 'L2-HIT', 'L2-STALE', 'L3-MISS'] },
               },
               'X-RateLimit-Limit': {
                 description: 'Maximum requests allowed per minute for your tier',
@@ -81,17 +90,36 @@ export const openApiSpec = {
                   verdict: 'healthy',
                   checkedAt: '2026-03-19T10:00:00Z',
                   cached: true,
+                  methodology: {
+                    version: METHODOLOGY.version,
+                    scoreType: METHODOLOGY.scoreType,
+                    description: METHODOLOGY.description,
+                    url: METHODOLOGY.url,
+                  },
                   signals: [
                     {
-                      name: 'last_commit',
+                      name: 'lastCommit',
                       label: 'Last Commit',
                       value: '2026-03-19T09:30:00Z',
                       score: 100,
                       weight: 0.25,
+                      measurement: 'direct',
+                      source: 'defaultBranchRef.target.history(first: 1)',
+                    },
+                  ],
+                  drivers: [
+                    {
+                      signal: 'lastCommit',
+                      label: 'Last Commit',
+                      direction: 'positive',
+                      weight: 0.25,
+                      score: 100,
+                      contribution: 12.5,
+                      summary: 'Default branch activity is recent (0 days ago).',
                     },
                   ],
                   cache: {
-                    status: 'hit',
+                    status: 'l2-hit',
                     tier: 'free',
                     ageSeconds: 3600,
                     dataFetchedAt: '2026-03-19T09:00:00Z',
@@ -199,7 +227,16 @@ export const openApiSpec = {
         operationId: 'auditManifest',
         summary: 'Audit dependency manifest',
         description: 'Upload a go.mod or package.json file and receive a scored health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
-        security: [{ bearerAuth: [] }, {}],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'include',
+            in: 'query',
+            required: false,
+            description: 'Optional extra per-dependency sections to include. Combine with commas, for example include=drivers,metrics.',
+            schema: { type: 'string' },
+          },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -236,6 +273,12 @@ export const openApiSpec = {
                   total: 2,
                   pending: 0,
                   unresolved: 0,
+                  methodology: {
+                    version: METHODOLOGY.version,
+                    scoreType: METHODOLOGY.scoreType,
+                    description: METHODOLOGY.description,
+                    url: METHODOLOGY.url,
+                  },
                   summary: {
                     healthy: 1,
                     stable: 0,
@@ -253,6 +296,14 @@ export const openApiSpec = {
                       github: 'zitadel/zitadel',
                       score: 100,
                       verdict: 'healthy',
+                      resolvedFrom: 'direct',
+                      checkedAt: '2026-03-19T10:00:00Z',
+                      methodology: {
+                        version: METHODOLOGY.version,
+                        scoreType: METHODOLOGY.scoreType,
+                        description: METHODOLOGY.description,
+                        url: METHODOLOGY.url,
+                      },
                     },
                     {
                       name: 'github.com/gorilla/mux',
@@ -297,13 +348,13 @@ export const openApiSpec = {
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
-        description: 'API key or GitHub Actions OIDC token. Pass as `Authorization: Bearer sk_your_key` or `Authorization: Bearer <oidc_jwt>`. Without auth: 10 req/min (IP-based). With any API key: 1,000 req/min (key-based).',
+        description: 'API key or GitHub Actions OIDC token. Pass as `Authorization: Bearer sk_your_key` or `Authorization: Bearer <oidc_jwt>`. Without auth: 5 req/min (IP-based). With any API key: 1,000 req/min (key-based).',
       },
     },
     schemas: {
       HealthCheckResult: {
         type: 'object',
-        required: ['project', 'provider', 'score', 'verdict', 'checkedAt', 'cached', 'signals'],
+        required: ['project', 'provider', 'score', 'verdict', 'checkedAt', 'cached', 'methodology', 'signals', 'drivers'],
         properties: {
           project: {
             type: 'string',
@@ -333,10 +384,21 @@ export const openApiSpec = {
             type: 'boolean',
             description: 'Whether this result was served from cache',
           },
+          methodology: {
+            $ref: '#/components/schemas/Methodology',
+          },
           signals: {
             type: 'array',
             items: { $ref: '#/components/schemas/Signal' },
             description: 'Individual health signals that make up the score',
+          },
+          drivers: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ScoreDriver' },
+            description: 'Top reasons the score is notably strong or weak',
+          },
+          metrics: {
+            $ref: '#/components/schemas/ProjectMetrics',
           },
           overrideReason: {
             type: 'string',
@@ -349,11 +411,12 @@ export const openApiSpec = {
       },
       Signal: {
         type: 'object',
-        required: ['name', 'label', 'value', 'score', 'weight'],
+        required: ['name', 'label', 'value', 'score', 'weight', 'measurement', 'source'],
         properties: {
           name: {
             type: 'string',
-            description: 'Machine-readable signal name (e.g. "last_commit", "issue_staleness")',
+            enum: SIGNAL_DEFINITIONS.map((signal) => signal.name),
+            description: 'Machine-readable signal name in camelCase',
           },
           label: {
             type: 'string',
@@ -374,6 +437,38 @@ export const openApiSpec = {
             maximum: 1,
             description: 'Weight of this signal in the total score (all weights sum to 1)',
           },
+          measurement: {
+            type: 'string',
+            enum: ['direct', 'sampled-proxy'],
+            description: 'Whether the signal is a direct measurement or a sampled proxy',
+          },
+          source: {
+            type: 'string',
+            description: 'Provider field or API used to compute the signal',
+          },
+        },
+      },
+      Methodology: {
+        type: 'object',
+        required: ['version', 'scoreType', 'description', 'url'],
+        properties: {
+          version: { type: 'string' },
+          scoreType: { type: 'string', enum: ['maintenance-health'] },
+          description: { type: 'string' },
+          url: { type: 'string', format: 'uri' },
+        },
+      },
+      ScoreDriver: {
+        type: 'object',
+        required: ['signal', 'label', 'direction', 'weight', 'score', 'contribution', 'summary'],
+        properties: {
+          signal: { type: 'string', enum: SIGNAL_DEFINITIONS.map((signal) => signal.name) },
+          label: { type: 'string' },
+          direction: { type: 'string', enum: ['positive', 'negative'] },
+          weight: { type: 'number' },
+          score: { type: 'integer' },
+          contribution: { type: 'number' },
+          summary: { type: 'string' },
         },
       },
       CacheMetadata: {
@@ -381,7 +476,7 @@ export const openApiSpec = {
         properties: {
           status: {
             type: 'string',
-            enum: ['l1-hit', 'hit', 'stale', 'miss'],
+            enum: CACHE_STATUS_DEFINITIONS.map((status) => status.name),
             description: 'Cache tier that served this response',
           },
           tier: {
@@ -431,7 +526,7 @@ export const openApiSpec = {
       },
       AuditResult: {
         type: 'object',
-        required: ['auditHash', 'complete', 'format', 'scored', 'total', 'pending', 'unresolved', 'freshlyScored', 'summary', 'dependencies'],
+        required: ['auditHash', 'complete', 'format', 'scored', 'total', 'pending', 'unresolved', 'freshlyScored', 'methodology', 'summary', 'dependencies'],
         properties: {
           auditHash: {
             type: 'string',
@@ -469,6 +564,9 @@ export const openApiSpec = {
             type: 'integer',
             description: 'Number of dependencies freshly scored this request (consumed quota). Cache hits are 0 quota.',
           },
+          methodology: {
+            $ref: '#/components/schemas/Methodology',
+          },
           summary: {
             type: 'object',
             properties: {
@@ -497,8 +595,53 @@ export const openApiSpec = {
           github: { type: 'string', nullable: true, description: 'Resolved GitHub owner/repo (e.g. "vercel/next.js") or null' },
           score: { type: 'integer', nullable: true, description: 'Health score 0-100, or null if unresolved' },
           verdict: { type: 'string', enum: ['healthy', 'stable', 'degraded', 'critical', 'unmaintained', 'pending', 'unresolved'] },
+          resolvedFrom: { type: 'string', nullable: true, enum: ['direct', 'vanity', 'registry', 'cache', null], description: 'How the dependency was resolved to GitHub' },
+          checkedAt: { type: 'string', format: 'date-time', nullable: true, description: 'When the underlying repo score was computed' },
+          methodology: { $ref: '#/components/schemas/Methodology' },
           cacheStatus: { type: 'string', enum: ['fresh', 'cached', 'pending', 'unresolved'], description: 'Whether this dep was freshly scored or served from cache' },
           unresolvedReason: { type: 'string', description: 'Why this dep could not be resolved (e.g. "gitlab_not_supported_yet", "no_github_repo", "repo_not_found")' },
+          signals: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Signal' },
+            description: 'Per-dependency signal breakdown. Only included when requested via include=signals.',
+          },
+          drivers: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ScoreDriver' },
+            description: 'Per-dependency drivers. Only included when requested via include=drivers.',
+          },
+          metrics: {
+            $ref: '#/components/schemas/ProjectMetrics',
+          },
+        },
+      },
+      ProjectMetrics: {
+        type: 'object',
+        properties: {
+          lastCommitDate: { type: 'string', format: 'date-time', nullable: true },
+          lastCommitAgeDays: { type: 'integer', nullable: true },
+          lastReleaseDate: { type: 'string', format: 'date-time', nullable: true },
+          lastReleaseAgeDays: { type: 'integer', nullable: true },
+          issueStalenessMedianDays: { type: 'integer', nullable: true },
+          issueSampleSize: { type: 'integer' },
+          issueSampleLimit: { type: 'integer' },
+          issueSamplingStrategy: { type: 'string' },
+          prResponsivenessMedianDays: { type: 'integer', nullable: true },
+          prSampleSize: { type: 'integer' },
+          prSampleLimit: { type: 'integer' },
+          prSamplingStrategy: { type: 'string' },
+          recentContributorCount: { type: 'integer' },
+          contributorCommitSampleSize: { type: 'integer' },
+          contributorWindowDays: { type: 'integer' },
+          topContributorCommitShare: { type: 'number' },
+          hasCi: { type: 'boolean' },
+          lastCiRunDate: { type: 'string', format: 'date-time', nullable: true },
+          lastCiRunAgeDays: { type: 'integer', nullable: true },
+          ciRunSuccessRate: { type: 'number', nullable: true },
+          ciRunCount: { type: 'integer' },
+          ciWorkflowRunSampleSize: { type: 'integer' },
+          ciSamplingWindowDays: { type: 'integer' },
+          ciDataSource: { type: 'string', enum: ['actions-runs', 'workflow-directory-only', 'actions-runs-unavailable', 'none'] },
         },
       },
     },

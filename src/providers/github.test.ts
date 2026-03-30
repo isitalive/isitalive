@@ -26,7 +26,7 @@ function makeGraphqlResponse(hasCi = true) {
         releases: { nodes: [{ publishedAt: '2026-03-01T00:00:00.000Z', tagName: 'v1.0.0' }] },
         issues: { totalCount: 1, nodes: [{ createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-03-02T00:00:00.000Z', comments: { nodes: [] } }] },
         closedIssues: { totalCount: 1 },
-        pullRequests: { totalCount: 1, nodes: [{ createdAt: '2026-03-01T00:00:00.000Z' }] },
+        pullRequests: { totalCount: 1, nodes: [{ createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-03-10T00:00:00.000Z' }] },
         ciCheck: hasCi ? { __typename: 'Tree' } : null,
       },
     },
@@ -63,5 +63,25 @@ describe('GitHubProvider timeouts', () => {
     expect(result.ciRunCount).toBe(0)
     expect(result.lastCiRunDate).toBeNull()
     expect(result.ciRunSuccessRate).toBeNull()
+    expect(result.ciDataSource).toBe('actions-runs-unavailable')
+    expect(result.issueSampleSize).toBe(1)
+    expect(result.prSampleSize).toBe(1)
+    expect(result.contributorCommitSampleSize).toBe(1)
+  })
+
+  it('measures PR responsiveness from updatedAt rather than createdAt', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/actions/runs')) {
+        return new Response(JSON.stringify({ total_count: 1, workflow_runs: [] }), { status: 200 })
+      }
+      return new Response(JSON.stringify(makeGraphqlResponse()), { status: 200 })
+    }))
+
+    const provider = new GitHubProvider()
+    const result = await provider.fetchProject('vercel', 'next.js', 'gh-token')
+
+    expect(result.prResponsivenessMedianDays).toBeLessThan(40)
+    expect(result.prSamplingStrategy).toContain('recently updated')
   })
 })

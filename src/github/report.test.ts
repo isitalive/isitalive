@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from '../github/report';
 import type { AuditResult } from '../audit/scorer';
 import { DEFAULT_CONFIG } from '../github/types';
+import { METHODOLOGY } from '../scoring/methodology';
 
 function makeAuditResult(overrides: Partial<AuditResult> = {}): AuditResult {
   return {
@@ -13,6 +14,7 @@ function makeAuditResult(overrides: Partial<AuditResult> = {}): AuditResult {
     pending: 0,
     unresolved: 1,
     freshlyScored: 0,
+    methodology: METHODOLOGY,
     summary: {
       healthy: 1,
       stable: 1,

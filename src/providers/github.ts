@@ -63,10 +63,10 @@ query($owner: String!, $repo: String!, $since: GitTimestamp!) {
       totalCount
     }
 
-    # 20 newest open PRs
-    pullRequests(first: 20, states: OPEN, orderBy: { field: CREATED_AT, direction: DESC }) {
+    # 20 most recently updated open PRs
+    pullRequests(first: 20, states: OPEN, orderBy: { field: UPDATED_AT, direction: DESC }) {
       totalCount
-      nodes { createdAt }
+      nodes { createdAt updatedAt }
     }
 
     # CI check — look for .github/workflows directory
@@ -158,7 +158,10 @@ export class GitHubProvider implements Provider {
 
     // ── PR responsiveness ───────────────────────────────────────────
     const prNodes = r.pullRequests?.nodes ?? [];
-    const prAgeDays = prNodes.map((pr: any) => daysBetween(pr.createdAt, now));
+    const prAgeDays = prNodes.map((pr: any) => {
+      const updatedAt = pr.updatedAt ?? pr.createdAt;
+      return daysBetween(updatedAt, now);
+    });
     const prResponsivenessMedianDays = median(prAgeDays);
 
     // ── Recent contributors & bus factor ────────────────────────────
@@ -183,6 +186,8 @@ export class GitHubProvider implements Provider {
     let lastCiRunDate: string | null = null;
     let ciRunSuccessRate: number | null = null;
     let ciRunCount = 0;
+    let ciWorkflowRunSampleSize = 0;
+    let ciDataSource: RawProjectData['ciDataSource'] = hasCi ? 'workflow-directory-only' : 'none';
 
     if (hasCi) {
       try {
@@ -207,6 +212,8 @@ export class GitHubProvider implements Provider {
         if (runsRes.ok) {
           const runsJson = await runsRes.json() as any;
           const runs: any[] = runsJson.workflow_runs ?? [];
+          ciWorkflowRunSampleSize = runs.length;
+          ciDataSource = 'actions-runs';
 
           // Use API's total_count for accurate 30-day run count
           ciRunCount = runsJson.total_count ?? runs.length;
@@ -222,6 +229,7 @@ export class GitHubProvider implements Provider {
         }
       } catch {
         // Non-critical — fall back to hasCi boolean
+        ciDataSource = 'actions-runs-unavailable';
       }
     }
 
@@ -240,16 +248,27 @@ export class GitHubProvider implements Provider {
       lastCommitDate,
       lastReleaseDate,
       issueStalenessMedianDays,
+      issueSampleSize: issueNodes.length,
+      issueSampleLimit: 50,
+      issueSamplingStrategy: 'median of the 50 most recently updated open issues',
       prResponsivenessMedianDays,
+      prSampleSize: prNodes.length,
+      prSampleLimit: 20,
+      prSamplingStrategy: 'median of the 20 most recently updated open pull requests',
       openIssueCount: r.issues?.totalCount ?? 0,
       closedIssueCount: r.closedIssues?.totalCount ?? 0,
       openPrCount: r.pullRequests?.totalCount ?? 0,
       recentContributorCount,
+      contributorCommitSampleSize: totalRecentCommits,
+      contributorWindowDays: 90,
       topContributorCommitShare,
       hasCi,
       lastCiRunDate,
       ciRunSuccessRate,
       ciRunCount,
+      ciWorkflowRunSampleSize,
+      ciSamplingWindowDays: 30,
+      ciDataSource,
     };
   }
 }
