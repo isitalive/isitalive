@@ -26,16 +26,27 @@ function makeData(overrides: Partial<RawProjectData> = {}): RawProjectData {
     lastCommitDate: null,
     lastReleaseDate: null,
     issueStalenessMedianDays: null,
+    issueSampleSize: 0,
+    issueSampleLimit: 50,
+    issueSamplingStrategy: 'median of the 50 most recently updated open issues',
     prResponsivenessMedianDays: null,
+    prSampleSize: 0,
+    prSampleLimit: 20,
+    prSamplingStrategy: 'median of the 20 most recently updated open pull requests',
     openIssueCount: 0,
     closedIssueCount: 0,
     openPrCount: 0,
     recentContributorCount: 0,
+    contributorCommitSampleSize: 0,
+    contributorWindowDays: 90,
     topContributorCommitShare: 0,
     hasCi: false,
     lastCiRunDate: null,
     ciRunSuccessRate: null,
     ciRunCount: 0,
+    ciWorkflowRunSampleSize: 0,
+    ciSamplingWindowDays: 30,
+    ciDataSource: 'none',
     ...overrides,
   }
 }
@@ -339,6 +350,10 @@ describe('busFactor rule', () => {
 
   it('scores 100 for < 50% commit share', () => {
     expect(r.evaluate(makeData({ topContributorCommitShare: 0.3 })).score).toBe(100)
+  })
+
+  it('does not round boundary cases into the wrong bucket', () => {
+    expect(r.evaluate(makeData({ topContributorCommitShare: 0.499 })).score).toBe(100)
   })
 
   it('scores 75 for 50-70% commit share', () => {

@@ -8,10 +8,17 @@
 // ---------------------------------------------------------------------------
 
 import type { ResolvedDep } from './resolver';
-import type { ScoringResult } from '../scoring/types';
+import type {
+  MethodologySummary,
+  ProjectMetrics,
+  ScoreDriver,
+  ScoringResult,
+  SignalResult,
+} from '../scoring/types';
 import { CacheManager, type Tier } from '../cache/index';
 import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
+import { METHODOLOGY } from '../scoring/methodology';
 import { bufferToHex } from '../utils/crypto';
 import type { Env } from '../types/env';
 
@@ -36,6 +43,18 @@ export interface AuditDep {
   score: number | null;
   /** Verdict, or "pending"/"unresolved" */
   verdict: string;
+  /** How the dependency was resolved to GitHub */
+  resolvedFrom?: ResolvedDep['resolvedFrom'] | null;
+  /** When the underlying repo score was computed */
+  checkedAt?: string;
+  /** Methodology used to compute the score */
+  methodology?: MethodologySummary;
+  /** Individual signal breakdowns, included on demand */
+  signals?: SignalResult[];
+  /** Top drivers, included on demand */
+  drivers?: ScoreDriver[];
+  /** Normalized raw metrics, included on demand */
+  metrics?: ProjectMetrics;
   /** Whether this dep was freshly scored or served from cache */
   cacheStatus?: 'fresh' | 'cached' | 'pending' | 'unresolved';
   /** If unresolved, why */
@@ -58,6 +77,8 @@ export interface AuditResult {
   freshlyScored: number;
   /** If incomplete, suggested wait before retry (ms) */
   retryAfterMs?: number;
+  /** Methodology used for all scored dependencies in this audit */
+  methodology: MethodologySummary;
   /** Aggregate stats (only over scored deps) */
   summary: {
     healthy: number;
@@ -71,9 +92,17 @@ export interface AuditResult {
   dependencies: AuditDep[];
 }
 
-const AUDIT_CACHE_PREFIX = 'audit:result:';
+const AUDIT_CACHE_PREFIX = `audit:result:${METHODOLOGY.version}:`;
 const AUDIT_CACHE_TTL = 6 * 60 * 60; // 6 hours
-const AUDIT_CACHE_URL_PREFIX = 'https://cache.isitalive.dev/api/manifest/';
+const AUDIT_CACHE_URL_PREFIX = `https://cache.isitalive.dev/api/manifest/${METHODOLOGY.version}/`;
+
+export function buildAuditCacheKey(contentHash: string): string {
+  return `${AUDIT_CACHE_PREFIX}${contentHash}`
+}
+
+export function buildAuditCacheUrl(contentHash: string, includeKey: string = 'base'): Request {
+  return new Request(`${AUDIT_CACHE_URL_PREFIX}${contentHash}?include=${encodeURIComponent(includeKey)}`)
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -96,13 +125,16 @@ export async function scoreAudit(
   contentHash: string,
   env: Env,
   ctx: ExecutionContext,
-  budgetMs = 28_000,
+  tierOrBudget: Tier | number = 'free',
+  maybeBudgetMs = 28_000,
 ): Promise<AuditResult> {
+  const tier: Tier = typeof tierOrBudget === 'string' ? tierOrBudget : 'free'
+  const budgetMs = typeof tierOrBudget === 'number' ? tierOrBudget : maybeBudgetMs
   const start = Date.now();
   const cacheManager = new CacheManager(env, ctx);
 
   // ── 1. Check for a cached full audit by manifest hash ──────────────
-  const auditCacheKey = `${AUDIT_CACHE_PREFIX}${contentHash}`;
+  const auditCacheKey = buildAuditCacheKey(contentHash);
   const cachedAudit = await env.CACHE_KV.get(auditCacheKey);
   if (cachedAudit) {
     const parsed = JSON.parse(cachedAudit) as AuditResult;
@@ -122,6 +154,9 @@ export async function scoreAudit(
       github: null,
       score: null,
       verdict: 'unresolved',
+      resolvedFrom: d.resolvedFrom,
+      checkedAt: undefined,
+      methodology: undefined,
       cacheStatus: 'unresolved' as const,
       unresolvedReason: d.unresolvedReason,
     }));
@@ -130,7 +165,7 @@ export async function scoreAudit(
   const cacheChecks = await Promise.allSettled(
     resolvable.map(async (dep) => {
       const { owner, repo } = dep.github!;
-      const cached = await cacheManager.get('github', owner, repo, 'free' as Tier);
+      const cached = await cacheManager.get('github', owner, repo, tier);
       return { dep, cached };
     }),
   );
@@ -169,6 +204,9 @@ export async function scoreAudit(
           github: `${uncached[j].github!.owner}/${uncached[j].github!.repo}`,
           score: null,
           verdict: 'pending',
+          resolvedFrom: uncached[j].resolvedFrom,
+          checkedAt: undefined,
+          methodology: undefined,
           cacheStatus: 'pending',
         });
       }
@@ -207,6 +245,9 @@ export async function scoreAudit(
           github: `${dep.github!.owner}/${dep.github!.repo}`,
           score: null,
           verdict: 'unresolved',
+          resolvedFrom: dep.resolvedFrom,
+          checkedAt: undefined,
+          methodology: undefined,
           cacheStatus: 'unresolved',
           unresolvedReason: error ?? 'scoring_error',
         });
@@ -245,6 +286,7 @@ export async function scoreAudit(
     pending: pendingCount,
     unresolved: unresolvedDeps.length,
     freshlyScored: freshCount,
+    methodology: METHODOLOGY,
     summary,
     dependencies: allDeps,
   };
@@ -257,7 +299,7 @@ export async function scoreAudit(
   }
 
   // ── 6. Persist current audit state immediately ─────────────────────
-  await persistAuditResult(env, auditCacheKey, contentHash, auditResult)
+  await persistAuditResult(env, auditCacheKey, auditResult)
 
   // If incomplete, finish the remaining deps in the background and promote
   // the manifest-hash cache entry to a complete result.
@@ -281,6 +323,12 @@ function depToAudit(dep: ResolvedDep, result: ScoringResult, cacheStatus: 'fresh
     github: `${dep.github!.owner}/${dep.github!.repo}`,
     score: result.score,
     verdict: result.verdict,
+    resolvedFrom: dep.resolvedFrom,
+    checkedAt: result.checkedAt,
+    methodology: result.methodology,
+    signals: result.signals,
+    drivers: result.drivers,
+    metrics: result.metrics,
     cacheStatus,
   };
 }
@@ -327,7 +375,17 @@ async function completeAuditInBackground(
           const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
           const result = scoreProject(rawData, 'github');
           await cacheManager.put('github', owner, repo, result);
-          replacements.set(dep.github, { ...dep, score: result.score, verdict: result.verdict, cacheStatus: 'fresh' })
+          replacements.set(dep.github, {
+            ...dep,
+            score: result.score,
+            verdict: result.verdict,
+            checkedAt: result.checkedAt,
+            methodology: result.methodology,
+            signals: result.signals,
+            drivers: result.drivers,
+            metrics: result.metrics,
+            cacheStatus: 'fresh',
+          })
         } catch {
           replacements.set(dep.github, {
             ...dep,
@@ -379,35 +437,18 @@ async function completeAuditInBackground(
     dependencies: finalDeps,
   }
 
-  await persistAuditResult(env, auditCacheKey, contentHash, finalResult)
+  await persistAuditResult(env, auditCacheKey, finalResult)
 }
 
 async function persistAuditResult(
   env: Env,
   auditCacheKey: string,
-  contentHash: string,
   auditResult: AuditResult,
 ): Promise<void> {
   const json = JSON.stringify(auditResult)
   await env.CACHE_KV.put(auditCacheKey, json, {
     expirationTtl: AUDIT_CACHE_TTL,
   })
-
-  if (!auditResult.complete) return
-
-  try {
-    const cache = caches.default
-    const response = new Response(json, {
-      headers: {
-        'Content-Type': 'application/json',
-        'ETag': `"${contentHash}"`,
-        'Cache-Control': 'public, max-age=3600',
-      },
-    })
-    await cache.put(new Request(`${AUDIT_CACHE_URL_PREFIX}${contentHash}`), response)
-  } catch {
-    // Cache API is best-effort outside the request path
-  }
 }
 
 /** Hash manifest content using SHA-256 */

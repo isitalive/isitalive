@@ -18,11 +18,13 @@ import type { Tier } from '../cache/index';
 import type { OidcClaims } from '../github/oidc';
 import { parseManifest, type ManifestFormat } from '../audit/parsers';
 import { resolveAll } from '../audit/resolver';
-import { scoreAudit, hashManifest } from '../audit/scorer';
+import { buildAuditCacheKey, buildAuditCacheUrl, scoreAudit, hashManifest, type AuditResult } from '../audit/scorer';
 import { buildManifestEvent } from '../events/manifest';
 import { buildUsageEvent } from '../events/usage';
 import { emitAll } from '../pipeline/emit';
 import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
+import { includeKey, parseIncludeFlags, shapeAuditResult, type IncludeFlags } from '../utils/healthResponse';
+import { METHODOLOGY } from '../scoring/methodology';
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
@@ -36,11 +38,12 @@ function buildCachedAuditResponse(
   cachedJson: string,
   contentHash: string,
   ifNoneMatch: string | undefined,
+  flags: IncludeFlags,
 ): Response | null {
-  let cachedResult: { complete?: boolean; retryAfterMs?: number } | null = null
+  let cachedResult: AuditResult | null = null
 
   try {
-    cachedResult = JSON.parse(cachedJson)
+    cachedResult = JSON.parse(cachedJson) as AuditResult
   } catch {
     return null
   }
@@ -52,7 +55,7 @@ function buildCachedAuditResponse(
     })
   }
 
-  const response = new Response(cachedJson, {
+  const response = new Response(JSON.stringify(shapeAuditResult(cachedResult, flags)), {
     headers: {
       'Content-Type': 'application/json',
       'ETag': `"${contentHash}"`,
@@ -75,6 +78,8 @@ function buildCachedAuditResponse(
 // ---------------------------------------------------------------------------
 
 audit.post('/', async (c) => {
+  const includeFlags = parseIncludeFlags(c.req.url)
+  const includeCacheKey = includeKey(includeFlags)
   // ── Auth gate — require authentication for API access ──────────────
   const isAuthenticated = c.get('isAuthenticated') ?? false
   if (!isAuthenticated) {
@@ -106,8 +111,8 @@ audit.post('/', async (c) => {
   const rawHash = c.req.header('X-Manifest-Hash');
   const clientHash = rawHash?.toLowerCase();
   if (clientHash && /^[a-f0-9]{64}$/.test(clientHash)) {
-    const auditCacheKey = `audit:result:${clientHash}`;
-    const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/manifest/${clientHash}`);
+    const auditCacheKey = buildAuditCacheKey(clientHash);
+    const syntheticCacheUrl = buildAuditCacheUrl(clientHash, includeCacheKey);
     const cache = caches.default;
 
     // L1: Cache API hit (Worker-internal, free ops)
@@ -119,7 +124,7 @@ audit.post('/', async (c) => {
     // L2: KV cache hit
     const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
     if (kvCached) {
-      const response = buildCachedAuditResponse(kvCached, clientHash, c.req.header('If-None-Match'))
+      const response = buildCachedAuditResponse(kvCached, clientHash, c.req.header('If-None-Match'), includeFlags)
       if (!response) {
         c.executionCtx.waitUntil(c.env.CACHE_KV.delete(auditCacheKey))
       } else {
@@ -169,13 +174,13 @@ audit.post('/', async (c) => {
 
   // ── Hash manifest for caching + ETag ───────────────────────────────
   const contentHash = await hashManifest(content);
-  const auditCacheKey = `audit:result:${contentHash}`;
+  const auditCacheKey = buildAuditCacheKey(contentHash);
 
   // ── L1: Cloudflare Cache API (edge, ~0ms) ─────────────────────────
   // POST can't use Cache API directly, so we use a synthetic URL keyed
   // by the manifest hash. Same pattern as /api/check.
   const cache = caches.default;
-  const syntheticCacheUrl = new Request(`https://cache.isitalive.dev/api/manifest/${contentHash}`);
+  const syntheticCacheUrl = buildAuditCacheUrl(contentHash, includeCacheKey);
 
   const l1Hit = await cache.match(syntheticCacheUrl);
   if (l1Hit) {
@@ -188,7 +193,7 @@ audit.post('/', async (c) => {
   // parse and re-serialize — return the raw JSON string directly.
   const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
   if (kvCached) {
-    const response = buildCachedAuditResponse(kvCached, contentHash, c.req.header('If-None-Match'))
+    const response = buildCachedAuditResponse(kvCached, contentHash, c.req.header('If-None-Match'), includeFlags)
     if (!response) {
       c.executionCtx.waitUntil(c.env.CACHE_KV.delete(auditCacheKey))
     } else {
@@ -223,6 +228,7 @@ audit.post('/', async (c) => {
       pending: 0,
       unresolved: 0,
       freshlyScored: 0,
+      methodology: METHODOLOGY,
       summary: { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0, avgScore: 0 },
       dependencies: [],
     });
@@ -238,10 +244,11 @@ audit.post('/', async (c) => {
     contentHash,
     c.env,
     c.executionCtx,
+    c.get('tier') ?? 'free',
   );
 
   // ── Response ───────────────────────────────────────────────────────
-  const response = c.json(result);
+  const response = c.json(shapeAuditResult(result, includeFlags));
   response.headers.set('ETag', `"${contentHash}"`);
   response.headers.set('Cache-Control', result.complete
     ? 'public, max-age=3600'

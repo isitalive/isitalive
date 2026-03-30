@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { CacheManager, TIERS, type Tier } from './index'
 import type { ScoringResult } from '../scoring/types'
 import type { Env } from '../types/env'
+import { METHODOLOGY } from '../scoring/methodology'
 
 // ---------------------------------------------------------------------------
 // Helpers — minimal ScoringResult factory
@@ -19,7 +20,9 @@ function makeScoringResult(overrides: Partial<ScoringResult> = {}): ScoringResul
     verdict: 'healthy',
     checkedAt: new Date().toISOString(),
     cached: false,
+    methodology: METHODOLOGY,
     signals: [],
+    drivers: [],
     ...overrides,
   }
 }
@@ -101,7 +104,7 @@ describe('CacheManager', () => {
 
   // ─── Helper: seed KV with a CachedEntry ──────────────────────────────
   function seedKV(provider: string, owner: string, repo: string, result: ScoringResult, storedAt: number) {
-    const key = `isitalive:v2:${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`
+    const key = `isitalive:${METHODOLOGY.version}:${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`
     mockKV._store.set(key, {
       value: JSON.stringify({ result, storedAt }),
     })
@@ -109,7 +112,7 @@ describe('CacheManager', () => {
 
   // ─── Helper: seed L1 cache with a result ─────────────────────────────
   function seedL1(provider: string, owner: string, repo: string, result: ScoringResult) {
-    const url = `https://cache.isitalive.dev/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`
+    const url = `https://cache.isitalive.dev/${METHODOLOGY.version}/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`
     const response = new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },
     })
@@ -264,7 +267,7 @@ describe('CacheManager', () => {
 
       await cm.put('github', 'vercel', 'next.js', result)
 
-      const kvEntry = mockKV._store.get('isitalive:v2:github/vercel/next.js')
+      const kvEntry = mockKV._store.get(`isitalive:${METHODOLOGY.version}:github/vercel/next.js`)
       expect(kvEntry).toBeDefined()
       const parsed = JSON.parse(kvEntry!.value)
       expect(parsed.result.score).toBe(92)
@@ -278,7 +281,7 @@ describe('CacheManager', () => {
       await cm.put('github', 'vercel', 'next.js', result)
 
       expect(mockKV.put).toHaveBeenCalledWith(
-        'isitalive:v2:github/vercel/next.js',
+        `isitalive:${METHODOLOGY.version}:github/vercel/next.js`,
         expect.any(String),
         { expirationTtl: 48 * 60 * 60 },
       )
@@ -300,7 +303,7 @@ describe('CacheManager', () => {
       await cm.put('github', 'vercel', 'next.js', result)
 
       // KV should still have the entry (awaited directly)
-      const kvEntry = mockKV._store.get('isitalive:v2:github/vercel/next.js')
+      const kvEntry = mockKV._store.get(`isitalive:${METHODOLOGY.version}:github/vercel/next.js`)
       expect(kvEntry).toBeDefined()
     })
 
@@ -330,7 +333,7 @@ describe('CacheManager', () => {
       const response = new Response(JSON.stringify({ score: 92 }), {
         headers: { 'Content-Type': 'application/json' },
       })
-      mockCache._store.set(req.url, response)
+      mockCache._store.set(`https://cache.isitalive.dev/response/${METHODOLOGY.version}/api/check/github/vercel/next.js`, response)
 
       const cm = new CacheManager(env, ctx)
       const cached = await cm.getResponse(req, false)
@@ -342,7 +345,7 @@ describe('CacheManager', () => {
 
     it('returns null for authenticated requests (bypasses cache)', async () => {
       const req = new Request('https://isitalive.dev/api/check/github/vercel/next.js')
-      mockCache._store.set(req.url, new Response('cached'))
+      mockCache._store.set(`https://cache.isitalive.dev/response/${METHODOLOGY.version}/api/check/github/vercel/next.js`, new Response('cached'))
 
       const cm = new CacheManager(env, ctx)
       const cached = await cm.getResponse(req, true)
@@ -376,7 +379,7 @@ describe('CacheManager', () => {
       const response = new Response(JSON.stringify({ score: 92 }), {
         headers: { 'Content-Type': 'application/json' },
       })
-      mockCache._store.set(req.url, response)
+      mockCache._store.set(`https://cache.isitalive.dev/response/${METHODOLOGY.version}/api/check/github/vercel/next.js`, response)
 
       const cm = new CacheManager(env, ctx)
       const cached = await cm.getResponse(req, false)

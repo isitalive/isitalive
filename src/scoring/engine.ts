@@ -4,6 +4,8 @@
 
 import type { RawProjectData, ScoringResult, Verdict, ProviderName, ProjectMetadata } from './types';
 import { RULES } from './rules';
+import { buildDrivers, buildProjectMetrics } from './insights';
+import { METHODOLOGY } from './methodology';
 
 /** Map a 0-100 score to a human-readable verdict */
 function toVerdict(score: number): Verdict {
@@ -26,6 +28,7 @@ export function scoreProject(
 ): ScoringResult {
   const project = `${provider}/${data.owner}/${data.name}`;
   const checkedAt = new Date().toISOString();
+  const metrics = buildProjectMetrics(data);
 
   // Build metadata once (shared by both paths)
   const metadata: ProjectMetadata = {
@@ -47,7 +50,10 @@ export function scoreProject(
       verdict: 'unmaintained',
       checkedAt,
       cached: false,
+      methodology: METHODOLOGY,
       signals: [],
+      drivers: [],
+      metrics,
       overrideReason: 'Repository is archived — score forced to 0.',
       metadata,
     };
@@ -55,6 +61,7 @@ export function scoreProject(
 
   // ── Evaluate all rules ────────────────────────────────────────────
   const signals = RULES.map((rule) => rule.evaluate(data));
+  const drivers = buildDrivers(signals, metrics);
 
   // Weighted sum
   const score = Math.round(
@@ -68,7 +75,10 @@ export function scoreProject(
     verdict: toVerdict(score),
     checkedAt,
     cached: false,
+    methodology: METHODOLOGY,
     signals,
+    drivers,
+    metrics,
     metadata,
   };
 }

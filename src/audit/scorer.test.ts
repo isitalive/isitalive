@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildSummary, hashManifest, scoreAudit, type AuditDep } from './scorer'
+import { buildAuditCacheKey, buildSummary, hashManifest, scoreAudit, type AuditDep } from './scorer'
 import type { RawProjectData } from '../scoring/types'
 import type { Env } from '../types/env'
 import { providers } from '../providers/index'
@@ -46,16 +46,27 @@ function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProject
     lastCommitDate: '2026-03-01T00:00:00.000Z',
     lastReleaseDate: '2026-03-01T00:00:00.000Z',
     issueStalenessMedianDays: 1,
+    issueSampleSize: 1,
+    issueSampleLimit: 50,
+    issueSamplingStrategy: 'median of the 50 most recently updated open issues',
     prResponsivenessMedianDays: 1,
+    prSampleSize: 1,
+    prSampleLimit: 20,
+    prSamplingStrategy: 'median of the 20 most recently updated open pull requests',
     openIssueCount: 1,
     closedIssueCount: 1,
     openPrCount: 1,
     recentContributorCount: 2,
+    contributorCommitSampleSize: 4,
+    contributorWindowDays: 90,
     topContributorCommitShare: 0.5,
     hasCi: true,
     lastCiRunDate: '2026-03-01T00:00:00.000Z',
     ciRunSuccessRate: 1,
     ciRunCount: 5,
+    ciWorkflowRunSampleSize: 5,
+    ciSamplingWindowDays: 30,
+    ciDataSource: 'actions-runs',
     ...overrides,
   }
 }
@@ -227,13 +238,13 @@ describe('scoreAudit background completion', () => {
     const initial = await scoreAudit(deps, 'package.json', contentHash, env, executionCtx, -1)
 
     expect(initial.complete).toBe(false)
-    const persistedInitial = JSON.parse(cacheKv._store.get(`audit:result:${contentHash}`)!)
+    const persistedInitial = JSON.parse(cacheKv._store.get(buildAuditCacheKey(contentHash))!)
     expect(persistedInitial.complete).toBe(false)
     expect(persistedInitial.pending).toBe(2)
 
     await Promise.all(executionCtx.pending)
 
-    const finalJson = cacheKv._store.get(`audit:result:${contentHash}`)
+    const finalJson = cacheKv._store.get(buildAuditCacheKey(contentHash))
     expect(finalJson).toBeTruthy()
     const final = JSON.parse(finalJson!)
     expect(final.complete).toBe(true)

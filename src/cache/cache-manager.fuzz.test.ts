@@ -11,6 +11,7 @@ import { test, fc } from '@fast-check/vitest'
 import { CacheManager, TIERS, type Tier } from './index'
 import type { ScoringResult, Verdict } from '../scoring/types'
 import type { Env } from '../types/env'
+import { METHODOLOGY } from '../scoring/methodology'
 
 // Cap iterations — each iteration involves async mock KV ops that compound.
 // At 500, cumulative overhead triggers Vitest worker timeouts on CI (~117s).
@@ -73,7 +74,9 @@ const scoringResultArb: fc.Arbitrary<ScoringResult> = fc.record({
   verdict: fc.constantFrom(...VALID_VERDICTS),
   checkedAt: fc.constant(new Date().toISOString()),
   cached: fc.constant(false),
+  methodology: fc.constant(METHODOLOGY),
   signals: fc.constant([]),
+  drivers: fc.constant([]),
 })
 
 // ---------------------------------------------------------------------------
@@ -103,7 +106,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 function seedKV(provider: string, owner: string, repo: string, result: ScoringResult, storedAt: number) {
-  const key = `isitalive:v2:${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`
+  const key = `isitalive:${METHODOLOGY.version}:${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`
   mockKV._store.set(key, {
     value: JSON.stringify({ result, storedAt }),
   })
@@ -124,7 +127,9 @@ describe('CacheManager fuzz', () => {
         verdict: 'stable',
         checkedAt: new Date().toISOString(),
         cached: false,
+        methodology: METHODOLOGY,
         signals: [],
+        drivers: [],
       }
 
       const cm = new CacheManager(env, ctx)
@@ -278,7 +283,9 @@ describe('CacheManager fuzz', () => {
         verdict: 'stable',
         checkedAt: new Date().toISOString(),
         cached: false,
+        methodology: METHODOLOGY,
         signals: [],
+        drivers: [],
       }
 
       const cm = new CacheManager(env, ctx)

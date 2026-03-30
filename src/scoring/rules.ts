@@ -3,6 +3,15 @@
 // ---------------------------------------------------------------------------
 
 import type { RawProjectData, SignalResult } from './types';
+import {
+  BUS_FACTOR_THRESHOLDS,
+  CONTRIBUTOR_THRESHOLDS,
+  getSignalDefinition,
+  LAST_COMMIT_THRESHOLDS,
+  LAST_RELEASE_THRESHOLDS,
+  RESPONSIVENESS_THRESHOLDS,
+  STAR_THRESHOLDS,
+} from './methodology';
 
 /** Helper: days between a date string and now */
 function daysAgo(isoDate: string | null): number | null {
@@ -29,18 +38,18 @@ function freshnessScore(
 // ---------------------------------------------------------------------------
 
 export interface Rule {
-  name: string;
+  name: SignalResult['name'];
   label: string;
   weight: number;
+  measurement: SignalResult['measurement'];
+  source: SignalResult['source'];
   evaluate(data: RawProjectData): SignalResult;
 }
 
 export const RULES: Rule[] = [
   // ── Last Commit ──────────────────────────────────────────────────────
   {
-    name: 'lastCommit',
-    label: 'Last Commit',
-    weight: 0.25,
+    ...getSignalDefinition('lastCommit'),
     evaluate(data) {
       const days = daysAgo(data.lastCommitDate);
 
@@ -59,52 +68,56 @@ export const RULES: Rule[] = [
           value: 'stable / complete',
           score: 100,
           weight: this.weight,
+          measurement: this.measurement,
+          source: this.source,
         };
       }
 
-      const score = freshnessScore(days, [
-        [30, 100],
-        [90, 75],
-        [180, 50],
-        [365, 25],
-      ]);
+      const score = freshnessScore(
+        days,
+        LAST_COMMIT_THRESHOLDS
+          .filter((row) => row.maxDays !== undefined)
+          .map((row) => [row.maxDays!, row.score]),
+      );
       return {
         name: this.name,
         label: this.label,
         value: data.lastCommitDate ?? 'never',
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── Last Release ─────────────────────────────────────────────────────
   {
-    name: 'lastRelease',
-    label: 'Last Release',
-    weight: 0.15,
+    ...getSignalDefinition('lastRelease'),
     evaluate(data) {
       const days = daysAgo(data.lastReleaseDate);
-      const score = freshnessScore(days, [
-        [90, 100],
-        [180, 75],
-        [365, 50],
-      ], 0);
+      const score = freshnessScore(
+        days,
+        LAST_RELEASE_THRESHOLDS
+          .filter((row) => row.maxDays !== undefined)
+          .map((row) => [row.maxDays!, row.score]),
+        0,
+      );
       return {
         name: this.name,
         label: this.label,
         value: data.lastReleaseDate ?? 'never',
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── Issue Staleness ──────────────────────────────────────────────────
   {
-    name: 'issueStaleness',
-    label: 'Issue Staleness',
-    weight: 0.10,
+    ...getSignalDefinition('issueStaleness'),
     evaluate(data) {
       const days = data.issueStalenessMedianDays;
       let score: number;
@@ -113,11 +126,13 @@ export const RULES: Rule[] = [
         // Differentiate "inbox zero hero" from "ghost town"
         score = data.closedIssueCount > 0 ? 100 : 75;
       } else {
-        score = freshnessScore(days, [
-          [7, 100],
-          [30, 75],
-          [90, 50],
-        ], 25);
+        score = freshnessScore(
+          days,
+          RESPONSIVENESS_THRESHOLDS
+            .filter((row) => row.maxDays !== undefined)
+            .map((row) => [row.maxDays!, row.score]),
+          25,
+        );
       }
 
       return {
@@ -126,15 +141,15 @@ export const RULES: Rule[] = [
         value: days !== null ? `${days}d median` : (data.closedIssueCount > 0 ? 'inbox zero' : 'no issues'),
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── PR Responsiveness ────────────────────────────────────────────────
   {
-    name: 'prResponsiveness',
-    label: 'PR Responsiveness',
-    weight: 0.15,
+    ...getSignalDefinition('prResponsiveness'),
     evaluate(data) {
       const days = data.prResponsivenessMedianDays;
       let score: number;
@@ -143,11 +158,13 @@ export const RULES: Rule[] = [
         // No open PRs: if they've closed issues before, they're on top of it
         score = data.closedIssueCount > 0 ? 100 : 75;
       } else {
-        score = freshnessScore(days, [
-          [7, 100],
-          [30, 75],
-          [90, 50],
-        ], 25);
+        score = freshnessScore(
+          days,
+          RESPONSIVENESS_THRESHOLDS
+            .filter((row) => row.maxDays !== undefined)
+            .map((row) => [row.maxDays!, row.score]),
+          25,
+        );
       }
 
       return {
@@ -156,61 +173,59 @@ export const RULES: Rule[] = [
         value: days !== null ? `${days}d median` : (data.openPrCount === 0 ? 'inbox zero' : 'no PRs'),
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── Recent Contributors ──────────────────────────────────────────────
   {
-    name: 'recentContributors',
-    label: 'Recent Contributors',
-    weight: 0.10,
+    ...getSignalDefinition('recentContributors'),
     evaluate(data) {
       const n = data.recentContributorCount;
-      let score: number;
-      if (n > 5) score = 100;
-      else if (n >= 2) score = 75;
-      else if (n === 1) score = 50;
-      else score = 0;
+      let score = CONTRIBUTOR_THRESHOLDS[CONTRIBUTOR_THRESHOLDS.length - 1].score;
+      if (n >= (CONTRIBUTOR_THRESHOLDS[0].minValue ?? Infinity)) score = CONTRIBUTOR_THRESHOLDS[0].score;
+      else if (n >= (CONTRIBUTOR_THRESHOLDS[1].minValue ?? Infinity)) score = CONTRIBUTOR_THRESHOLDS[1].score;
+      else if (n >= (CONTRIBUTOR_THRESHOLDS[2].minValue ?? Infinity)) score = CONTRIBUTOR_THRESHOLDS[2].score;
       return {
         name: this.name,
         label: this.label,
         value: n,
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── Stars Trend ──────────────────────────────────────────────────────
   {
-    name: 'starsTrend',
-    label: 'Stars',
-    weight: 0.05,
+    ...getSignalDefinition('starsTrend'),
     evaluate(data) {
       // For v1 we just check absolute star count as a proxy for community
       // Real trend tracking will come when we have KV historical data
       const s = data.stars;
-      let score: number;
-      if (s >= 1000) score = 100;
-      else if (s >= 100) score = 75;
-      else if (s >= 10) score = 50;
-      else score = 25;
+      let score = STAR_THRESHOLDS[STAR_THRESHOLDS.length - 1].score;
+      if (s >= (STAR_THRESHOLDS[0].minValue ?? Infinity)) score = STAR_THRESHOLDS[0].score;
+      else if (s >= (STAR_THRESHOLDS[1].minValue ?? Infinity)) score = STAR_THRESHOLDS[1].score;
+      else if (s >= (STAR_THRESHOLDS[2].minValue ?? Infinity)) score = STAR_THRESHOLDS[2].score;
       return {
         name: this.name,
         label: this.label,
         value: s,
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── CI/CD Activity ──────────────────────────────────────────────────
   {
-    name: 'ciActivity',
-    label: 'CI/CD',
-    weight: 0.10,
+    ...getSignalDefinition('ciActivity'),
     evaluate(data) {
       // No workflows at all → 0
       if (!data.hasCi) {
@@ -220,6 +235,8 @@ export const RULES: Rule[] = [
           value: 'none',
           score: 0,
           weight: this.weight,
+          measurement: this.measurement,
+          source: this.source,
         };
       }
 
@@ -231,6 +248,8 @@ export const RULES: Rule[] = [
           value: 'configured',
           score: 30,
           weight: this.weight,
+          measurement: this.measurement,
+          source: this.source,
         };
       }
 
@@ -275,15 +294,15 @@ export const RULES: Rule[] = [
         value: displayValue,
         score: Math.min(100, score),
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },
 
   // ── Bus Factor ───────────────────────────────────────────────────────
   {
-    name: 'busFactor',
-    label: 'Bus Factor',
-    weight: 0.10,
+    ...getSignalDefinition('busFactor'),
     evaluate(data) {
       const share = data.topContributorCommitShare;
       let score: number;
@@ -292,14 +311,12 @@ export const RULES: Rule[] = [
       // with a single maintainer are normal, not risky.
       if (share >= 0.9 && data.stars < 1000) {
         score = 85;
-      } else if (share < 0.5) {
-        score = 100;
-      } else if (share < 0.7) {
-        score = 75;
-      } else if (share < 0.9) {
-        score = 50;
       } else {
-        score = 25;
+        const sharePct = Math.floor(share * 100);
+        if (sharePct <= (BUS_FACTOR_THRESHOLDS[0].maxValue ?? 49)) score = BUS_FACTOR_THRESHOLDS[0].score;
+        else if (sharePct <= (BUS_FACTOR_THRESHOLDS[1].maxValue ?? 69)) score = BUS_FACTOR_THRESHOLDS[1].score;
+        else if (sharePct <= (BUS_FACTOR_THRESHOLDS[2].maxValue ?? 89)) score = BUS_FACTOR_THRESHOLDS[2].score;
+        else score = BUS_FACTOR_THRESHOLDS[3].score;
       }
 
       return {
@@ -308,6 +325,8 @@ export const RULES: Rule[] = [
         value: `${Math.round(share * 100)}%`,
         score,
         weight: this.weight,
+        measurement: this.measurement,
+        source: this.source,
       };
     },
   },

@@ -19,8 +19,9 @@
 
 import type { ScoringResult } from '../scoring/types';
 import type { Env } from '../types/env';
+import { METHODOLOGY } from '../scoring/methodology';
 
-const CACHE_PREFIX = 'isitalive:v2:';
+const CACHE_PREFIX = `isitalive:${METHODOLOGY.version}:`;
 
 // Cache API uses a synthetic URL as the key
 const CACHE_DOMAIN = 'https://cache.isitalive.dev';
@@ -101,7 +102,15 @@ export class CacheManager {
   }
 
   private l1CacheUrl(provider: string, owner: string, repo: string): string {
-    return `${CACHE_DOMAIN}/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+    return `${CACHE_DOMAIN}/${METHODOLOGY.version}/${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  }
+
+  private responseCacheRequest(request: Request): Request {
+    const url = new URL(request.url);
+    return new Request(
+      `${CACHE_DOMAIN}/response/${METHODOLOGY.version}${url.pathname}${url.search}`,
+      request,
+    );
   }
 
   private async getL1(
@@ -245,7 +254,7 @@ export class CacheManager {
     if (isAuthenticated) return null;
     try {
       const cache = caches.default;
-      const cachedResponse = await cache.match(request);
+      const cachedResponse = await cache.match(this.responseCacheRequest(request));
       if (cachedResponse) {
         console.log(`⚡ Cache HIT for: ${request.url}`);
         // Return a mutable copy — caches.default.match() returns immutable
@@ -265,7 +274,7 @@ export class CacheManager {
   async putResponse(request: Request, response: Response): Promise<void> {
     try {
       const cache = caches.default;
-      const promise = cache.put(request, response.clone());
+      const promise = cache.put(this.responseCacheRequest(request), response.clone());
       if (this.ctx) {
         this.ctx.waitUntil(promise);
       } else {
