@@ -168,6 +168,28 @@ describe('agent-ready health API', () => {
     await Promise.all([...defaultCtx.pending, ...metricsCtx.pending])
   })
 
+  it('uses the canonical l2-stale cache status on stale /api/check responses', async () => {
+    const rawData = makeRawProjectData()
+    const staleResult = scoreProject(rawData, 'github')
+    seedRepoCache(cacheKv, staleResult, Date.now() - (30 * 60 * 60 * 1000))
+    const env = createEnv(cacheKv)
+    const fetchSpy = vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/github/owner/repo'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.cache.status).toBe('l2-stale')
+
+    await Promise.all(ctx.pending)
+    expect(fetchSpy).toHaveBeenCalledOnce()
+  })
+
   it('keeps manifest audits compact by default but still includes provenance fields', async () => {
     const rawData = makeRawProjectData()
     const staleResult = scoreProject(rawData, 'github')

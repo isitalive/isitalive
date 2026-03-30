@@ -16,7 +16,7 @@ export type SignalName =
   | 'ciActivity'
   | 'busFactor'
 
-/** Human-readable health verdict — describes dependency risk, not just activity */
+/** Human-readable maintenance-health verdict — summarizes maintainer activity and project durability */
 export type Verdict =
   | 'healthy'       // 80-100
   | 'stable'        // 60-79

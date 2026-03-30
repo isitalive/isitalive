@@ -312,8 +312,8 @@ export const RULES: Rule[] = [
       if (share >= 0.9 && data.stars < 1000) {
         score = 85;
       } else {
-        const sharePct = Math.round(share * 100);
-        if (sharePct < (BUS_FACTOR_THRESHOLDS[0].maxValue ?? 50)) score = BUS_FACTOR_THRESHOLDS[0].score;
+        const sharePct = Math.floor(share * 100);
+        if (sharePct <= (BUS_FACTOR_THRESHOLDS[0].maxValue ?? 49)) score = BUS_FACTOR_THRESHOLDS[0].score;
         else if (sharePct <= (BUS_FACTOR_THRESHOLDS[1].maxValue ?? 69)) score = BUS_FACTOR_THRESHOLDS[1].score;
         else if (sharePct <= (BUS_FACTOR_THRESHOLDS[2].maxValue ?? 89)) score = BUS_FACTOR_THRESHOLDS[2].score;
         else score = BUS_FACTOR_THRESHOLDS[3].score;

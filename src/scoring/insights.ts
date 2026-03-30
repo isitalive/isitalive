@@ -62,10 +62,16 @@ function buildDriverSummary(signal: SignalResult, metrics: ProjectMetrics): stri
         ? `Recent release activity is visible (${metrics.lastReleaseAgeDays ?? 'unknown'} days since the latest release).`
         : 'Release activity is sparse or absent.'
     case 'issueStaleness':
+      if (metrics.issueSampleSize === 0) {
+        return 'There are currently no open issues, so issue triage is effectively at inbox zero.'
+      }
       return signal.score >= 75
         ? `Issue triage looks active across a sample of ${metrics.issueSampleSize} recently updated open issues.`
         : `Open issue follow-up looks slow across a sample of ${metrics.issueSampleSize} recently updated open issues.`
     case 'prResponsiveness':
+      if (metrics.prSampleSize === 0) {
+        return 'There are currently no open pull requests, so the review queue is effectively at inbox zero.'
+      }
       return signal.score >= 75
         ? `PR updates look responsive across a sample of ${metrics.prSampleSize} recently updated open pull requests.`
         : `Open pull requests are aging across a sample of ${metrics.prSampleSize} recently updated open pull requests.`
