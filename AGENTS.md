@@ -67,7 +67,7 @@ src/
 GET https://isitalive.dev/api/check/github/{owner}/{repo}
 ```
 
-Returns a JSON object with the health score and verdict for any GitHub project.
+Returns a JSON object with the maintenance-health score and verdict for any GitHub project.
 
 ### Example
 
@@ -82,22 +82,30 @@ curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
   "score": 92,
   "verdict": "healthy",
   "project": "github/vercel/next.js",
+  "methodology": {
+    "version": "2026-03-30-agent-ready-v1",
+    "scoreType": "maintenance-health"
+  },
   "signals": [
-    { "label": "Last Commit", "score": 100, "weight": 0.25, "value": "2 days ago" },
-    { "label": "Release Cadence", "score": 95, "weight": 0.15, "value": "3 days ago" }
+    { "name": "lastCommit", "label": "Last Commit", "score": 100, "weight": 0.25, "value": "2 days ago" }
+  ],
+  "drivers": [
+    { "signal": "lastCommit", "direction": "positive", "summary": "Default branch activity is recent." }
   ]
 }
 ```
+
+Use `?include=metrics` when an agent needs normalized raw measurements and sampling metadata in addition to the default score, signals, and drivers.
 
 ## Verdicts
 
 | Verdict | Score Range | Meaning |
 |---------|------------|---------|
-| healthy | 80–100 | Actively maintained, safe to depend on |
+| healthy | 80–100 | Strong observable maintenance activity |
 | stable | 60–79 | Maintained but showing some age |
-| degraded | 40–59 | Slowing down, worth monitoring |
+| degraded | 40–59 | Maintenance signals are weakening |
 | critical | 20–39 | Significant maintenance concerns |
-| unmaintained | 0–19 | Likely abandoned |
+| unmaintained | 0–19 | Likely abandoned or archived |
 
 ## Manifest Audit
 
@@ -112,10 +120,22 @@ Content-Type: application/json
 }
 ```
 
-Audits all dependencies in a manifest file and returns per-dependency health scores.
+Audits all dependencies in a manifest file and returns per-dependency maintenance-health scores.
 Requires authentication (API key or GitHub Actions OIDC token). The old `/api/audit` path redirects here.
 
 Supported formats: `package.json`, `go.mod`.
+
+Optional query params:
+
+- `include=drivers`
+- `include=metrics`
+- `include=signals`
+
+Combine them with commas for richer agent output, for example:
+
+```bash
+curl -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics' ...
+```
 
 ### Authentication
 
@@ -125,17 +145,6 @@ Two authentication methods are supported:
 2. **GitHub Actions OIDC** (public repos only): `Authorization: Bearer <oidc_jwt>`
 
 OIDC tokens are obtained automatically by the [`isitalive/audit-action`](https://github.com/isitalive/audit-action). Public repos get 500 deps scored/month free.
-
-## Manifest Hash Lookup (CDN-cached)
-
-```
-GET https://isitalive.dev/api/manifest/hash/{sha256_hash}
-```
-
-Returns cached audit results by manifest content hash. No authentication required.
-CDN-cached for 7 days (`s-maxage=604800`). Returns 404 if the manifest hasn't been audited yet.
-
-Used by the GitHub Action for $0-cost cache hits — hash your manifest locally, try GET first, POST only on miss.
 
 ## Badge
 
@@ -167,16 +176,18 @@ GET https://isitalive.dev/.well-known/ai-plugin.json
 
 Rate limiting is purely infrastructure protection (not billing):
 
-- **Anonymous**: 10 requests/minute (edge-cached, shouldn't hit Worker often)
+- **Anonymous**: 5 requests/minute
 - **With API key**: 1,000 requests/minute
 
 ## Tips for Agents
 
-1. **Cache results** — scores are cached for 6 hours; avoid redundant checks
-2. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
-3. **Use the hash endpoint first** — `GET /api/manifest/hash/{hash}` is free (CDN-cached); only POST on miss
-4. **Check the `verdict` field** for a quick human-readable assessment
-5. **The `signals` array** gives granular detail if you need to explain the score
-6. **Archived repos** are instantly scored 0 — no need to check signals
-7. **Anonymous check requests** are served from CDN edge cache (24h TTL) at zero Worker cost
-8. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI
+1. **Treat this as maintenance-health** — the score is useful for maintainer activity and project durability, not security posture
+2. **Cache results** — repo scores are freshness-tiered (`free`: 24h fresh / 48h stale, `pro`: 1h / 6h, `enterprise`: 15m / 1h)
+3. **Use `GET /api/check/...` first** for individual dependencies — it now returns `methodology`, `signals`, and `drivers` by default
+4. **Use `?include=metrics`** on `GET /api/check/...` when you need normalized raw measurements and sampling metadata
+5. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
+6. **Use `include=drivers,metrics,signals` on `/api/manifest`** when an agent needs richer per-dependency evidence without rescoring
+7. **Check the `verdict` field** for a quick human-readable assessment
+8. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
+9. **Archived repos** are instantly scored 0 — no need to inspect signals
+10. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI

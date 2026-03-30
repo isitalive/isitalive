@@ -14,10 +14,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Is It Alive? — Open Source Health Checker</title>
-  <meta name="description" content="Instantly check if an open-source project is actively maintained or abandoned. Fast, cached, API-ready.">
+  <meta name="description" content="Instantly check the maintenance-health of any open-source project. Fast, cached, API-ready.">
   ${ogTags({
     title: 'Is It Alive? — Open Source Health Checker',
-    description: 'Instantly check if an open-source project is actively maintained or abandoned. Fast, cached, API-ready.',
+    description: 'Instantly check the maintenance-health of any open-source project. Fast, cached, API-ready.',
     url: 'https://isitalive.dev/',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -599,8 +599,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
   <div class="container">    <header>
 
-      <h1>Is this project safe to depend on?</h1>
-      <p class="subtitle">Instantly check the health of any open-source project. One query, one score, one answer.</p>
+      <h1>Does this project look maintained?</h1>
+      <p class="subtitle">Check the maintenance-health of any open-source project. One query, one score, inspectable evidence.</p>
 
       <div class="search-container">
         <form action="/_check" method="POST" id="searchForm">

@@ -11,6 +11,7 @@ import { buildResultEvent } from '../events/result'
 import { buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildProviderEvent } from '../events/provider'
 import { emitAll } from '../pipeline/emit'
+import { parseIncludeFlags, shapeScoringResult } from '../utils/healthResponse'
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean } }
 const check = new Hono<AppEnv>()
@@ -46,6 +47,7 @@ function cacheMeta(
 
 check.get('/:provider/:owner/:repo', async (c) => {
   const startTime = Date.now()
+  const includeFlags = parseIncludeFlags(c.req.url)
   const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
 
   // Validate path params — blocks XSS / path-traversal payloads
@@ -113,7 +115,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     )
 
     const response = c.json({
-      ...cached.result,
+      ...shapeScoringResult(cached.result, includeFlags),
       ...cacheMeta(cached.status, tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
 
@@ -140,7 +142,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     c.executionCtx.waitUntil(Promise.all(bgTasks))
 
     const response = c.json({
-      ...cached.result,
+      ...shapeScoringResult(cached.result, includeFlags),
       ...cacheMeta('stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
 
@@ -179,7 +181,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const now = new Date().toISOString()
     
     const response = c.json({
-      ...result,
+      ...shapeScoringResult(result, includeFlags),
       ...cacheMeta('l3-miss', tier, 0, now, now, now),
     })
 
