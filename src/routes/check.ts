@@ -143,7 +143,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
     const response = c.json({
       ...shapeScoringResult(cached.result, includeFlags),
-      ...cacheMeta('stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
+      ...cacheMeta('l2-stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
 
     response.headers.set('Cache-Control', headers['Cache-Control'])

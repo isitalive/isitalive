@@ -352,6 +352,10 @@ describe('busFactor rule', () => {
     expect(r.evaluate(makeData({ topContributorCommitShare: 0.3 })).score).toBe(100)
   })
 
+  it('does not round boundary cases into the wrong bucket', () => {
+    expect(r.evaluate(makeData({ topContributorCommitShare: 0.499 })).score).toBe(100)
+  })
+
   it('scores 75 for 50-70% commit share', () => {
     expect(r.evaluate(makeData({ topContributorCommitShare: 0.6 })).score).toBe(75)
   })

@@ -100,7 +100,7 @@ export function buildAuditCacheKey(contentHash: string): string {
   return `${AUDIT_CACHE_PREFIX}${contentHash}`
 }
 
-export function buildAuditCacheUrl(contentHash: string, includeKey: string = 'internal'): Request {
+export function buildAuditCacheUrl(contentHash: string, includeKey: string = 'base'): Request {
   return new Request(`${AUDIT_CACHE_URL_PREFIX}${contentHash}?include=${encodeURIComponent(includeKey)}`)
 }
 
@@ -299,7 +299,7 @@ export async function scoreAudit(
   }
 
   // ── 6. Persist current audit state immediately ─────────────────────
-  await persistAuditResult(env, auditCacheKey, contentHash, auditResult)
+  await persistAuditResult(env, auditCacheKey, auditResult)
 
   // If incomplete, finish the remaining deps in the background and promote
   // the manifest-hash cache entry to a complete result.
@@ -437,35 +437,18 @@ async function completeAuditInBackground(
     dependencies: finalDeps,
   }
 
-  await persistAuditResult(env, auditCacheKey, contentHash, finalResult)
+  await persistAuditResult(env, auditCacheKey, finalResult)
 }
 
 async function persistAuditResult(
   env: Env,
   auditCacheKey: string,
-  contentHash: string,
   auditResult: AuditResult,
 ): Promise<void> {
   const json = JSON.stringify(auditResult)
   await env.CACHE_KV.put(auditCacheKey, json, {
     expirationTtl: AUDIT_CACHE_TTL,
   })
-
-  if (!auditResult.complete) return
-
-  try {
-    const cache = caches.default
-    const response = new Response(json, {
-      headers: {
-        'Content-Type': 'application/json',
-        'ETag': `"${contentHash}"`,
-        'Cache-Control': 'public, max-age=3600',
-      },
-    })
-    await cache.put(buildAuditCacheUrl(contentHash), response)
-  } catch {
-    // Cache API is best-effort outside the request path
-  }
 }
 
 /** Hash manifest content using SHA-256 */
