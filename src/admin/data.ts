@@ -5,7 +5,7 @@
 // Keeps route handlers thin — they just call these + render templates.
 // ---------------------------------------------------------------------------
 
-import type { Env, ApiKeyEntry } from '../scoring/types'
+import type { Env, ApiKeyEntry } from '../types/env'
 import { getTrackedIndex, type TrackedIndex } from '../aggregate/tracked'
 import { TRENDING_KEY } from '../state/keys'
 

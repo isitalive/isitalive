@@ -17,7 +17,8 @@
 //   4. Stale (KV only) → serve + trigger background revalidation
 // ---------------------------------------------------------------------------
 
-import type { ScoringResult, Env } from '../scoring/types';
+import type { ScoringResult } from '../scoring/types';
+import type { Env } from '../types/env';
 
 const CACHE_PREFIX = 'isitalive:v2:';
 

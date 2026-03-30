@@ -103,6 +103,18 @@ CF_ANALYTICS_TOKEN = "c075f9d44e444ec099e35a6f1859a688"
 # - CF_ACCOUNT_ID: Cloudflare account ID (for R2 SQL API in Cron)
 # - CF_R2_SQL_TOKEN: Read-only scoped token for R2 SQL queries
 #     → Create Custom Token: Account → R2 Data Catalog + R2 Storage + R2 SQL → Read
+[secrets]
+required = [
+  "GITHUB_TOKEN",
+  "GITHUB_APP_ID",
+  "GITHUB_PRIVATE_KEY",
+  "GITHUB_WEBHOOK_SECRET",
+  "TURNSTILE_SECRET_KEY",
+  "ADMIN_SECRET",
+  "CF_ACCOUNT_ID",
+  "CF_R2_SQL_TOKEN",
+  "CF_R2_WAREHOUSE",
+]
 
 # Observability — logs and traces
 [observability]

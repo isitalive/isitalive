@@ -8,7 +8,7 @@
 // Ref: https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 import { sign } from 'hono/jwt';
 
 const GITHUB_API = 'https://api.github.com';

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchAndScoreProject, scheduleRevalidation, providers } from './index'
-import type { Env, RawProjectData } from '../scoring/types'
+import type { RawProjectData } from '../scoring/types'
+import type { Env } from '../types/env'
 
 function createMockKV(): KVNamespace & { _store: Map<string, string> } {
   const store = new Map<string, string>()

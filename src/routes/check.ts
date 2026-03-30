@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono'
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
 import { CacheManager, cacheControlHeaders, TIERS, type Tier, trackFirstSeen } from '../cache/index'
 import { isValidParam } from '../utils/validate'

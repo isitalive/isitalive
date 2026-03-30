@@ -5,7 +5,7 @@
 // so the CF_R2_SQL_TOKEN is never exposed to the browser.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { fetchWithTimeout } from '../utils/http'
 
 export interface QueryResult {

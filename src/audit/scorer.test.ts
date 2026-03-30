@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildSummary, hashManifest, scoreAudit, type AuditDep } from './scorer'
-import type { Env, RawProjectData } from '../scoring/types'
+import type { RawProjectData } from '../scoring/types'
+import type { Env } from '../types/env'
 import { providers } from '../providers/index'
 import type { ResolvedDep } from './resolver'
 

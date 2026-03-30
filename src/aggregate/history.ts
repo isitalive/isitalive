@@ -5,7 +5,7 @@
 // Each repo's trend data is queried from result_events on demand and cached.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { queryR2SQL } from '../admin/r2sql'
 import { historyKey } from '../state/keys'
 

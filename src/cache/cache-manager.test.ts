@@ -4,7 +4,8 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { CacheManager, TIERS, type Tier } from './index'
-import type { ScoringResult, Env } from '../scoring/types'
+import type { ScoringResult } from '../scoring/types'
+import type { Env } from '../types/env'
 
 // ---------------------------------------------------------------------------
 // Helpers — minimal ScoringResult factory

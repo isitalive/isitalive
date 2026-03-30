@@ -19,7 +19,7 @@ import {
 } from 'cloudflare:workers'
 import type { WorkflowEvent } from 'cloudflare:workers'
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { snapshotRepo } from './processor'
 import {
   getTrackedIndex,

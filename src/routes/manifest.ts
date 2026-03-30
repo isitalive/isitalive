@@ -13,7 +13,7 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 import type { Tier } from '../cache/index';
 import type { OidcClaims } from '../github/oidc';
 import { parseManifest, type ManifestFormat } from '../audit/parsers';

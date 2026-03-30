@@ -13,8 +13,18 @@ import type { ProviderEvent } from '../events/provider'
 import type { ResultEvent } from '../events/result'
 import type { UsageEvent } from '../events/usage'
 import type { ManifestEvent } from '../events/manifest'
-import type { Event, EventDomain } from '../events/envelope'
 import type { PipelineBindings } from './types'
+
+type ProviderStreamRecord = Parameters<PipelineBindings['PROVIDER_PIPELINE']['send']>[0][number]
+type ResultStreamRecord = Parameters<PipelineBindings['RESULT_PIPELINE']['send']>[0][number]
+type UsageStreamRecord = Parameters<PipelineBindings['USAGE_PIPELINE']['send']>[0][number]
+type ManifestStreamRecord = Parameters<PipelineBindings['MANIFEST_PIPELINE']['send']>[0][number]
+
+function nullsToUndefined<T extends Record<string, unknown>>(record: T): T {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [key, value === null ? undefined : value]),
+  ) as T
+}
 
 /**
  * Flatten an event envelope into a single-level object for Iceberg.
@@ -23,9 +33,24 @@ import type { PipelineBindings } from './types'
  * NOTE: `type` is kept for backward compatibility — usage_events and
  * manifest_events streams still require it. V2 streams ignore extra fields.
  */
-function flatten<T extends object>(event: { domain: string; timestamp: string; id: string; data: T }): Record<string, unknown> {
+function flattenProvider(event: ProviderEvent): ProviderStreamRecord {
   const { data, ...envelope } = event
-  return { ...envelope, type: event.domain, ...data }
+  return nullsToUndefined({ ...envelope, ...data }) as ProviderStreamRecord
+}
+
+function flattenResult(event: ResultEvent): ResultStreamRecord {
+  const { data, ...envelope } = event
+  return nullsToUndefined({ ...envelope, ...data }) as ResultStreamRecord
+}
+
+function flattenUsage(event: UsageEvent): UsageStreamRecord {
+  const { data, ...envelope } = event
+  return nullsToUndefined({ ...envelope, type: event.domain, ...data }) as UsageStreamRecord
+}
+
+function flattenManifest(event: ManifestEvent): ManifestStreamRecord {
+  const { data, ...envelope } = event
+  return nullsToUndefined({ ...envelope, type: event.domain, ...data }) as ManifestStreamRecord
 }
 
 /**
@@ -37,7 +62,7 @@ export async function emitProviderEvent(
   event: ProviderEvent,
 ): Promise<void> {
   try {
-    await env.PROVIDER_PIPELINE.send([flatten(event)])
+    await env.PROVIDER_PIPELINE.send([flattenProvider(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit provider event:', err)
   }
@@ -51,7 +76,7 @@ export async function emitResultEvent(
   event: ResultEvent,
 ): Promise<void> {
   try {
-    await env.RESULT_PIPELINE.send([flatten(event)])
+    await env.RESULT_PIPELINE.send([flattenResult(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit result event:', err)
   }
@@ -65,7 +90,7 @@ export async function emitUsageEvent(
   event: UsageEvent,
 ): Promise<void> {
   try {
-    await env.USAGE_PIPELINE.send([flatten(event)])
+    await env.USAGE_PIPELINE.send([flattenUsage(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit usage event:', err)
   }
@@ -79,7 +104,7 @@ export async function emitManifestEvent(
   event: ManifestEvent,
 ): Promise<void> {
   try {
-    await env.MANIFEST_PIPELINE.send([flatten(event)])
+    await env.MANIFEST_PIPELINE.send([flattenManifest(event)])
   } catch (err) {
     console.error('Pipeline: failed to emit manifest event:', err)
   }
@@ -107,4 +132,3 @@ export async function emitAll(
 
   await Promise.allSettled(promises)
 }
-

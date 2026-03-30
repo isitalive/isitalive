@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono'
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
 import { CacheManager, getFirstSeen, trackFirstSeen } from '../cache/index'
 import { landingPage } from '../ui/landing'

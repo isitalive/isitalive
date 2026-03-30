@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono';
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 
 const ANON_LIMIT = 5;  // Tightened from 10 — every request wakes Worker (ADR-006)
 const AUTH_LIMIT = 1000;

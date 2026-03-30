@@ -5,7 +5,7 @@
 // Cron runs this every 10 min → queries Iceberg → caches in KV.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { queryR2SQL } from '../admin/r2sql'
 import { TRENDING_KEY } from '../state/keys'
 

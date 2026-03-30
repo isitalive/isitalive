@@ -4,7 +4,7 @@
 // Replaces the cron-maintained sitemap in cron/handler.ts.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { queryR2SQL } from '../admin/r2sql'
 import { SITEMAP_KEY } from '../state/keys'
 

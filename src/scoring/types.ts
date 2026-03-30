@@ -121,12 +121,3 @@ export interface Provider {
   /** Fetch raw data for a project identifier */
   fetchProject(owner: string, repo: string, token?: string): Promise<RawProjectData>;
 }
-
-// ---------------------------------------------------------------------------
-// Worker environment bindings — re-exported from types/env.ts
-//
-// Kept here for backward compatibility so existing imports don't break.
-// New code should import directly from '../types/env'.
-// ---------------------------------------------------------------------------
-
-export type { Pipeline, Env, ApiKeyEntry } from '../types/env';

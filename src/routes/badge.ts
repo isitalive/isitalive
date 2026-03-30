@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 import type { Verdict } from '../scoring/types';
 import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index';
 import { CacheManager } from '../cache/index';

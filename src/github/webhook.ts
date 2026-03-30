@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 import { verifyWebhookSignature } from './verify';
 import { handlePullRequest, handlePush, handleInstallation } from './handlers';
 import { DEFAULT_CONFIG } from './types';

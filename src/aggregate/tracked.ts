@@ -5,7 +5,7 @@
 // The RefreshWorkflow reads this to decide which repos to refresh.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { queryR2SQL } from '../admin/r2sql'
 import { TRACKED_KEY } from '../state/keys'
 

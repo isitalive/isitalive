@@ -20,7 +20,7 @@ import { handleScheduled } from '../cron/handler'
 import { refreshTrending } from '../aggregate/trending'
 import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap } from '../aggregate/sitemap'
-import type { ApiKeyEntry } from '../scoring/types'
+import type { ApiKeyEntry } from '../types/env'
 
 /**
  * Constant-time admin secret verification via SHA-256 hash comparison.

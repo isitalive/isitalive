@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono';
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 

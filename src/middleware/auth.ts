@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import type { Env, ApiKeyEntry } from '../scoring/types';
+import type { Env, ApiKeyEntry } from '../types/env';
 import type { Tier } from '../cache/index';
 import { verifyOidcToken, type OidcClaims } from '../github/oidc';
 

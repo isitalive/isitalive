@@ -2,7 +2,7 @@
 // Is It Alive? — Main entry point (Cloudflare Worker + Hono)
 // ---------------------------------------------------------------------------
 
-import type { Env } from './scoring/types';
+import type { Env } from './types/env';
 import { app } from './app';
 import { handleScheduled } from './cron/handler';
 
@@ -19,4 +19,3 @@ export default {
 // ── Workflow exports ──────────────────────────────────────────────────
 export { IngestWorkflow } from './ingest/workflow';
 export { RefreshWorkflow } from './ingest/refresh-workflow';
-

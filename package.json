@@ -9,6 +9,8 @@
     "build": "npx tsx --import ./scripts/register-md.mjs scripts/build-static.ts",
     "predeploy": "npm run build",
     "deploy": "wrangler deploy",
+    "types:generate": "wrangler types worker-configuration.d.ts",
+    "types:check": "wrangler types worker-configuration.d.ts --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:fuzz": "FC_NUM_RUNS=10000 vitest run"
@@ -17,7 +19,7 @@
     "hono": "^4.7.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250313.0",
+    "@types/node": "^24.6.0",
     "@fast-check/vitest": "^0.3.0",
     "fast-check": "^4.6.0",
     "typescript": "^5.8.0",

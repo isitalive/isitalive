@@ -1,19 +1,19 @@
 // ---------------------------------------------------------------------------
-// Pipeline Types — re-export Pipeline from scoring/types for convenience
+// Pipeline Types — derived from generated Worker bindings
 //
-// The Pipeline interface is defined in scoring/types.ts (alongside Env)
-// to avoid circular imports. This module re-exports it and provides
-// the PipelineBindings interface for functions that only need pipelines.
+// This module provides a small subset type for helpers that only need the
+// pipeline bindings, while keeping the binding surface sourced from the
+// generated Worker `Env`.
 // ---------------------------------------------------------------------------
 
-import type { Pipeline } from '../scoring/types'
+import type { Env, Pipeline } from '../types/env'
 
 export type { Pipeline }
 
 /** Pipeline bindings subset of Env — for functions that only need pipelines */
 export interface PipelineBindings {
-  PROVIDER_PIPELINE: Pipeline
-  RESULT_PIPELINE: Pipeline
-  USAGE_PIPELINE: Pipeline
-  MANIFEST_PIPELINE: Pipeline
+  PROVIDER_PIPELINE: Env['PROVIDER_PIPELINE']
+  RESULT_PIPELINE: Env['RESULT_PIPELINE']
+  USAGE_PIPELINE: Env['USAGE_PIPELINE']
+  MANIFEST_PIPELINE: Env['MANIFEST_PIPELINE']
 }

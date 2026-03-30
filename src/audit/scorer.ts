@@ -8,11 +8,12 @@
 // ---------------------------------------------------------------------------
 
 import type { ResolvedDep } from './resolver';
-import type { Env, ScoringResult } from '../scoring/types';
+import type { ScoringResult } from '../scoring/types';
 import { CacheManager, type Tier } from '../cache/index';
 import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { bufferToHex } from '../utils/crypto';
+import type { Env } from '../types/env';
 
 const github = providers.github;
 

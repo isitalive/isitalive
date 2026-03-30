@@ -1,4 +1,4 @@
-import type { Env } from '../../scoring/types';
+import type { Env } from '../../types/env';
 import type { IngestSource } from '../types';
 
 export const gitHubTrendingSource: IngestSource = {

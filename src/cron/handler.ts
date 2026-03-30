@@ -7,7 +7,7 @@
 // Daily (6AM UTC): Dispatches the IngestWorkflow to re-check top repos.
 // ---------------------------------------------------------------------------
 
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { refreshTrending, getTrending as getAggTrending } from '../aggregate/trending'
 import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap, getSitemapRepos as getAggSitemapRepos } from '../aggregate/sitemap'

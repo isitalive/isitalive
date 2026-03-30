@@ -1,4 +1,4 @@
-import type { Env } from '../scoring/types'
+import type { Env } from '../types/env'
 import { providers } from '../providers/index'
 import { scoreProject } from '../scoring/engine'
 import { CacheManager } from '../cache/index'

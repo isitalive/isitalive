@@ -9,7 +9,8 @@
 import { describe, expect, vi, beforeEach, afterEach } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
 import { CacheManager, TIERS, type Tier } from './index'
-import type { ScoringResult, Env, Verdict } from '../scoring/types'
+import type { ScoringResult, Verdict } from '../scoring/types'
+import type { Env } from '../types/env'
 
 // Cap iterations — each iteration involves async mock KV ops that compound.
 // At 500, cumulative overhead triggers Vitest worker timeouts on CI (~117s).

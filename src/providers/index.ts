@@ -5,13 +5,14 @@
 // separate GitHubProvider objects across routes, audit scorer, and cron.
 // ---------------------------------------------------------------------------
 
-import type { Env, RawProjectData, ScoringResult } from '../scoring/types';
+import type { RawProjectData, ScoringResult } from '../scoring/types';
 import { GitHubProvider } from './github';
 import { scoreProject } from '../scoring/engine';
 import { CacheManager } from '../cache/index';
 import { buildProviderEvent } from '../events/provider';
 import { buildResultEvent } from '../events/result';
 import { emitAll } from '../pipeline/emit';
+import type { Env } from '../types/env';
 
 export const providers = {
   github: new GitHubProvider(),

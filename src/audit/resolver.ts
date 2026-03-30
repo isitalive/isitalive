@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ParsedDep } from './parsers';
-import type { Env } from '../scoring/types';
+import type { Env } from '../types/env';
 import { fetchWithTimeout } from '../utils/http';
 
 export interface ResolvedDep extends ParsedDep {
