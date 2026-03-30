@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Pricing card centering, container width, and form sizing on mobile
 - Turnstile form submission racing with token after back-navigation — now gates on fresh token
 - Mixed-case repo names in recent query chips (e.g. `BurntSushi/toml` displayed with original GitHub casing)
+- Trending aggregation now uses `usage_events` (all checks) instead of `result_events_v2` (score recomputes only), fixing intermittent/under-counted trending rankings when cache hit rates are high
 
 ## [0.10.0] - 2026-03-22
 
