@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../scoring/types'
+import { fetchWithTimeout } from '../utils/http'
 
 export interface QueryResult {
   columns: string[]
@@ -109,7 +110,7 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
   }
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://api.sql.cloudflarestorage.com/api/v1/accounts/${accountId}/r2-sql/query/${warehouse}`,
       {
         method: 'POST',
@@ -118,6 +119,8 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query: sql }),
+        timeoutMs: 10_000,
+        timeoutMessage: 'R2 SQL request timed out after 10000ms',
       },
     )
 

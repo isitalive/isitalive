@@ -9,8 +9,7 @@
 
 import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
-import { providers, revalidateInBackground } from '../providers/index'
-import { scoreProject } from '../scoring/engine'
+import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
 import { CacheManager, getFirstSeen, trackFirstSeen } from '../cache/index'
 import { landingPage } from '../ui/landing'
 import { resultPage } from '../ui/result'
@@ -37,6 +36,7 @@ import { resolveAll } from '../audit/resolver'
 import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
+import { fetchWithTimeout } from '../utils/http'
 import { isValidParam } from '../utils/validate'
 
 // Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
@@ -614,7 +614,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
     if (cached && (status === 'l1-hit' || status === 'l2-hit' || status === 'l2-stale')) {
       if (status === 'l2-stale') {
-        c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo))
+        c.executionCtx.waitUntil(scheduleRevalidation(c.env, c.executionCtx, provider, owner, repo))
       }
       // Track cache hit for operational visibility
       c.executionCtx.waitUntil(Promise.all([
@@ -639,9 +639,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       return response
     }
 
-    const prov = providers[provider as keyof typeof providers]
-    const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN)
-    const result = scoreProject(rawData, prov.name)
+    const { rawData, result } = await fetchAndScoreProject(c.env, provider, owner, repo)
 
     // Browser checks are anonymous — skip usage events.
     // Emit result/provider events on miss (powers trending) and track for landing page.
@@ -706,8 +704,10 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
   // Fetch raw content from GitHub
   let content: string
   try {
-    const res = await fetch(rawUrl, {
+    const res = await fetchWithTimeout(rawUrl, {
       headers: { 'User-Agent': 'isitalive/1.0' },
+      timeoutMs: 5_000,
+      timeoutMessage: 'GitHub manifest fetch timed out after 5000ms',
     })
     if (!res.ok) {
       const status = res.status === 404 ? 'File not found' : `GitHub returned ${res.status}`

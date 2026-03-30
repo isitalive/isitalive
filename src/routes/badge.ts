@@ -5,8 +5,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../scoring/types';
 import type { Verdict } from '../scoring/types';
-import { providers, revalidateInBackground } from '../providers/index';
-import { scoreProject } from '../scoring/engine';
+import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index';
 import { CacheManager } from '../cache/index';
 
 const badge = new Hono<{ Bindings: Env }>();
@@ -72,13 +71,11 @@ badge.get('/:provider/:owner/:repo', async (c) => {
 
     if (status === 'l2-stale' && cached) {
       // Serve stale, revalidate in background
-      c.executionCtx.waitUntil(revalidateInBackground(c.env, provider, owner, repo));
+      c.executionCtx.waitUntil(scheduleRevalidation(c.env, c.executionCtx, provider, owner, repo));
     }
 
     if (!result) {
-      const prov = providers[provider as keyof typeof providers];
-      const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN);
-      result = scoreProject(rawData, prov.name);
+      ({ result } = await fetchAndScoreProject(c.env, provider, owner, repo));
       c.executionCtx.waitUntil(cacheManager.put(provider, owner, repo, result));
     }
 

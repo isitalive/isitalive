@@ -86,6 +86,45 @@ describe('HTTP surface area hardening', () => {
   });
 });
 
+describe('/api/manifest request hardening', () => {
+  it('rejects oversized request bodies before JSON parsing', async () => {
+    const keyStore = new Map<string, string>([
+      ['sk_test', JSON.stringify({ tier: 'pro', name: 'test', active: true })],
+    ])
+
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/manifest', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer sk_test',
+          'Content-Type': 'application/json',
+        },
+        body: 'x'.repeat(600 * 1024),
+      }),
+      {
+        CACHE_KV: {
+          get: vi.fn(async () => null),
+          put: vi.fn(async () => {}),
+          delete: vi.fn(async () => {}),
+        },
+        KEYS_KV: {
+          get: vi.fn(async (key: string, format?: string) => {
+            const value = keyStore.get(key)
+            if (!value) return null
+            return format === 'json' ? JSON.parse(value) : value
+          }),
+        },
+        RATE_LIMITER_ANON: { limit: vi.fn(async () => ({ success: true })) },
+        RATE_LIMITER_AUTH: { limit: vi.fn(async () => ({ success: true })) },
+      } as any,
+      executionCtx,
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ error: 'Payload too large' });
+  });
+});
+
 describe('secureHeaders middleware', () => {
   it('sets X-Frame-Options to DENY', async () => {
     const res = await app.fetch(

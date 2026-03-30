@@ -4,8 +4,7 @@
 
 import { Hono } from 'hono'
 import type { Env } from '../scoring/types'
-import { providers, revalidateInBackground } from '../providers/index'
-import { scoreProject } from '../scoring/engine'
+import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
 import { CacheManager, cacheControlHeaders, TIERS, type Tier, trackFirstSeen } from '../cache/index'
 import { isValidParam } from '../utils/validate'
 import { buildResultEvent } from '../events/result'
@@ -128,7 +127,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
   if (cached.status === 'l2-stale' && cached.result) {
     const bgTasks: Promise<unknown>[] = [
-      revalidateInBackground(c.env, provider, owner, repo),
+      scheduleRevalidation(c.env, c.executionCtx, provider, owner, repo),
     ]
 
     // Emit usage event for all requests
@@ -155,9 +154,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
   // ── Cache miss — fetch synchronously ────────────────────────────
   try {
-    const prov = providers[provider as keyof typeof providers]
-    const rawData = await prov.fetchProject(owner, repo, c.env.GITHUB_TOKEN)
-    const result = scoreProject(rawData, prov.name)
+    const { rawData, result } = await fetchAndScoreProject(c.env, provider, owner, repo)
 
     const bgTasks: Promise<unknown>[] = [
       cacheManager.put(provider, owner, repo, result, tier),

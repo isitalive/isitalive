@@ -11,46 +11,9 @@ import { verifyWebhookSignature } from './verify';
 import { handlePullRequest, handlePush, handleInstallation } from './handlers';
 import { DEFAULT_CONFIG } from './types';
 import type { PullRequestEvent, PushEvent, InstallationEvent } from './types';
+import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
 
 export const githubWebhook = new Hono<{ Bindings: Env }>();
-
-/**
- * Read a request body with a hard byte limit.
- * Streams the body in chunks and aborts early if the limit is exceeded,
- * preventing OOM from oversized payloads even when Content-Length is spoofed.
- */
-async function readBodyWithByteLimit(req: Request, maxBytes: number): Promise<string> {
-  const stream = req.body;
-  if (!stream) return '';
-
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      totalBytes += value.byteLength;
-      if (totalBytes > maxBytes) {
-        reader.cancel('payload too large').catch(() => {});
-        throw new Error('PAYLOAD_TOO_LARGE');
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const merged = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder('utf-8').decode(merged);
-}
 
 githubWebhook.post('/webhook', async (c) => {
   const webhookSecret = c.env.GITHUB_WEBHOOK_SECRET;
@@ -67,21 +30,13 @@ githubWebhook.post('/webhook', async (c) => {
   // while streaming the request body so spoofed/absent headers can't bypass.
   const MAX_WEBHOOK_BODY = 1_048_576; // 1 MB
 
-  const clHeader = c.req.header('content-length');
-  if (clHeader != null) {
-    const cl = Number(clHeader);
-    if (Number.isFinite(cl) && cl > MAX_WEBHOOK_BODY) {
-      return c.json({ error: 'Payload too large' }, 413);
-    }
-  }
-
   // ── Read body with hard byte limit ──────────────────────────────────
   const signature = c.req.header('x-hub-signature-256') ?? null;
   let body: string;
   try {
     body = await readBodyWithByteLimit(c.req.raw, MAX_WEBHOOK_BODY);
   } catch (err) {
-    if (err instanceof Error && err.message === 'PAYLOAD_TOO_LARGE') {
+    if (err instanceof RequestBodyTooLargeError) {
       return c.json({ error: 'Payload too large' }, 413);
     }
     throw err;

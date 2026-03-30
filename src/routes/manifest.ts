@@ -22,13 +22,50 @@ import { scoreAudit, hashManifest } from '../audit/scorer';
 import { buildManifestEvent } from '../events/manifest';
 import { buildUsageEvent } from '../events/usage';
 import { emitAll } from '../pipeline/emit';
+import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
 
 const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
+const MAX_REQUEST_BODY_BYTES = 576 * 1024; // ~576 KB total JSON payload
 const OIDC_FREE_QUOTA_LIMIT = 500; // deps scored/month per public repo (ADR-004)
+
+function buildCachedAuditResponse(
+  cachedJson: string,
+  contentHash: string,
+  ifNoneMatch: string | undefined,
+): Response | null {
+  let cachedResult: { complete?: boolean; retryAfterMs?: number } | null = null
+
+  try {
+    cachedResult = JSON.parse(cachedJson)
+  } catch {
+    return null
+  }
+
+  if (cachedResult?.complete && ifNoneMatch === `"${contentHash}"`) {
+    return new Response(null, {
+      status: 304,
+      headers: { ETag: `"${contentHash}"` },
+    })
+  }
+
+  const response = new Response(cachedJson, {
+    headers: {
+      'Content-Type': 'application/json',
+      'ETag': `"${contentHash}"`,
+      'Cache-Control': cachedResult?.complete ? 'public, max-age=3600' : 'no-cache',
+    },
+  })
+
+  if (!cachedResult?.complete && cachedResult?.retryAfterMs) {
+    response.headers.set('Retry-After', String(Math.ceil(cachedResult.retryAfterMs / 1000)))
+  }
+
+  return response
+}
 
 // ---------------------------------------------------------------------------
 // POST /api/manifest — submit manifest for scoring (auth required)
@@ -76,38 +113,34 @@ audit.post('/', async (c) => {
     // L1: Cache API hit (Worker-internal, free ops)
     const l1Hit = await cache.match(syntheticCacheUrl);
     if (l1Hit) {
-      if (c.req.header('If-None-Match') === `"${clientHash}"`) {
-        return new Response(null, { status: 304, headers: { ETag: `"${clientHash}"` } });
-      }
       return l1Hit;
     }
 
     // L2: KV cache hit
     const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
     if (kvCached) {
-      if (c.req.header('If-None-Match') === `"${clientHash}"`) {
-        return new Response(null, { status: 304, headers: { ETag: `"${clientHash}"` } });
+      const response = buildCachedAuditResponse(kvCached, clientHash, c.req.header('If-None-Match'))
+      if (!response) {
+        c.executionCtx.waitUntil(c.env.CACHE_KV.delete(auditCacheKey))
+      } else {
+        if (response.headers.get('Cache-Control') !== 'no-cache') {
+          c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()))
+        }
+        c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c))
+        return response
       }
-
-      // Return raw cached string directly (0 CPU parse time)
-      const response = new Response(kvCached, {
-        headers: {
-          'Content-Type': 'application/json',
-          'ETag': `"${clientHash}"`,
-          'Cache-Control': 'public, max-age=3600',
-        },
-      });
-      c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
-      c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
-      return response;
     }
   }
 
   // ── Parse request ──────────────────────────────────────────────────
   let body: { format?: string; content?: string };
   try {
-    body = await c.req.json();
-  } catch {
+    const rawBody = await readBodyWithByteLimit(c.req.raw, MAX_REQUEST_BODY_BYTES)
+    body = JSON.parse(rawBody || '{}')
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return c.json({ error: 'Payload too large' }, 413)
+    }
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
@@ -155,32 +188,21 @@ audit.post('/', async (c) => {
   // parse and re-serialize — return the raw JSON string directly.
   const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
   if (kvCached) {
-    // ETag: 304 if client already has this version
-    const ifNoneMatch = c.req.header('If-None-Match');
-    if (ifNoneMatch === `"${contentHash}"`) {
-      return new Response(null, {
-        status: 304,
-        headers: { ETag: `"${contentHash}"` },
-      });
+    const response = buildCachedAuditResponse(kvCached, contentHash, c.req.header('If-None-Match'))
+    if (!response) {
+      c.executionCtx.waitUntil(c.env.CACHE_KV.delete(auditCacheKey))
+    } else {
+      if (response.headers.get('Cache-Control') !== 'no-cache') {
+        c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()))
+      }
+
+      // Emit usage events in background — parse cached JSON AFTER response
+      // is sent so it doesn't affect latency.
+      // NOTE: these events have cacheStatus='l2-hit' so quota aggregation
+      // cron must exclude them (ADR-004: only Layer 3 misses consume quota).
+      c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
+      return response;
     }
-
-    const response = new Response(kvCached, {
-      headers: {
-        'Content-Type': 'application/json',
-        'ETag': `"${contentHash}"`,
-        'Cache-Control': 'public, max-age=3600',
-      },
-    });
-    // Re-populate L1 edge cache for same-datacenter instant hits
-    c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
-
-    // Emit usage events in background — parse cached JSON AFTER response
-    // is sent so it doesn't affect latency.
-    // NOTE: these events have cacheStatus='l2-hit' so quota aggregation
-    // cron must exclude them (ADR-004: only Layer 3 misses consume quota).
-    c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
-
-    return response;
   }
 
   // ── Parse manifest ─────────────────────────────────────────────────

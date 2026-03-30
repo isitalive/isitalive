@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Provider, RawProjectData, ProviderName } from '../scoring/types';
+import { fetchWithTimeout } from '../utils/http';
 
 const GITHUB_GRAPHQL = 'https://api.github.com/graphql';
 
@@ -102,7 +103,7 @@ export class GitHubProvider implements Provider {
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-    const res = await fetch(GITHUB_GRAPHQL, {
+    const res = await fetchWithTimeout(GITHUB_GRAPHQL, {
       method: 'POST',
       headers: {
         'Authorization': `bearer ${token}`,
@@ -117,6 +118,8 @@ export class GitHubProvider implements Provider {
           since: ninetyDaysAgo.toISOString(),
         },
       }),
+      timeoutMs: 5_000,
+      timeoutMessage: 'GitHub GraphQL request timed out after 5000ms',
     });
 
     if (!res.ok) {
@@ -189,7 +192,7 @@ export class GitHubProvider implements Provider {
         // 30-day run count for scoring thresholds (≥30, ≥10, ≥3, ≥1).
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         const createdFilter = `>=${thirtyDaysAgo.toISOString().split('T')[0]}`;
-        const runsRes = await fetch(
+        const runsRes = await fetchWithTimeout(
           `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=10&status=completed&created=${encodeURIComponent(createdFilter)}`,
           {
             headers: {
@@ -197,6 +200,8 @@ export class GitHubProvider implements Provider {
               'Accept': 'application/vnd.github+json',
               'User-Agent': 'isitalive/0.1',
             },
+            timeoutMs: 3_000,
+            timeoutMessage: 'GitHub Actions runs request timed out after 3000ms',
           },
         );
         if (runsRes.ok) {

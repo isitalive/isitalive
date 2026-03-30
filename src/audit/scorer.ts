@@ -72,6 +72,7 @@ export interface AuditResult {
 
 const AUDIT_CACHE_PREFIX = 'audit:result:';
 const AUDIT_CACHE_TTL = 6 * 60 * 60; // 6 hours
+const AUDIT_CACHE_URL_PREFIX = 'https://cache.isitalive.dev/api/manifest/';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -254,18 +255,13 @@ export async function scoreAudit(
     auditResult.retryAfterMs = Math.max(1000, Math.min(estimatedSeconds * 1000, 10_000));
   }
 
-  // ── 6. Cache the full audit result if complete ─────────────────────
-  if (complete) {
-    ctx.waitUntil(
-      env.CACHE_KV.put(auditCacheKey, JSON.stringify(auditResult), {
-        expirationTtl: AUDIT_CACHE_TTL,
-      }),
-    );
-  }
+  // ── 6. Persist current audit state immediately ─────────────────────
+  await persistAuditResult(env, auditCacheKey, contentHash, auditResult)
 
-  // If incomplete, use waitUntil to continue scoring in background
+  // If incomplete, finish the remaining deps in the background and promote
+  // the manifest-hash cache entry to a complete result.
   if (!complete && remaining.length > 0) {
-    ctx.waitUntil(scoreRemainingInBackground(remaining, env));
+    ctx.waitUntil(completeAuditInBackground(remaining, auditResult, auditCacheKey, contentHash, env));
   }
 
   return auditResult;
@@ -309,16 +305,20 @@ export function buildSummary(scored: AuditDep[]) {
  * Continue scoring deps in the background via waitUntil.
  * This primes the KV cache so the next call returns instantly.
  */
-async function scoreRemainingInBackground(
+async function completeAuditInBackground(
   remaining: AuditDep[],
+  currentResult: AuditResult,
+  auditCacheKey: string,
+  contentHash: string,
   env: Env,
 ): Promise<void> {
   const cacheManager = new CacheManager(env);
+  const replacements = new Map<string, AuditDep>()
   // Process in parallel batches of 10 (less aggressive than foreground)
   const bgBatchSize = 10;
   for (let i = 0; i < remaining.length; i += bgBatchSize) {
     const batch = remaining.slice(i, i + bgBatchSize);
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       batch.map(async (dep) => {
         if (!dep.github) return;
         const [owner, repo] = dep.github.split('/');
@@ -326,15 +326,86 @@ async function scoreRemainingInBackground(
           const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
           const result = scoreProject(rawData, 'github');
           await cacheManager.put('github', owner, repo, result);
+          replacements.set(dep.github, { ...dep, score: result.score, verdict: result.verdict, cacheStatus: 'fresh' })
         } catch {
-          // Best effort
+          replacements.set(dep.github, {
+            ...dep,
+            score: null,
+            verdict: 'unresolved',
+            cacheStatus: 'unresolved',
+            unresolvedReason: 'scoring_error',
+          })
         }
       }),
-    );
+    )
+
+    for (const result of results) {
+      if (result.status === 'rejected') continue
+    }
     // Small pause between background batches
     if (i + bgBatchSize < remaining.length) {
       await sleep(100);
     }
+  }
+
+  const finalDeps = currentResult.dependencies
+    .map((dep) => dep.cacheStatus === 'pending' && dep.github
+      ? (replacements.get(dep.github) ?? {
+          ...dep,
+          score: null,
+          verdict: 'unresolved' as const,
+          cacheStatus: 'unresolved' as const,
+          unresolvedReason: 'scoring_error',
+        } satisfies AuditDep)
+      : dep,
+    )
+    .sort((a, b) => {
+      if (a.score !== null && b.score !== null) return b.score - a.score
+      if (a.score !== null) return -1
+      if (b.score !== null) return 1
+      return 0
+    })
+
+  const scoredDeps = finalDeps.filter((dep) => dep.score !== null)
+  const finalResult: AuditResult = {
+    ...currentResult,
+    complete: true,
+    pending: 0,
+    unresolved: finalDeps.filter((dep) => dep.verdict === 'unresolved').length,
+    freshlyScored: finalDeps.filter((dep) => dep.cacheStatus === 'fresh').length,
+    retryAfterMs: undefined,
+    summary: buildSummary(scoredDeps),
+    dependencies: finalDeps,
+  }
+
+  await persistAuditResult(env, auditCacheKey, contentHash, finalResult)
+}
+
+async function persistAuditResult(
+  env: Env,
+  auditCacheKey: string,
+  contentHash: string,
+  auditResult: AuditResult,
+): Promise<void> {
+  const json = JSON.stringify(auditResult)
+  await env.CACHE_KV.put(auditCacheKey, json, {
+    expirationTtl: AUDIT_CACHE_TTL,
+  })
+
+  if (!auditResult.complete) return
+
+  try {
+    const cache = caches.default
+    const response = new Response(json, {
+      headers: {
+        'Content-Type': 'application/json',
+        'ETag': `"${contentHash}"`,
+        'Cache-Control': 'public, max-age=3600',
+      },
+    })
+    await cache.put(new Request(`${AUDIT_CACHE_URL_PREFIX}${contentHash}`), response)
+  } catch {
+    // Cache API is best-effort outside the request path
   }
 }
 

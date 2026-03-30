@@ -9,6 +9,7 @@
 
 import type { ParsedDep } from './parsers';
 import type { Env } from '../scoring/types';
+import { fetchWithTimeout } from '../utils/http';
 
 export interface ResolvedDep extends ParsedDep {
   /** GitHub owner/repo, or null if unresolvable */
@@ -197,9 +198,10 @@ async function followGoImport(
   const url = `https://${rootPath}?go-get=1`;
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       redirect: 'follow',
-      signal: AbortSignal.timeout(2000), // 2s timeout as recommended
+      timeoutMs: 2_000,
+      timeoutMessage: `Go import lookup timed out after 2000ms for ${rootPath}`,
     });
 
     if (!res.ok) return null;
@@ -247,9 +249,10 @@ async function resolveNpm(dep: ParsedDep): Promise<ResolvedDep> {
       ? dep.name.replace('/', '%2F')
       : encodeURIComponent(dep.name);
 
-    const res = await fetch(`https://registry.npmjs.org/${registryName}`, {
+    const res = await fetchWithTimeout(`https://registry.npmjs.org/${registryName}`, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(3000),
+      timeoutMs: 3_000,
+      timeoutMessage: `npm registry lookup timed out after 3000ms for ${dep.name}`,
     });
 
     if (!res.ok) {
