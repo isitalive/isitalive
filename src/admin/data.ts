@@ -7,7 +7,7 @@
 
 import type { Env, ApiKeyEntry } from '../types/env'
 import { getTrackedIndex, type TrackedIndex } from '../aggregate/tracked'
-import { TRENDING_KEY } from '../state/keys'
+import { getTrending } from '../aggregate/trending'
 
 // ---------------------------------------------------------------------------
 // Overview stats
@@ -24,9 +24,12 @@ export interface AdminOverview {
 }
 
 export async function getAdminOverview(env: Env): Promise<AdminOverview> {
+  // getTrending() transparently handles both the new TrendingCache wrapper
+  // and the legacy bare-array KV payload — reading TRENDING_KEY directly
+  // would silently return 0 for the new wrapper shape.
   const [tracked, trending] = await Promise.all([
     getTrackedIndex(env.CACHE_KV),
-    env.CACHE_KV.get(TRENDING_KEY, 'json') as Promise<any[] | null>,
+    getTrending(env.CACHE_KV),
   ])
 
   let hot = 0, warm = 0, cold = 0
@@ -41,7 +44,7 @@ export async function getAdminOverview(env: Env): Promise<AdminOverview> {
     hotRepoCount: hot,
     warmRepoCount: warm,
     coldRepoCount: cold,
-    trendingCount: trending?.length ?? 0,
+    trendingCount: trending.length,
     tierLimits: [
       { tier: 'free', limit: 60, period: 60 },
       { tier: 'pro', limit: 120, period: 60 },
