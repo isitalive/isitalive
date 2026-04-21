@@ -9,12 +9,15 @@ import { queryR2SQL } from '../admin/r2sql'
 import { SITEMAP_KEY } from '../state/keys'
 
 // Sourced from usage_events — see comment in aggregate/tracked.ts for why
-// we avoid result_events_v2 as the primary aggregation source.
+// we avoid result_events_v2 as the primary aggregation source. Excluding
+// source='cron' keeps synthetic refresh traffic from biasing the top-repo
+// ranking that feeds the sitemap.
 const SITEMAP_SQL = `
 SELECT repo
 FROM usage_events
 WHERE timestamp > NOW() - INTERVAL '90 days'
   AND repo != ''
+  AND source != 'cron'
 GROUP BY repo
 ORDER BY COUNT(*) DESC
 LIMIT 5000

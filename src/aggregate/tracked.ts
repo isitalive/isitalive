@@ -47,8 +47,9 @@ function classifyTier(lastSeen: string): TrackedRepo['tier'] {
 }
 
 /**
- * Query Iceberg for all tracked repos (seen in last 90d) and cache in KV.
- * Called by the cron handler every 10 minutes.
+ * Query Iceberg for all tracked repos (seen in the last 30d, excluding
+ * synthetic cron traffic) and cache in KV. Called by the cron handler
+ * every 10 minutes.
  */
 export async function refreshTracked(env: Env): Promise<TrackedIndex> {
   const result = await queryR2SQL(env, TRACKED_SQL)
