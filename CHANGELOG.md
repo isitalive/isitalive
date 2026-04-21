@@ -4,7 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.11.0] - 2026-03-23
+## [0.12.0] - 2026-04-21
+
+### Security
+
+- **Admin login brute-force protection** — POST `/admin/auth/login` is now guarded by a dedicated per-IP rate-limit binding (`RATE_LIMITER_ADMIN`, 10 attempts/min). On trip the endpoint returns the same generic 401 page as a bad-secret failure so rate-limit state is not disclosed.
+- **GitHub Actions pinned to commit SHAs** — `.github/workflows/ci.yml` and `audit.yml` now pin `actions/checkout`, `actions/setup-node`, and `isitalive/audit-action` to exact SHAs (previously `@v6` / `@main`). The audit-action pin in particular closes a supply-chain vector since it runs with `id-token: write`.
+- **`npm audit` CI gate** — CI now runs `npm audit --audit-level=high` after `npm ci`; high/critical advisories fail the build. Bumped transitive dev deps (picomatch, vite) to clear existing advisories.
+- **Sanitized parse errors** — `POST /api/manifest` no longer echoes inner parser messages (`Parse error: <leaked details>`); instead returns `{error: "Invalid manifest format", error_code: "invalid_manifest"}`.
+
+### Added
+
+- **Structured `error_code` on error responses** — `/api/check` and `/api/manifest` JSON errors now include a machine-readable `error_code` (`not_found`, `github_rate_limited`, `github_timeout`, `github_circuit_open`, `upstream_error`, `invalid_manifest`, `payload_too_large`, `invalid_json`). OpenAPI schema updated.
+- **Serve-stale fallback on upstream failure** — when GitHub is unavailable, `/api/check` now serves the last cached score (within a 7-day hard cap) with `degraded: true`, `X-Cache: L2-STALE-DEGRADED`, and `Cache-Control: no-store`. Only returns 503/504 when no cache exists at all. KV retention extended from 48h to 7 days to widen the degraded-fallback window.
+- **Circuit breaker for GitHub** — three consecutive retryable failures within 60s trip a 30s fail-fast window. Paired with serve-stale, this bounds the Worker CPU cost of a sustained GitHub outage. State is backed by `CACHE_KV` (`cb:github`) so it survives isolate restarts.
+- **Dependency-aware `/health`** — now probes `CACHE_KV` with an 80ms budget and returns `{status, kv, version, probeMs}`; 503 when KV fails. `Cache-Control: no-store`.
+- **`unhandledrejection` handler** — the Worker entry (`src/index.ts`) logs structured JSON for silent `waitUntil` rejections, making background pipeline/cron failures visible in Cloudflare Observability.
+- **Pipeline emit retry + timeout** — each `env.*_PIPELINE.send()` is now wrapped in a 3-attempt retry with 250/500ms backoff and a 2s per-attempt timeout. Reduces data loss on transient pipeline hiccups while remaining fire-and-forget.
+- **Per-repo anonymous rate-limit key** — `/api/check/*` anonymous requests now include `owner/repo` in the rate-limit key so one viral repo cannot starve the per-IP budget for every other project (`/api/manifest` is unaffected).
+
+### Changed
+
+- **HTTP status remap for upstream errors on `/api/check`** — previously all non-404 upstream failures returned 502. Now: 504 on timeout, 503 on GitHub rate-limit and when the circuit is open, 502 only on other upstream errors. Responses also include `error_code` (see Added). Callers parsing the old `{error: string}` shape continue to work since the new fields are additive.
+
+
 
 ### Added
 

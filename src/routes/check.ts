@@ -5,6 +5,7 @@
 import { Hono } from 'hono'
 import type { Env } from '../types/env'
 import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
+import { classifyError, type ProviderErrorCode } from '../providers/errors'
 import { CacheManager, cacheControlHeaders, TIERS, type Tier, trackFirstSeen } from '../cache/index'
 import { isValidParam } from '../utils/validate'
 import { buildResultEvent } from '../events/result'
@@ -192,13 +193,41 @@ check.get('/:provider/:owner/:repo', async (c) => {
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
     return response
-  } catch (err: any) {
-    const status = err.message?.includes('not found') ? 404 : 502
-    if (status !== 404) {
+  } catch (err: unknown) {
+    const errorCode = classifyError(err)
+
+    if (errorCode !== 'not_found') {
       console.error(`Project fetch failed for ${provider}/${owner}/${repo}:`, err)
+      const stale = await cacheManager.getAny(provider, owner, repo)
+      if (stale) {
+        const response = c.json({
+          ...shapeScoringResult(stale.result, includeFlags),
+          ...cacheMeta('l2-stale-degraded', tier, stale.ageSeconds, stale.storedAt, null, null),
+          degraded: true,
+          error_code: errorCode,
+        })
+        response.headers.set('Cache-Control', 'no-store')
+        response.headers.set('CDN-Cache-Control', 'no-store')
+        response.headers.set('X-Cache', 'L2-STALE-DEGRADED')
+        return response
+      }
     }
-    const message = status === 404 ? 'Project not found' : 'Failed to fetch project data'
-    return c.json({ error: message }, status)
+
+    const statusMap = {
+      not_found: 404,
+      github_timeout: 504,
+      github_rate_limited: 503,
+      github_circuit_open: 503,
+      upstream_error: 502,
+    } as const
+    const messageMap: Record<ProviderErrorCode, string> = {
+      not_found: 'Project not found',
+      github_timeout: 'Upstream timed out',
+      github_rate_limited: 'Upstream is rate-limited',
+      github_circuit_open: 'Upstream temporarily unavailable',
+      upstream_error: 'Failed to fetch project data',
+    }
+    return c.json({ error: messageMap[errorCode], error_code: errorCode }, statusMap[errorCode])
   }
 })
 

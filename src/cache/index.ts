@@ -59,8 +59,9 @@ export const TIERS: Record<Tier, TierConfig> = {
   },
 };
 
-/** KV max TTL — longest we ever keep a record */
-const KV_MAX_TTL = 48 * 60 * 60; // 48h
+/** KV max TTL — also the hard cap for the degraded-fallback window. */
+const KV_MAX_TTL = 7 * 24 * 60 * 60;
+const DEGRADED_FALLBACK_MAX_AGE_S = KV_MAX_TTL;
 
 // ---------------------------------------------------------------------------
 // Stored shape (wraps ScoringResult with metadata for KV)
@@ -214,6 +215,28 @@ export class CacheManager {
 
     // Too old
     return { result: null, status: 'l3-miss' as const, ageSeconds, storedAt, freshUntil, staleUntil };
+  }
+
+  /**
+   * Bypasses per-tier freshness gates and returns any cached entry within
+   * the hard fallback cap. Used by the check endpoint's catch block to
+   * serve degraded-but-useful data when GitHub is unavailable.
+   */
+  async getAny(
+    provider: string,
+    owner: string,
+    repo: string,
+  ): Promise<{ result: ScoringResult; ageSeconds: number; storedAt: string } | null> {
+    const key = this.kvKey(provider, owner, repo);
+    const entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
+    if (!entry) return null;
+    const ageSeconds = Math.round((Date.now() - entry.storedAt) / 1000);
+    if (ageSeconds > DEGRADED_FALLBACK_MAX_AGE_S) return null;
+    return {
+      result: { ...entry.result, cached: true },
+      ageSeconds,
+      storedAt: new Date(entry.storedAt).toISOString(),
+    };
   }
 
   /**

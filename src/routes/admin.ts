@@ -47,6 +47,17 @@ admin.post('/auth/login', async (c) => {
     return c.html(adminLoginPage('Admin section is not configured.'), 503)
   }
 
+  // Consume budget BEFORE the secret check; return the same 401 as a
+  // bad-secret failure so rate-limit state is not disclosed.
+  const limiter = c.env.RATE_LIMITER_ADMIN
+  if (limiter) {
+    const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
+    const rl = await limiter.limit({ key: `admin-login:${ip}` })
+    if (!rl.success) {
+      return c.html(adminLoginPage('Invalid secret. Please try again.'), 401)
+    }
+  }
+
   const body = await c.req.parseBody()
   const input = (body['secret'] as string || '').trim()
 

@@ -53,6 +53,38 @@ function flattenManifest(event: ManifestEvent): ManifestStreamRecord {
   return nullsToUndefined({ ...envelope, type: event.domain, ...data }) as ManifestStreamRecord
 }
 
+const PIPELINE_SEND_TIMEOUT_MS = 2000
+const PIPELINE_RETRY_DELAYS_MS = [250, 500]
+
+/** Fire-and-forget send with per-attempt timeout + bounded retry. Errors are absorbed. */
+export async function sendWithRetry(
+  send: () => Promise<void>,
+  label: string,
+): Promise<void> {
+  for (let attempt = 0; attempt <= PIPELINE_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      await Promise.race([
+        send(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('pipeline send timed out')), PIPELINE_SEND_TIMEOUT_MS),
+        ),
+      ])
+      return
+    } catch (err) {
+      if (attempt === PIPELINE_RETRY_DELAYS_MS.length) {
+        console.error(JSON.stringify({
+          level: 'error',
+          msg: 'pipeline_send_failed',
+          pipeline: label,
+          error: err instanceof Error ? err.message : String(err),
+        }))
+        return
+      }
+      await new Promise((r) => setTimeout(r, PIPELINE_RETRY_DELAYS_MS[attempt]))
+    }
+  }
+}
+
 /**
  * Emit a provider event to the provider pipeline.
  * Call via `ctx.waitUntil(emitProviderEvent(env, event))`.
@@ -61,11 +93,7 @@ export async function emitProviderEvent(
   env: PipelineBindings,
   event: ProviderEvent,
 ): Promise<void> {
-  try {
-    await env.PROVIDER_PIPELINE.send([flattenProvider(event)])
-  } catch (err) {
-    console.error('Pipeline: failed to emit provider event:', err)
-  }
+  await sendWithRetry(() => env.PROVIDER_PIPELINE.send([flattenProvider(event)]), 'provider')
 }
 
 /**
@@ -75,11 +103,7 @@ export async function emitResultEvent(
   env: PipelineBindings,
   event: ResultEvent,
 ): Promise<void> {
-  try {
-    await env.RESULT_PIPELINE.send([flattenResult(event)])
-  } catch (err) {
-    console.error('Pipeline: failed to emit result event:', err)
-  }
+  await sendWithRetry(() => env.RESULT_PIPELINE.send([flattenResult(event)]), 'result')
 }
 
 /**
@@ -89,11 +113,7 @@ export async function emitUsageEvent(
   env: PipelineBindings,
   event: UsageEvent,
 ): Promise<void> {
-  try {
-    await env.USAGE_PIPELINE.send([flattenUsage(event)])
-  } catch (err) {
-    console.error('Pipeline: failed to emit usage event:', err)
-  }
+  await sendWithRetry(() => env.USAGE_PIPELINE.send([flattenUsage(event)]), 'usage')
 }
 
 /**
@@ -103,11 +123,7 @@ export async function emitManifestEvent(
   env: PipelineBindings,
   event: ManifestEvent,
 ): Promise<void> {
-  try {
-    await env.MANIFEST_PIPELINE.send([flattenManifest(event)])
-  } catch (err) {
-    console.error('Pipeline: failed to emit manifest event:', err)
-  }
+  await sendWithRetry(() => env.MANIFEST_PIPELINE.send([flattenManifest(event)]), 'manifest')
 }
 
 /**

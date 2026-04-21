@@ -17,6 +17,7 @@ import type {
 } from '../scoring/types';
 import { CacheManager, type Tier } from '../cache/index';
 import { providers } from '../providers/index';
+import { isProviderError } from '../providers/errors';
 import { scoreProject } from '../scoring/engine';
 import { METHODOLOGY } from '../scoring/methodology';
 import { bufferToHex } from '../utils/crypto';
@@ -199,8 +200,8 @@ export async function scoreAudit(
         const result = scoreProject(rawData, 'github');
         ctx.waitUntil(cacheManager.put('github', owner, repo, result));
         return { result, error: null as string | null };
-      } catch (err: any) {
-        const is404 = err.message?.includes('not found');
+      } catch (err: unknown) {
+        const is404 = isProviderError(err) && err.code === 'not_found';
         return { result: null, error: is404 ? 'repo_not_found' : 'scoring_error' };
       }
     },

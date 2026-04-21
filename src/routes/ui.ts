@@ -10,6 +10,7 @@
 import { Hono } from 'hono'
 import type { Env } from '../types/env'
 import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
+import { classifyError } from '../providers/errors'
 import { CacheManager, getFirstSeen, trackFirstSeen } from '../cache/index'
 import { landingPage } from '../ui/landing'
 import { resultPage } from '../ui/result'
@@ -672,15 +673,17 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
     return response
-  } catch (err: any) {
-    const isNotFound = err.message?.includes('not found')
-    if (!isNotFound) {
+  } catch (err: unknown) {
+    const errorCode = classifyError(err)
+    if (errorCode !== 'not_found') {
       console.error(`Project fetch failed for ${provider}/${owner}/${repo}:`, err)
     }
     c.header('Cache-Control', 'public, max-age=300')
-    const status = isNotFound ? 404 : 502
-    const message = isNotFound ? 'Project not found' : 'Failed to fetch project data. Please try again later.'
-    return c.html(errorPage(message), status)
+    const statusMap = { not_found: 404, github_timeout: 504, github_rate_limited: 503, github_circuit_open: 503, upstream_error: 503 } as const
+    const message = errorCode === 'not_found'
+      ? 'Project not found'
+      : 'Failed to fetch project data. Please try again later.'
+    return c.html(errorPage(message), statusMap[errorCode])
   }
 }
 

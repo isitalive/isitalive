@@ -20,6 +20,13 @@ const AUTH_LIMIT = 1000;
 
 type AppEnv = { Bindings: Env; Variables: { tier: string; keyName: string | null; isAuthenticated: boolean } };
 
+function buildAnonKey(ip: string, path: string): string {
+  const match = path.match(/^\/api\/check\/([^/]+)\/([^/]+)\/([^/]+)/);
+  if (!match) return `ip:${ip}`;
+  const [, provider, owner, repo] = match;
+  return `ip:${ip}:${provider.toLowerCase()}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+}
+
 /**
  * Rate limiter using native Cloudflare Rate Limiting bindings.
  *
@@ -36,7 +43,11 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
   const limit = isAuthenticated ? AUTH_LIMIT : ANON_LIMIT;
 
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
-  const rateLimitKey = isAuthenticated ? `key:${keyName}` : `ip:${ip}`;
+  // Scope anonymous /api/check/* by owner/repo so one viral repo can't
+  // starve the 5 req/min budget for every other project on the same IP.
+  const rateLimitKey = isAuthenticated
+    ? `key:${keyName}`
+    : buildAnonKey(ip, c.req.path);
 
   const result = await rateLimiter.limit({ key: rateLimitKey });
 

@@ -144,9 +144,9 @@ audit.post('/', async (c) => {
     body = JSON.parse(rawBody || '{}')
   } catch (err) {
     if (err instanceof RequestBodyTooLargeError) {
-      return c.json({ error: 'Payload too large' }, 413)
+      return c.json({ error: 'Payload too large', error_code: 'payload_too_large' }, 413)
     }
-    return c.json({ error: 'Invalid JSON body' }, 400);
+    return c.json({ error: 'Invalid JSON body', error_code: 'invalid_json' }, 400);
   }
 
   const { format, content } = body;
@@ -214,8 +214,8 @@ audit.post('/', async (c) => {
   let deps;
   try {
     deps = parseManifest(format as ManifestFormat, content);
-  } catch (err: any) {
-    return c.json({ error: `Parse error: ${err.message}` }, 400);
+  } catch {
+    return c.json({ error: 'Invalid manifest format', error_code: 'invalid_manifest' }, 400);
   }
 
   if (deps.length === 0) {

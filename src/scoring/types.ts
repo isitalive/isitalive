@@ -28,7 +28,7 @@ export type Verdict =
 export type SignalMeasurement = 'direct' | 'sampled-proxy'
 
 /** Cache status labels shared across docs and responses */
-export type CacheStatusName = 'l1-hit' | 'l2-hit' | 'l2-stale' | 'l3-miss'
+export type CacheStatusName = 'l1-hit' | 'l2-hit' | 'l2-stale' | 'l2-stale-degraded' | 'l3-miss'
 
 /** Shared methodology summary */
 export interface MethodologySummary {

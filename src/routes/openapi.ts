@@ -139,6 +139,10 @@ export const openApiSpec = {
                   type: 'object',
                   properties: {
                     error: { type: 'string' },
+                    error_code: {
+                      type: 'string',
+                      description: 'Machine-readable error classification.',
+                    },
                   },
                 },
               },
@@ -152,6 +156,52 @@ export const openApiSpec = {
                   type: 'object',
                   properties: {
                     error: { type: 'string' },
+                    error_code: {
+                      type: 'string',
+                      enum: ['not_found'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '502': {
+            description: 'Upstream provider error (GitHub returned 5xx or malformed payload)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error: { type: 'string' },
+                    error_code: { type: 'string', enum: ['upstream_error'] },
+                  },
+                },
+              },
+            },
+          },
+          '503': {
+            description: 'Upstream rate-limited or temporarily unavailable (serve-stale fallback is unavailable).',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error: { type: 'string' },
+                    error_code: { type: 'string', enum: ['github_rate_limited', 'github_circuit_open'] },
+                  },
+                },
+              },
+            },
+          },
+          '504': {
+            description: 'Upstream provider timed out.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error: { type: 'string' },
+                    error_code: { type: 'string', enum: ['github_timeout'] },
                   },
                 },
               },
