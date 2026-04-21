@@ -53,7 +53,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
   // Validate path params — blocks XSS / path-traversal payloads
   if (!isValidParam(rawOwner) || !isValidParam(rawRepo)) {
-    return c.json({ error: 'Invalid owner or repo name' }, 400)
+    return c.json({ error: 'Invalid owner or repo name', error_code: 'invalid_param' }, 400)
   }
 
   // Normalize to lowercase — GitHub is case-insensitive

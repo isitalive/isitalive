@@ -1,7 +1,9 @@
-// Circuit breaker for upstream providers. Per-isolate Map is the hot path;
-// KV is only touched on state transitions (open↔close) and on the first
-// call per isolate that observes a failure — steady-state success and
-// steady-state closed-breaker both skip KV entirely.
+// Circuit breaker for upstream providers. Per-isolate Map is the hot path.
+// Steady-state success (closed, zero failures) skips KV entirely. Each
+// failure writes to KV so other isolates can eventually see the same state;
+// write amplification is bounded by the short KV TTL and the fact that
+// failures are rare in steady state. Reads hydrate from KV at most once
+// per isolate.
 
 import type { Env } from '../types/env'
 

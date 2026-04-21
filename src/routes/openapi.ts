@@ -66,8 +66,8 @@ export const openApiSpec = {
             description: 'Project health check result',
             headers: {
               'X-Cache': {
-                description: 'Cache status header used by the route handler',
-                schema: { type: 'string', enum: ['L1-HIT', 'L2-HIT', 'L2-STALE', 'L3-MISS'] },
+                description: 'Cache status header used by the route handler. `L2-STALE-DEGRADED` means the upstream provider was unavailable and the response was served from the last known cache (within a 7-day fallback window); such responses also set `Cache-Control: no-store` and include `degraded: true` in the body.',
+                schema: { type: 'string', enum: ['L1-HIT', 'L2-HIT', 'L2-STALE', 'L2-STALE-DEGRADED', 'L3-MISS'] },
               },
               'X-RateLimit-Limit': {
                 description: 'Maximum requests allowed per minute for your tier',
@@ -456,6 +456,15 @@ export const openApiSpec = {
           },
           cache: {
             $ref: '#/components/schemas/CacheMetadata',
+          },
+          degraded: {
+            type: 'boolean',
+            description: 'True when the upstream provider was unavailable and this response was served from cached data past its normal stale window. Such responses set `Cache-Control: no-store` and `X-Cache: L2-STALE-DEGRADED`.',
+          },
+          error_code: {
+            type: 'string',
+            enum: ['github_rate_limited', 'github_timeout', 'github_circuit_open', 'upstream_error'],
+            description: 'Only present when `degraded: true`. Machine-readable reason the upstream call failed.',
           },
         },
       },

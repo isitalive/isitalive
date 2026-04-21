@@ -228,7 +228,14 @@ export class CacheManager {
     repo: string,
   ): Promise<{ result: ScoringResult; ageSeconds: number; storedAt: string } | null> {
     const key = this.kvKey(provider, owner, repo);
-    const entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
+    let entry: CachedEntry | null;
+    try {
+      entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
+    } catch {
+      // KV degraded is exactly when serve-stale matters — don't let a read
+      // failure promote the upstream error into a 500.
+      return null;
+    }
     if (!entry) return null;
     const ageSeconds = Math.round((Date.now() - entry.storedAt) / 1000);
     if (ageSeconds > DEGRADED_FALLBACK_MAX_AGE_S) return null;
