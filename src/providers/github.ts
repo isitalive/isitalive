@@ -131,10 +131,13 @@ export class GitHubProvider implements Provider {
 
     if (json.errors?.length) {
       const msg = json.errors.map((e: any) => e.message).join('; ');
+      if (json.errors.some((e: any) => e.type === 'NOT_FOUND')) {
+        throw new Error(`Repository not found: ${owner}/${repo}`);
+      }
       throw new Error(`GitHub GraphQL error: ${msg}`);
     }
 
-    const r = json.data.repository;
+    const r = json.data?.repository;
     if (!r) {
       throw new Error(`Repository not found: ${owner}/${repo}`);
     }

@@ -194,6 +194,9 @@ check.get('/:provider/:owner/:repo', async (c) => {
     return response
   } catch (err: any) {
     const status = err.message?.includes('not found') ? 404 : 502
+    if (status !== 404) {
+      console.error(`Project fetch failed for ${provider}/${owner}/${repo}:`, err)
+    }
     const message = status === 404 ? 'Project not found' : 'Failed to fetch project data'
     return c.json({ error: message }, status)
   }
