@@ -8,12 +8,14 @@ import type { Env } from '../types/env'
 import { queryR2SQL } from '../admin/r2sql'
 import { SITEMAP_KEY } from '../state/keys'
 
+// Sourced from usage_events — see comment in aggregate/tracked.ts for why
+// we avoid result_events_v2 as the primary aggregation source.
 const SITEMAP_SQL = `
-SELECT project
-FROM result_events_v2
+SELECT repo
+FROM usage_events
 WHERE timestamp > NOW() - INTERVAL '90 days'
-  AND project != ''
-GROUP BY project
+  AND repo != ''
+GROUP BY repo
 ORDER BY COUNT(*) DESC
 LIMIT 5000
 `
