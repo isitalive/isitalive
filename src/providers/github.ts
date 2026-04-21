@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Provider, RawProjectData, ProviderName } from '../scoring/types';
-import { fetchWithTimeout } from '../utils/http';
+import { fetchWithRetry } from '../utils/http';
 
 const GITHUB_GRAPHQL = 'https://api.github.com/graphql';
 
@@ -103,7 +103,7 @@ export class GitHubProvider implements Provider {
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-    const res = await fetchWithTimeout(GITHUB_GRAPHQL, {
+    const res = await fetchWithRetry(GITHUB_GRAPHQL, {
       method: 'POST',
       headers: {
         'Authorization': `bearer ${token}`,
@@ -197,7 +197,7 @@ export class GitHubProvider implements Provider {
         // 30-day run count for scoring thresholds (≥30, ≥10, ≥3, ≥1).
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         const createdFilter = `>=${thirtyDaysAgo.toISOString().split('T')[0]}`;
-        const runsRes = await fetchWithTimeout(
+        const runsRes = await fetchWithRetry(
           `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=10&status=completed&created=${encodeURIComponent(createdFilter)}`,
           {
             headers: {

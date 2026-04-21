@@ -144,7 +144,7 @@ export async function handlePullRequest(
       return;
     }
 
-    const resolved = await resolveAll(deps, env);
+    const resolved = await resolveAll(deps, env, ctx);
     const contentHash = await hashManifest(content);
     const auditResult = await scoreAudit(resolved, manifest.format, contentHash, env, ctx);
 
@@ -271,7 +271,7 @@ export async function handlePush(
 
       if (deps.length === 0) continue;
 
-      const resolved = await resolveAll(deps, env);
+      const resolved = await resolveAll(deps, env, ctx);
       const contentHash = await hashManifest(content);
       const auditResult = await scoreAudit(resolved, format, contentHash, env, ctx);
 

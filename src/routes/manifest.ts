@@ -235,7 +235,7 @@ audit.post('/', async (c) => {
   }
 
   // ── Resolve → GitHub repos ─────────────────────────────────────────
-  const resolved = await resolveAll(deps, c.env);
+  const resolved = await resolveAll(deps, c.env, c.executionCtx);
 
   // ── Score with time budget ─────────────────────────────────────────
   const result = await scoreAudit(

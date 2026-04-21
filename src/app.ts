@@ -103,9 +103,35 @@ app.get('/.well-known/ai-plugin.json', (c) => {
 
 app.get('/health', (c) => c.json({ status: 'ok', version }));
 
-// Global error handler — content-negotiated response for unhandled exceptions
+// Global error handler — content-negotiated response for unhandled exceptions.
+// Logs a single JSON line (indexed by Cloudflare Observability) with request
+// metadata so failures are triageable from logs alone.
 app.onError((err, c) => {
-  console.error('Unhandled error:', err);
+  const errObj = err instanceof Error ? err : new Error(String(err))
+  let path: string | null = null
+  try {
+    path = new URL(c.req.url).pathname
+  } catch {
+    path = c.req.path ?? null
+  }
+  let tier: string | null = null
+  try {
+    tier = (c.get as (k: string) => unknown)('tier') as string | null
+  } catch {
+    tier = null
+  }
+  console.error(JSON.stringify({
+    level: 'error',
+    msg: 'unhandled_error',
+    name: errObj.name,
+    message: errObj.message,
+    stack: errObj.stack,
+    method: c.req.method,
+    path,
+    userAgent: c.req.header('User-Agent') ?? null,
+    cfRay: c.req.header('CF-Ray') ?? null,
+    tier,
+  }))
   const wantsHtml = (c.req.header('Accept') || '').includes('text/html')
   if (wantsHtml) {
     return c.html(

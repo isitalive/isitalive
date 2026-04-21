@@ -445,7 +445,7 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
   allDeps.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version))
 
   // Resolve to GitHub repos + score
-  const resolved = await resolveAll(allDeps, c.env)
+  const resolved = await resolveAll(allDeps, c.env, c.executionCtx)
 
   // Hash the combined content for scoreAudit's cache key
   const combinedContent = allDeps.map(d => `${d.name}@${d.version}`).join('\n')
@@ -744,7 +744,7 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
     return c.html(errorPage(`No dependencies found in ${filename}.`), 400)
   }
 
-  const resolved = await resolveAll(deps, c.env)
+  const resolved = await resolveAll(deps, c.env, c.executionCtx)
   const auditResult = await scoreAudit(resolved, format, contentHash, c.env, c.executionCtx)
 
   // Write KV synchronously before redirect — scoreAudit only writes via

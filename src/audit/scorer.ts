@@ -20,6 +20,7 @@ import { providers } from '../providers/index';
 import { scoreProject } from '../scoring/engine';
 import { METHODOLOGY } from '../scoring/methodology';
 import { bufferToHex } from '../utils/crypto';
+import { runWithConcurrency } from '../utils/concurrency';
 import type { Env } from '../types/env';
 
 const github = providers.github;
@@ -185,79 +186,71 @@ export async function scoreAudit(
   }
 
   // ── 4. Score uncached deps within time budget ──────────────────────
+  // Runs up to 20 concurrent GitHub fetches. `shouldStop` fires once the
+  // budget is blown; still-queued items come back as `skipped` and are
+  // surfaced as `pending` below.
   const remaining: AuditDep[] = [];
-  const batchSize = 20;
-  let timedOut = false;
-
-  for (let i = 0; i < uncached.length; i += batchSize) {
-    // Check time budget before each batch
-    const elapsed = Date.now() - start;
-    if (elapsed > budgetMs) {
-      timedOut = true;
-      // Add remaining as pending
-      for (let j = i; j < uncached.length; j++) {
-        remaining.push({
-          name: uncached[j].name,
-          version: uncached[j].version,
-          dev: uncached[j].dev,
-          ecosystem: uncached[j].ecosystem,
-          github: `${uncached[j].github!.owner}/${uncached[j].github!.repo}`,
-          score: null,
-          verdict: 'pending',
-          resolvedFrom: uncached[j].resolvedFrom,
-          checkedAt: undefined,
-          methodology: undefined,
-          cacheStatus: 'pending',
-        });
+  const scoreResults = await runWithConcurrency(
+    uncached,
+    async (dep) => {
+      const { owner, repo } = dep.github!;
+      try {
+        const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
+        const result = scoreProject(rawData, 'github');
+        ctx.waitUntil(cacheManager.put('github', owner, repo, result));
+        return { result, error: null as string | null };
+      } catch (err: any) {
+        const is404 = err.message?.includes('not found');
+        return { result: null, error: is404 ? 'repo_not_found' : 'scoring_error' };
       }
-      break;
+    },
+    {
+      limit: 20,
+      shouldStop: () => Date.now() - start > budgetMs,
+    },
+  );
+
+  for (let i = 0; i < uncached.length; i++) {
+    const dep = uncached[i];
+    const entry = scoreResults[i];
+
+    if (entry.status === 'skipped') {
+      remaining.push({
+        name: dep.name,
+        version: dep.version,
+        dev: dep.dev,
+        ecosystem: dep.ecosystem,
+        github: `${dep.github!.owner}/${dep.github!.repo}`,
+        score: null,
+        verdict: 'pending',
+        resolvedFrom: dep.resolvedFrom,
+        checkedAt: undefined,
+        methodology: undefined,
+        cacheStatus: 'pending',
+      });
+      continue;
     }
 
-    const batch = uncached.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(async (dep) => {
-        const { owner, repo } = dep.github!;
-        try {
-          const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
-          const result = scoreProject(rawData, 'github');
-          // Cache in background
-          ctx.waitUntil(cacheManager.put('github', owner, repo, result));
-          return { dep, result, error: null as string | null };
-        } catch (err: any) {
-          const is404 = err.message?.includes('not found');
-          return { dep, result: null, error: is404 ? 'repo_not_found' : 'scoring_error' };
-        }
-      }),
-    );
-
-    for (const r of results) {
-      if (r.status === 'rejected') continue;
-      const { dep, result, error } = r.value;
-      if (result) {
-        scored.push(depToAudit(dep, result, 'fresh'));
-      } else {
-        // Scoring failed — treat as unresolved (not pending), it's not recoverable
-        unresolvedDeps.push({
-          name: dep.name,
-          version: dep.version,
-          dev: dep.dev,
-          ecosystem: dep.ecosystem,
-          github: `${dep.github!.owner}/${dep.github!.repo}`,
-          score: null,
-          verdict: 'unresolved',
-          resolvedFrom: dep.resolvedFrom,
-          checkedAt: undefined,
-          methodology: undefined,
-          cacheStatus: 'unresolved',
-          unresolvedReason: error ?? 'scoring_error',
-        });
-      }
+    if (entry.status === 'fulfilled' && entry.value.result) {
+      scored.push(depToAudit(dep, entry.value.result, 'fresh'));
+      continue;
     }
 
-    // Brief pause between batches to avoid GitHub secondary rate limits
-    if (i + batchSize < uncached.length && !timedOut) {
-      await sleep(50);
-    }
+    const reason = entry.status === 'fulfilled' ? (entry.value.error ?? 'scoring_error') : 'scoring_error';
+    unresolvedDeps.push({
+      name: dep.name,
+      version: dep.version,
+      dev: dep.dev,
+      ecosystem: dep.ecosystem,
+      github: `${dep.github!.owner}/${dep.github!.repo}`,
+      score: null,
+      verdict: 'unresolved',
+      resolvedFrom: dep.resolvedFrom,
+      checkedAt: undefined,
+      methodology: undefined,
+      cacheStatus: 'unresolved',
+      unresolvedReason: reason,
+    });
   }
 
   // ── 5. Build result ────────────────────────────────────────────────
@@ -363,49 +356,40 @@ async function completeAuditInBackground(
 ): Promise<void> {
   const cacheManager = new CacheManager(env);
   const replacements = new Map<string, AuditDep>()
-  // Process in parallel batches of 10 (less aggressive than foreground)
-  const bgBatchSize = 10;
-  for (let i = 0; i < remaining.length; i += bgBatchSize) {
-    const batch = remaining.slice(i, i + bgBatchSize);
-    const results = await Promise.allSettled(
-      batch.map(async (dep) => {
-        if (!dep.github) return;
-        const [owner, repo] = dep.github.split('/');
-        try {
-          const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
-          const result = scoreProject(rawData, 'github');
-          await cacheManager.put('github', owner, repo, result);
-          replacements.set(dep.github, {
-            ...dep,
-            score: result.score,
-            verdict: result.verdict,
-            checkedAt: result.checkedAt,
-            methodology: result.methodology,
-            signals: result.signals,
-            drivers: result.drivers,
-            metrics: result.metrics,
-            cacheStatus: 'fresh',
-          })
-        } catch {
-          replacements.set(dep.github, {
-            ...dep,
-            score: null,
-            verdict: 'unresolved',
-            cacheStatus: 'unresolved',
-            unresolvedReason: 'scoring_error',
-          })
-        }
-      }),
-    )
 
-    for (const result of results) {
-      if (result.status === 'rejected') continue
-    }
-    // Small pause between background batches
-    if (i + bgBatchSize < remaining.length) {
-      await sleep(100);
-    }
-  }
+  // Less aggressive than foreground — 10 concurrent, no shouldStop (runs to completion).
+  await runWithConcurrency(
+    remaining,
+    async (dep) => {
+      if (!dep.github) return;
+      const [owner, repo] = dep.github.split('/');
+      try {
+        const rawData = await github.fetchProject(owner, repo, env.GITHUB_TOKEN);
+        const result = scoreProject(rawData, 'github');
+        await cacheManager.put('github', owner, repo, result);
+        replacements.set(dep.github, {
+          ...dep,
+          score: result.score,
+          verdict: result.verdict,
+          checkedAt: result.checkedAt,
+          methodology: result.methodology,
+          signals: result.signals,
+          drivers: result.drivers,
+          metrics: result.metrics,
+          cacheStatus: 'fresh',
+        })
+      } catch {
+        replacements.set(dep.github, {
+          ...dep,
+          score: null,
+          verdict: 'unresolved',
+          cacheStatus: 'unresolved',
+          unresolvedReason: 'scoring_error',
+        })
+      }
+    },
+    { limit: 10 },
+  )
 
   const finalDeps = currentResult.dependencies
     .map((dep) => dep.cacheStatus === 'pending' && dep.github
@@ -456,8 +440,4 @@ export async function hashManifest(content: string): Promise<string> {
   const data = new TextEncoder().encode(content);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   return bufferToHex(hashBuffer);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
