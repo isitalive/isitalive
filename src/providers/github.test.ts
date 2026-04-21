@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GitHubProvider } from './github'
 
 function makeGraphqlResponse(hasCi = true) {
@@ -34,7 +34,15 @@ function makeGraphqlResponse(hasCi = true) {
 }
 
 describe('GitHubProvider timeouts', () => {
+  beforeEach(() => {
+    // Freeze Date so median-days math is stable regardless of when CI runs
+    // (AbortSignal.timeout keeps real timers, since fetch is mocked anyway).
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-03-15T00:00:00.000Z'))
+  })
+
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
