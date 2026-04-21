@@ -5,9 +5,10 @@
 // hash-based comparison works correctly and prevents length leakage.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
 import { verifyAdminSecret } from './admin'
+import { admin } from './admin'
 
 describe('verifyAdminSecret (S3)', () => {
   const SECRET = 'my-test-admin-secret-42'
@@ -50,5 +51,69 @@ describe('verifyAdminSecret (S3)', () => {
   ], { numRuns: 200 })('never throws on arbitrary input', async (input) => {
     const result = await verifyAdminSecret(input, SECRET)
     expect(typeof result).toBe('boolean')
+  })
+})
+
+describe('admin login rate limit', () => {
+  const SECRET = 'brute-force-test-secret-0xDEADBEEF'
+
+  function makeRequest(body = 'secret=wrong') {
+    return new Request('https://example.com/auth/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'cf-connecting-ip': '203.0.113.7',
+      },
+      body,
+    })
+  }
+
+  function baseEnv(limitResult: { success: boolean }) {
+    return {
+      ADMIN_SECRET: SECRET,
+      RATE_LIMITER_ADMIN: { limit: vi.fn().mockResolvedValue(limitResult) },
+    } as unknown as Cloudflare.Env
+  }
+
+  it('returns generic 401 page when rate limit is exceeded', async () => {
+    const env = baseEnv({ success: false })
+    const res = await admin.request(makeRequest(`secret=${SECRET}`), {}, env)
+    expect(res.status).toBe(401)
+    expect(res.headers.get('retry-after')).toBeNull()
+    expect(res.headers.get('content-type') ?? '').toContain('text/html')
+    const html = await res.text()
+    expect(html).toContain('Invalid secret')
+    // Must not set a session cookie
+    expect(res.headers.get('set-cookie')).toBeNull()
+    // Must have consumed rate-limit budget
+    const limitFn = env.RATE_LIMITER_ADMIN!.limit as ReturnType<typeof vi.fn>
+    expect(limitFn).toHaveBeenCalledTimes(1)
+    expect(limitFn.mock.calls[0][0]).toEqual({ key: 'admin-login:203.0.113.7' })
+  })
+
+  it('returns generic 401 page when rate limit passes but secret is wrong', async () => {
+    const env = baseEnv({ success: true })
+    const res = await admin.request(makeRequest('secret=definitely-wrong'), {}, env)
+    expect(res.status).toBe(401)
+    expect(res.headers.get('retry-after')).toBeNull()
+    expect(res.headers.get('set-cookie')).toBeNull()
+    const html = await res.text()
+    expect(html).toContain('Invalid secret')
+  })
+
+  it('consumes rate-limit budget even when the secret is correct', async () => {
+    const env = baseEnv({ success: true })
+    const res = await admin.request(makeRequest(`secret=${SECRET}`), {}, env)
+    // Correct secret + budget available → redirect to /admin
+    expect(res.status).toBe(302)
+    const limitFn = env.RATE_LIMITER_ADMIN!.limit as ReturnType<typeof vi.fn>
+    expect(limitFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls open when the rate limiter binding is missing (backwards compat during deploy)', async () => {
+    const env = { ADMIN_SECRET: SECRET } as unknown as Cloudflare.Env
+    const res = await admin.request(makeRequest('secret=wrong'), {}, env)
+    // Binding absent → login still functions (path exists before wrangler.toml is deployed)
+    expect(res.status).toBe(401)
   })
 })

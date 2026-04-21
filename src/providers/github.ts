@@ -4,6 +4,7 @@
 
 import type { Provider, RawProjectData, ProviderName } from '../scoring/types';
 import { fetchWithRetry } from '../utils/http';
+import { ProviderError } from './errors';
 
 const GITHUB_GRAPHQL = 'https://api.github.com/graphql';
 
@@ -97,34 +98,56 @@ export class GitHubProvider implements Provider {
 
   async fetchProject(owner: string, repo: string, token?: string): Promise<RawProjectData> {
     if (!token) {
-      throw new Error('GITHUB_TOKEN is required for the GitHub provider');
+      throw new ProviderError('upstream_error', 'GITHUB_TOKEN is required for the GitHub provider');
     }
 
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-    const res = await fetchWithRetry(GITHUB_GRAPHQL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `bearer ${token}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'isitalive/0.1',
-      },
-      body: JSON.stringify({
-        query: PROJECT_QUERY,
-        variables: {
-          owner,
-          repo,
-          since: ninetyDaysAgo.toISOString(),
+    let res: Response;
+    try {
+      res = await fetchWithRetry(GITHUB_GRAPHQL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'isitalive/0.1',
         },
-      }),
-      timeoutMs: 5_000,
-      timeoutMessage: 'GitHub GraphQL request timed out after 5000ms',
-    });
+        body: JSON.stringify({
+          query: PROJECT_QUERY,
+          variables: {
+            owner,
+            repo,
+            since: ninetyDaysAgo.toISOString(),
+          },
+        }),
+        timeoutMs: 5_000,
+        timeoutMessage: 'GitHub GraphQL request timed out after 5000ms',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/timed out after|aborted/i.test(msg)) {
+        throw new ProviderError('github_timeout', msg);
+      }
+      throw new ProviderError('upstream_error', msg);
+    }
 
     if (!res.ok) {
+      // Classify rate limits by the documented GitHub headers, then fall back
+      // to status-based classification.
+      const rateRemaining = res.headers.get('x-ratelimit-remaining');
+      const retryAfter = res.headers.get('retry-after');
+      if (res.status === 403 && (rateRemaining === '0' || retryAfter)) {
+        throw new ProviderError('github_rate_limited', `GitHub API rate-limited (status 403)`);
+      }
+      if (res.status === 429) {
+        throw new ProviderError('github_rate_limited', `GitHub API rate-limited (status 429)`);
+      }
+      if (res.status === 404) {
+        throw new ProviderError('not_found', `Repository not found: ${owner}/${repo}`);
+      }
       const body = await res.text();
-      throw new Error(`GitHub API error ${res.status}: ${body}`);
+      throw new ProviderError('upstream_error', `GitHub API error ${res.status}: ${body.slice(0, 200)}`);
     }
 
     const json = await res.json() as any;
@@ -132,14 +155,17 @@ export class GitHubProvider implements Provider {
     if (json.errors?.length) {
       const msg = json.errors.map((e: any) => e.message).join('; ');
       if (json.errors.some((e: any) => e.type === 'NOT_FOUND')) {
-        throw new Error(`Repository not found: ${owner}/${repo}`);
+        throw new ProviderError('not_found', `Repository not found: ${owner}/${repo}`);
       }
-      throw new Error(`GitHub GraphQL error: ${msg}`);
+      if (json.errors.some((e: any) => e.type === 'RATE_LIMITED' || /rate.?limit/i.test(e.message ?? ''))) {
+        throw new ProviderError('github_rate_limited', `GitHub GraphQL rate-limited: ${msg}`);
+      }
+      throw new ProviderError('upstream_error', `GitHub GraphQL error: ${msg}`);
     }
 
     const r = json.data?.repository;
     if (!r) {
-      throw new Error(`Repository not found: ${owner}/${repo}`);
+      throw new ProviderError('not_found', `Repository not found: ${owner}/${repo}`);
     }
 
     // ── Parse last commit ───────────────────────────────────────────

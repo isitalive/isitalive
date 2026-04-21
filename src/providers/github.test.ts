@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GitHubProvider } from './github'
+import { ProviderError } from './errors'
 
 function makeGraphqlResponse(hasCi = true) {
   return {
@@ -53,9 +54,42 @@ describe('GitHubProvider timeouts', () => {
 
     const provider = new GitHubProvider()
 
-    await expect(provider.fetchProject('vercel', 'next.js', 'gh-token')).rejects.toThrow(
-      'GitHub GraphQL request timed out after 5000ms',
-    )
+    await expect(provider.fetchProject('vercel', 'next.js', 'gh-token')).rejects.toMatchObject({
+      name: 'ProviderError',
+      code: 'github_timeout',
+    })
+  })
+
+  it('classifies 404 responses as not_found', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })))
+
+    const provider = new GitHubProvider()
+    const err = await provider.fetchProject('ghost', 'nope', 'gh-token').catch((e) => e)
+    expect(err).toBeInstanceOf(ProviderError)
+    expect(err.code).toBe('not_found')
+  })
+
+  it('classifies 403 + x-ratelimit-remaining: 0 as github_rate_limited', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('rate limited', {
+      status: 403,
+      headers: { 'x-ratelimit-remaining': '0' },
+    })))
+
+    const provider = new GitHubProvider()
+    const err = await provider.fetchProject('vercel', 'next.js', 'gh-token').catch((e) => e)
+    expect(err).toBeInstanceOf(ProviderError)
+    expect(err.code).toBe('github_rate_limited')
+  })
+
+  it('classifies GraphQL NOT_FOUND errors as not_found', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      errors: [{ type: 'NOT_FOUND', message: 'Could not resolve to a Repository' }],
+    }), { status: 200 })))
+
+    const provider = new GitHubProvider()
+    const err = await provider.fetchProject('ghost', 'nope', 'gh-token').catch((e) => e)
+    expect(err).toBeInstanceOf(ProviderError)
+    expect(err.code).toBe('not_found')
   })
 
   it('falls back to CI presence when the Actions runs lookup times out', async () => {

@@ -101,7 +101,19 @@ app.get('/.well-known/ai-plugin.json', (c) => {
   return c.json(aiPluginManifest);
 });
 
-app.get('/health', (c) => c.json({ status: 'ok', version }));
+app.get('/health', async (c) => {
+  c.header('Cache-Control', 'no-store');
+  const start = Date.now();
+  let kv: 'ok' | 'degraded' = 'degraded';
+  try {
+    await Promise.race([
+      c.env.CACHE_KV.get('health:ping'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('kv timeout')), 80)),
+    ]);
+    kv = 'ok';
+  } catch { /* kv stays 'degraded' */ }
+  return c.json({ status: kv, kv, version, probeMs: Date.now() - start }, kv === 'ok' ? 200 : 503);
+});
 
 // Global error handler — content-negotiated response for unhandled exceptions.
 // Logs a single JSON line (indexed by Cloudflare Observability) with request

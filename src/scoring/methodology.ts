@@ -111,6 +111,11 @@ export const CACHE_STATUS_DEFINITIONS: ReadonlyArray<{
     description: 'Served from stale KV data while background revalidation runs.',
   },
   {
+    name: 'l2-stale-degraded',
+    label: 'L2 stale (degraded)',
+    description: 'Upstream provider is unavailable; served from cached data past its normal stale window. The response includes degraded: true and is not re-cached.',
+  },
+  {
     name: 'l3-miss',
     label: 'Live fetch',
     description: 'Fetched live from the provider and freshly scored.',

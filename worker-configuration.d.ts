@@ -34,6 +34,7 @@ declare namespace Cloudflare {
 		REFRESH_WORKFLOW: Workflow<Parameters<import("./src/index").RefreshWorkflow['run']>[0]['payload']>;
 		RATE_LIMITER_ANON: RateLimit;
 		RATE_LIMITER_AUTH: RateLimit;
+		RATE_LIMITER_ADMIN: RateLimit;
 	}
 }
 interface Env extends Cloudflare.Env {}

@@ -13,6 +13,8 @@ import { buildProviderEvent } from '../events/provider';
 import { buildResultEvent } from '../events/result';
 import { emitAll } from '../pipeline/emit';
 import type { Env } from '../types/env';
+import { isProviderError, ProviderError } from './errors';
+import * as circuit from './circuit';
 
 export const providers = {
   github: new GitHubProvider(),
@@ -47,15 +49,29 @@ export async function fetchAndScoreProject(
   owner: string,
   repo: string,
 ): Promise<{ rawData: RawProjectData; result: ScoringResult }> {
-  const key = `${INFLIGHT_SCORE_PREFIX}${projectKey(provider, owner, repo)}`
-  const existing = inflightScores.get(key)
-  if (existing) return existing
+  const key = `${INFLIGHT_SCORE_PREFIX}${projectKey(provider, owner, repo)}`;
+  const existing = inflightScores.get(key);
+  if (existing) return existing;
 
   const promise = (async () => {
-    const prov = getProvider(provider)
-    const rawData = await prov.fetchProject(owner, repo, env.GITHUB_TOKEN)
-    const result = scoreProject(rawData, prov.name)
-    return { rawData, result }
+    const prov = getProvider(provider);
+
+    if (await circuit.isOpen(env, prov.name)) {
+      throw new ProviderError('github_circuit_open', `${prov.name} circuit breaker is open`);
+    }
+
+    try {
+      const rawData = await prov.fetchProject(owner, repo, env.GITHUB_TOKEN);
+      const result = scoreProject(rawData, prov.name);
+      await circuit.recordSuccess(env, prov.name);
+      return { rawData, result };
+    } catch (err) {
+      // 404s are a user-input outcome, not an upstream failure — don't trip the breaker.
+      if (!isProviderError(err) || err.code !== 'not_found') {
+        await circuit.recordFailure(env, prov.name);
+      }
+      throw err;
+    }
   })().finally(() => {
     inflightScores.delete(key)
   })

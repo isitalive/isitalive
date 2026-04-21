@@ -30,18 +30,39 @@ describe('HTTP surface area hardening', () => {
     expect(response.status).toBe(404);
   });
 
-  it('keeps the public health endpoint available', async () => {
+  it('keeps the public health endpoint available and probes KV', async () => {
+    const healthyEnv = {
+      CACHE_KV: { get: vi.fn(async () => null) },
+    } as any;
     const response = await app.fetch(
       new Request('https://isitalive.dev/health'),
-      env,
+      healthyEnv,
       executionCtx,
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      status: 'ok',
-      version,
-    });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await response.json() as { status: string; kv: string; version: string; probeMs: number };
+    expect(body.status).toBe('ok');
+    expect(body.kv).toBe('ok');
+    expect(body.version).toBe(version);
+    expect(typeof body.probeMs).toBe('number');
+  });
+
+  it('returns 503 from /health when the KV probe fails', async () => {
+    const brokenEnv = {
+      CACHE_KV: { get: vi.fn(async () => { throw new Error('KV down') }) },
+    } as any;
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      brokenEnv,
+      executionCtx,
+    );
+
+    expect(response.status).toBe(503);
+    const body = await response.json() as { status: string; kv: string };
+    expect(body.status).toBe('degraded');
+    expect(body.kv).toBe('degraded');
   });
 
   it('rejects analytics beacons from lookalike origins', async () => {
@@ -121,7 +142,10 @@ describe('/api/manifest request hardening', () => {
     );
 
     expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toEqual({ error: 'Payload too large' });
+    await expect(response.json()).resolves.toEqual({
+      error: 'Payload too large',
+      error_code: 'payload_too_large',
+    });
   });
 });
 

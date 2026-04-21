@@ -274,7 +274,7 @@ describe('CacheManager', () => {
       expect(parsed.storedAt).toBeGreaterThan(0)
     })
 
-    it('sets KV expirationTtl to 48 hours', async () => {
+    it('sets KV expirationTtl to 7 days (degraded-fallback window)', async () => {
       const result = makeScoringResult()
       const cm = new CacheManager(env, ctx)
 
@@ -283,7 +283,7 @@ describe('CacheManager', () => {
       expect(mockKV.put).toHaveBeenCalledWith(
         `isitalive:${METHODOLOGY.version}:github/vercel/next.js`,
         expect.any(String),
-        { expirationTtl: 48 * 60 * 60 },
+        { expirationTtl: 7 * 24 * 60 * 60 },
       )
     })
 
@@ -320,6 +320,43 @@ describe('CacheManager', () => {
       expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(73)
       expect(cached.result!.verdict).toBe('stable')
+    })
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // getAny() tests — degraded-fallback window on upstream failures
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('getAny()', () => {
+    it('returns a cached entry past the stale window but within 7 days', async () => {
+      const result = makeScoringResult()
+      const fiftyHoursAgo = Date.now() - 50 * 60 * 60 * 1000 // past free/pro stale caps
+      mockKV._store.set(`isitalive:${METHODOLOGY.version}:github/vercel/next.js`, {
+        value: JSON.stringify({ result, storedAt: fiftyHoursAgo }),
+      })
+
+      const cm = new CacheManager(env, ctx)
+      const stale = await cm.getAny('github', 'vercel', 'next.js')
+
+      expect(stale).not.toBeNull()
+      expect(stale!.result.score).toBe(92)
+      expect(stale!.ageSeconds).toBeGreaterThan(48 * 60 * 60)
+    })
+
+    it('returns null when the cached entry is older than 7 days', async () => {
+      const result = makeScoringResult()
+      const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000
+      mockKV._store.set(`isitalive:${METHODOLOGY.version}:github/vercel/next.js`, {
+        value: JSON.stringify({ result, storedAt: eightDaysAgo }),
+      })
+
+      const cm = new CacheManager(env, ctx)
+      expect(await cm.getAny('github', 'vercel', 'next.js')).toBeNull()
+    })
+
+    it('returns null when there is no cached entry at all', async () => {
+      const cm = new CacheManager(env, ctx)
+      expect(await cm.getAny('github', 'ghost', 'nope')).toBeNull()
     })
   })
 
