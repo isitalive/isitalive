@@ -70,6 +70,22 @@ describe('rateLimit — per-repo anonymous key scoping', () => {
     expect(limit.mock.calls[0][0]).toEqual({ key: 'ip:203.0.113.3' })
   })
 
+  it('falls back to plain per-IP key when params are invalid (DoS-resistant)', async () => {
+    const limit = vi.fn<(...a: LimitArgs) => LimitReturn>(async () => ({ success: true }))
+    const { app, env } = buildApp(limit)
+
+    // Owner is over-long and contains invalid characters — must not inflate
+    // rate-limit cardinality.
+    const longOwner = 'a'.repeat(200)
+    await app.request(
+      `https://x/api/check/github/${longOwner}/repo%20with%20spaces`,
+      { headers: { 'cf-connecting-ip': '203.0.113.9' } },
+      env,
+    )
+
+    expect(limit.mock.calls[0][0]).toEqual({ key: 'ip:203.0.113.9' })
+  })
+
   it('uses key-scoped name for authenticated callers (not IP)', async () => {
     const limit = vi.fn<(...a: LimitArgs) => LimitReturn>(async () => ({ success: true }))
     const { app, env } = buildApp(limit)

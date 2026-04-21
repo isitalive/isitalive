@@ -56,26 +56,39 @@ function flattenManifest(event: ManifestEvent): ManifestStreamRecord {
 const PIPELINE_SEND_TIMEOUT_MS = 2000
 const PIPELINE_RETRY_DELAYS_MS = [250, 500]
 
+class PipelineTimeoutError extends Error {
+  constructor() { super('pipeline send timed out') }
+}
+
 /** Fire-and-forget send with per-attempt timeout + bounded retry. Errors are absorbed. */
 export async function sendWithRetry(
   send: () => Promise<void>,
   label: string,
 ): Promise<void> {
   for (let attempt = 0; attempt <= PIPELINE_RETRY_DELAYS_MS.length; attempt++) {
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
       await Promise.race([
         send(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('pipeline send timed out')), PIPELINE_SEND_TIMEOUT_MS),
-        ),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new PipelineTimeoutError()), PIPELINE_SEND_TIMEOUT_MS)
+        }),
       ])
+      if (timer) clearTimeout(timer)
       return
     } catch (err) {
-      if (attempt === PIPELINE_RETRY_DELAYS_MS.length) {
+      if (timer) clearTimeout(timer)
+      // `.send()` has no AbortSignal, so a timed-out send may still succeed
+      // server-side. Retrying would risk duplicate analytics events, so we
+      // log and give up on timeouts and only retry on explicit failures.
+      const isTimeout = err instanceof PipelineTimeoutError
+      const isTerminal = isTimeout || attempt === PIPELINE_RETRY_DELAYS_MS.length
+      if (isTerminal) {
         console.error(JSON.stringify({
           level: 'error',
           msg: 'pipeline_send_failed',
           pipeline: label,
+          reason: isTimeout ? 'timeout' : 'error',
           error: err instanceof Error ? err.message : String(err),
         }))
         return

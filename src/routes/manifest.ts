@@ -153,21 +153,21 @@ audit.post('/', async (c) => {
 
   if (!format || !content) {
     return c.json(
-      { error: 'Missing required fields: "format" and "content"', supported: SUPPORTED_FORMATS },
+      { error: 'Missing required fields: "format" and "content"', error_code: 'invalid_param', supported: SUPPORTED_FORMATS },
       400,
     );
   }
 
   if (!SUPPORTED_FORMATS.includes(format as ManifestFormat)) {
     return c.json(
-      { error: `Unsupported format: "${format}"`, supported: SUPPORTED_FORMATS },
+      { error: `Unsupported format: "${format}"`, error_code: 'unsupported_format', supported: SUPPORTED_FORMATS },
       400,
     );
   }
 
   if (content.length > MAX_CONTENT_SIZE) {
     return c.json(
-      { error: `Content too large (${Math.round(content.length / 1024)}KB). Max: ${MAX_CONTENT_SIZE / 1024}KB` },
+      { error: `Content too large (${Math.round(content.length / 1024)}KB). Max: ${MAX_CONTENT_SIZE / 1024}KB`, error_code: 'content_too_large' },
       400,
     );
   }

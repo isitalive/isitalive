@@ -14,6 +14,7 @@
 
 import { Context, Next } from 'hono';
 import type { Env } from '../types/env';
+import { isValidParam } from '../utils/validate';
 
 const ANON_LIMIT = 5;  // Tightened from 10 — every request wakes Worker (ADR-006)
 const AUTH_LIMIT = 1000;
@@ -24,6 +25,11 @@ function buildAnonKey(ip: string, path: string): string {
   const match = path.match(/^\/api\/check\/([^/]+)\/([^/]+)\/([^/]+)/);
   if (!match) return `ip:${ip}`;
   const [, provider, owner, repo] = match;
+  // Validate before including in the key — an invalid request will 400 at the
+  // route, but we still see it here and must not explode key cardinality.
+  if (!isValidParam(provider) || !isValidParam(owner) || !isValidParam(repo)) {
+    return `ip:${ip}`;
+  }
   return `ip:${ip}:${provider.toLowerCase()}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
 }
 

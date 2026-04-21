@@ -29,6 +29,18 @@ describe('sendWithRetry', () => {
     const parsed = JSON.parse(logged)
     expect(parsed.msg).toBe('pipeline_send_failed')
     expect(parsed.pipeline).toBe('usage')
+    expect(parsed.reason).toBe('error')
+    errSpy.mockRestore()
+  })
+
+  it('does not retry on timeout (avoids duplicate delivery)', async () => {
+    const send = vi.fn(() => new Promise<void>(() => {/* hangs forever */}))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(sendWithRetry(send, 'manifest')).resolves.toBeUndefined()
+    expect(send).toHaveBeenCalledTimes(1)
+    const parsed = JSON.parse(errSpy.mock.calls[0][0] as string)
+    expect(parsed.reason).toBe('timeout')
     errSpy.mockRestore()
   })
 })

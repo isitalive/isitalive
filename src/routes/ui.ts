@@ -679,7 +679,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       console.error(`Project fetch failed for ${provider}/${owner}/${repo}:`, err)
     }
     c.header('Cache-Control', 'public, max-age=300')
-    const statusMap = { not_found: 404, github_timeout: 504, github_rate_limited: 503, github_circuit_open: 503, upstream_error: 503 } as const
+    const statusMap = { not_found: 404, github_timeout: 504, github_rate_limited: 503, github_circuit_open: 503, upstream_error: 502 } as const
     const message = errorCode === 'not_found'
       ? 'Project not found'
       : 'Failed to fetch project data. Please try again later.'
