@@ -63,6 +63,13 @@ badge.get('/:provider/:owner/:repo', async (c) => {
   }
 
   const cacheManager = new CacheManager(c.env, c.executionCtx);
+  const cacheKey = new Request(c.req.url);
+
+  // L1 response cache fast-path — serve the cached SVG directly.
+  const cachedResponse = await cacheManager.getResponse(cacheKey, false);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
 
   try {
     const { result: cached, status } = await cacheManager.get(provider, owner, repo);
@@ -81,13 +88,19 @@ badge.get('/:provider/:owner/:repo', async (c) => {
 
     const svg = generateSvg(result.score, result.verdict);
 
-    return c.body(svg, 200, {
+    const response = c.body(svg, 200, {
       'Content-Type': 'image/svg+xml',
       'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
       'CDN-Cache-Control': 'public, s-maxage=86400',
     });
+
+    // Prime the L1 response cache so subsequent badge hits skip the KV/provider
+    // lookups entirely (freshness is bounded by the same max-age=3600 above).
+    c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response));
+
+    return response;
   } catch {
-    // Fallback badge on error
+    // Fallback badge on error — do NOT cache this.
     const svg = generateSvg(0, 'unmaintained');
     return c.body(svg, 200, {
       'Content-Type': 'image/svg+xml',

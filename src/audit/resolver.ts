@@ -10,6 +10,7 @@
 import type { ParsedDep } from './parsers';
 import type { Env } from '../types/env';
 import { fetchWithTimeout } from '../utils/http';
+import { runWithConcurrency } from '../utils/concurrency';
 
 export interface ResolvedDep extends ParsedDep {
   /** GitHub owner/repo, or null if unresolvable */
@@ -31,26 +32,39 @@ const RESOLVE_CACHE_TTL = 7 * 24 * 60 * 60; // 7 days
  * Resolve an array of parsed deps to GitHub repos.
  * Uses KV cache for previously resolved packages.
  *
- * Batches in groups of 20 to avoid overwhelming external registries
- * (npm, vanity URL hosts) with too many concurrent requests.
+ * Runs with bounded concurrency (20) to avoid overwhelming external registries
+ * (npm, vanity URL hosts). When `ctx` is provided, per-dep KV writes are
+ * queued via `waitUntil` so they don't block resolution of sibling deps.
  */
 export async function resolveAll(
   deps: ParsedDep[],
   env: Env,
+  ctx?: ExecutionContext,
 ): Promise<ResolvedDep[]> {
-  const BATCH_SIZE = 20
-  const results: ResolvedDep[] = []
+  const settled = await runWithConcurrency(
+    deps,
+    (dep) => resolveSingle(dep, env, ctx),
+    { limit: 20 },
+  )
 
-  for (let i = 0; i < deps.length; i += BATCH_SIZE) {
-    const batch = deps.slice(i, i + BATCH_SIZE)
-    const batchResults = await Promise.all(batch.map((d) => resolveSingle(d, env)))
-    results.push(...batchResults)
-  }
-
-  return results
+  return settled.map((entry, i) => {
+    if (entry.status === 'fulfilled') return entry.value
+    // A crash inside resolveSingle should never fail the whole audit — surface
+    // it as an unresolved dep so the user still gets partial results.
+    return {
+      ...deps[i],
+      github: null,
+      resolvedFrom: null,
+      unresolvedReason: 'resolver_error',
+    }
+  })
 }
 
-async function resolveSingle(dep: ParsedDep, env: Env): Promise<ResolvedDep> {
+async function resolveSingle(
+  dep: ParsedDep,
+  env: Env,
+  ctx?: ExecutionContext,
+): Promise<ResolvedDep> {
   // Check cache first
   const cacheKey = `${RESOLVE_CACHE_PREFIX}${dep.ecosystem}:${dep.name}`;
   const cached = await env.CACHE_KV.get(cacheKey);
@@ -72,9 +86,14 @@ async function resolveSingle(dep: ParsedDep, env: Env): Promise<ResolvedDep> {
   const cacheValue = result.github
     ? { github: result.github }
     : { github: null, reason: result.unresolvedReason };
-  await env.CACHE_KV.put(cacheKey, JSON.stringify(cacheValue), {
+  const putPromise = env.CACHE_KV.put(cacheKey, JSON.stringify(cacheValue), {
     expirationTtl: RESOLVE_CACHE_TTL,
   });
+  if (ctx) {
+    ctx.waitUntil(putPromise);
+  } else {
+    await putPromise;
+  }
 
   return result;
 }
