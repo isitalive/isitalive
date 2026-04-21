@@ -21,15 +21,20 @@ export interface TrackedRepo {
 /** Full tracked index (repo slug → TrackedRepo) */
 export type TrackedIndex = Record<string, TrackedRepo>
 
+// Sourced from usage_events (the freshest, most-reliable pipeline) rather
+// than result_events_v2. Excluding source='cron' prevents a self-reinforcing
+// loop where the refresh workflow's own synthetic usage events keep the
+// tracked set frozen regardless of real traffic.
 const TRACKED_SQL = `
 SELECT
-  project,
+  repo,
   MAX(timestamp) as last_seen,
   COUNT(*) as request_count
-FROM result_events_v2
-WHERE timestamp > NOW() - INTERVAL '90 days'
-  AND project != ''
-GROUP BY project
+FROM usage_events
+WHERE timestamp > NOW() - INTERVAL '30 days'
+  AND repo != ''
+  AND source != 'cron'
+GROUP BY repo
 ORDER BY request_count DESC
 `
 
