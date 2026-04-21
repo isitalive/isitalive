@@ -673,8 +673,11 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
     return response
   } catch (err: any) {
-    c.header('Cache-Control', 'public, max-age=300')
     const isNotFound = err.message?.includes('not found')
+    if (!isNotFound) {
+      console.error(`Project fetch failed for ${provider}/${owner}/${repo}:`, err)
+    }
+    c.header('Cache-Control', 'public, max-age=300')
     const status = isNotFound ? 404 : 502
     const message = isNotFound ? 'Project not found' : 'Failed to fetch project data. Please try again later.'
     return c.html(errorPage(message), status)
