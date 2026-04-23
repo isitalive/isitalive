@@ -43,6 +43,7 @@ function buildAnonKey(ip: string, path: string): string {
 export async function rateLimit(c: Context<AppEnv>, next: Next) {
   const isAuthenticated = c.get('isAuthenticated') ?? false;
   const keyName = c.get('keyName');
+  const tier = c.get('tier') ?? 'free';
 
   // Pick binding and key based on auth status
   const rateLimiter = isAuthenticated ? c.env.RATE_LIMITER_AUTH : c.env.RATE_LIMITER_ANON;
@@ -59,6 +60,7 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
 
   // Set headers regardless of outcome
   c.header('X-RateLimit-Limit', String(limit));
+  c.header('X-RateLimit-Tier', tier);
 
   if (!result.success) {
     c.header('Retry-After', '60');
@@ -66,6 +68,7 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
       {
         error: 'Rate limit exceeded',
         limit,
+        tier,
         authenticated: isAuthenticated,
         retryAfterSeconds: 60,
         message: isAuthenticated

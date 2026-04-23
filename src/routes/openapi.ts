@@ -222,11 +222,19 @@ export const openApiSpec = {
                   properties: {
                     error: { type: 'string' },
                     limit: { type: 'integer' },
-                    tier: { type: 'string' },
+                    tier: { type: 'string', enum: ['free', 'pro', 'enterprise'] },
                     authenticated: { type: 'boolean' },
-                    remaining: { type: 'integer' },
                     retryAfterSeconds: { type: 'integer' },
                     message: { type: 'string' },
+                    hint: {
+                      type: 'string',
+                      description: 'Only present for anonymous requests. Human-readable guidance agents can surface to users.',
+                    },
+                    upgrade_url: {
+                      type: 'string',
+                      format: 'uri',
+                      description: 'Only present for anonymous requests. Pricing/upgrade page for getting an API key.',
+                    },
                   },
                 },
               },
