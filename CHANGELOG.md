@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- Footer copyright text now omits the incorrect year and renders as `© Is It Alive` across shared UI pages.
+
 ## [0.12.0] - 2026-04-21
 
 ### Security
