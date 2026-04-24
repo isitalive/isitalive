@@ -54,6 +54,10 @@ app.use('/api/check/*', apiKeyAuth);
 app.use('/api/check/*', rateLimit);
 app.use('/api/manifest', apiKeyAuth);
 app.use('/api/manifest', rateLimit);
+app.use('/_data/deps/*', apiKeyAuth);
+app.use('/_data/deps/*', rateLimit);
+app.use('/_view', apiKeyAuth);
+app.use('/_view', rateLimit);
 
 app.route('/api/check', check);
 app.route('/api/badge', badge);

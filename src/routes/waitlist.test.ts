@@ -71,6 +71,21 @@ describe('/_data/waitlist', () => {
     expect(json.ok).toBe(true);
   });
 
+  it('returns 413 for oversized payloads', async () => {
+    const res = await app.fetch(
+      new Request('https://isitalive.dev/_data/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'x'.repeat(20 * 1024), tier: 'starter' }),
+      }),
+      { WAITLIST_KV: { put: vi.fn() } } as any,
+      executionCtx,
+    );
+
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toEqual({ ok: false, error: 'payload_too_large' });
+  });
+
   // ── KV write correctness ──────────────────────────────────────────
 
   it('writes to KV with a SHA-256 hashed key prefix', async () => {

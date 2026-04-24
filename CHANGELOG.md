@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Security
 
 - **Admin login brute-force protection** — POST `/admin/auth/login` is now guarded by a dedicated per-IP rate-limit binding (`RATE_LIMITER_ADMIN`, 10 attempts/min). On trip the endpoint returns the same generic 401 page as a bad-secret failure so rate-limit state is not disclosed.
+- **Abuse hardening for high-cost UI routes** — `/_data/deps/*` and `/_view` now run through the same auth-aware rate limiter used by API routes, reducing unauthenticated event spam and expensive dependency-hydration abuse.
+- **Bounded body parsing on public form endpoints** — Turnstile-gated routes (`/_check`, `/_audit`) and waitlist submissions now enforce strict request-size caps and return 413 on oversized payloads.
 - **GitHub Actions pinned to commit SHAs** — `.github/workflows/ci.yml` and `audit.yml` now pin `actions/checkout`, `actions/setup-node`, and `isitalive/audit-action` to exact SHAs (previously `@v6` / `@main`). The audit-action pin in particular closes a supply-chain vector since it runs with `id-token: write`.
 - **`npm audit` CI gate** — CI now runs `npm audit --audit-level=high` after `npm ci`; high/critical advisories fail the build. Bumped transitive dev deps (picomatch, vite) to clear existing advisories.
 - **Sanitized parse errors** — `POST /api/manifest` no longer echoes inner parser messages (`Parse error: <leaked details>`); instead returns `{error: "Invalid manifest format", error_code: "invalid_manifest"}`.

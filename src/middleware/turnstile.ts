@@ -10,8 +10,10 @@
 
 import { Context, Next } from 'hono';
 import type { Env } from '../types/env';
+import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
 
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+const MAX_TURNSTILE_BODY_BYTES = 16 * 1024;
 
 type AppEnv = { Bindings: Env; Variables: { parsedBody?: Record<string, string> } };
 
@@ -33,7 +35,28 @@ export async function verifyTurnstile(
   const secretKey = c.env.TURNSTILE_SECRET_KEY;
 
   // Parse body once and store for downstream handlers
-  const body = await c.req.parseBody().catch(() => ({})) as Record<string, string>;
+  let body: Record<string, string> = {}
+  try {
+    const rawBody = await readBodyWithByteLimit(c.req.raw, MAX_TURNSTILE_BODY_BYTES)
+    const contentType = c.req.header('Content-Type') || ''
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      body = Object.fromEntries(new URLSearchParams(rawBody).entries())
+    } else if (contentType.includes('application/json')) {
+      const parsed = JSON.parse(rawBody || '{}') as Record<string, unknown>
+      body = Object.fromEntries(
+        Object.entries(parsed)
+          .filter(([, value]) => typeof value === 'string')
+          .map(([key, value]) => [key, value as string]),
+      )
+    } else {
+      body = Object.fromEntries(new URLSearchParams(rawBody).entries())
+    }
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return c.html(errorHtml('Request body is too large.'), 413)
+    }
+    body = {}
+  }
   (c as any).set('parsedBody', body);
 
   // Skip if Turnstile not configured (local dev, staging)

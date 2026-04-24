@@ -23,7 +23,15 @@ type AppEnv = { Bindings: Env; Variables: { tier: string; keyName: string | null
 
 function buildAnonKey(ip: string, path: string): string {
   const match = path.match(/^\/api\/check\/([^/]+)\/([^/]+)\/([^/]+)/);
-  if (!match) return `ip:${ip}`;
+  if (!match) {
+    const depsMatch = path.match(/^\/_data\/deps\/([^/]+)\/([^/]+)\/([^/]+)/)
+    if (!depsMatch) return `ip:${ip}`
+    const [, provider, owner, repo] = depsMatch
+    if (!isValidParam(provider) || !isValidParam(owner) || !isValidParam(repo)) {
+      return `ip:${ip}`
+    }
+    return `ip:${ip}:deps:${provider.toLowerCase()}/${owner.toLowerCase()}/${repo.toLowerCase()}`
+  }
   const [, provider, owner, repo] = match;
   // Validate before including in the key — an invalid request will 400 at the
   // route, but we still see it here and must not explode key cardinality.
@@ -48,6 +56,9 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
   // Pick binding and key based on auth status
   const rateLimiter = isAuthenticated ? c.env.RATE_LIMITER_AUTH : c.env.RATE_LIMITER_ANON;
   const limit = isAuthenticated ? AUTH_LIMIT : ANON_LIMIT;
+  if (!rateLimiter || typeof rateLimiter.limit !== 'function') {
+    return next()
+  }
 
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
   // Scope anonymous /api/check/* by owner/repo so one viral repo can't

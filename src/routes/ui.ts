@@ -37,13 +37,14 @@ import { resolveAll } from '../audit/resolver'
 import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
-import { fetchWithTimeout } from '../utils/http'
+import { fetchWithTimeout, readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http'
 import { isValidParam } from '../utils/validate'
 
 // Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
 
 const ui = new Hono<{ Bindings: Env }>()
+const MAX_WAITLIST_BODY_BYTES = 16 * 1024
 
 /** Suppress Turnstile + CF Web Analytics on local dev */
 function isLocalDev(c: any): boolean {
@@ -290,8 +291,15 @@ ui.get('/pricing', (c) => {
 // Waitlist email collection — Turnstile-protected, KV-backed
 // Security invariant: always returns identical 200 regardless of duplicate
 ui.post('/_data/waitlist', async (c) => {
-  const body = await c.req.json<{ email?: string; tier?: string; 'cf-turnstile-response'?: string }>()
-    .catch(() => ({} as { email?: string; tier?: string; 'cf-turnstile-response'?: string }))
+  let body = {} as { email?: string; tier?: string; 'cf-turnstile-response'?: string }
+  try {
+    const rawBody = await readBodyWithByteLimit(c.req.raw, MAX_WAITLIST_BODY_BYTES)
+    body = JSON.parse(rawBody || '{}') as { email?: string; tier?: string; 'cf-turnstile-response'?: string }
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return c.json({ ok: false, error: 'payload_too_large' }, 413)
+    }
+  }
   const email = (body.email ?? '').trim().toLowerCase()
   const tier = body.tier ?? ''
   const turnstileToken = body['cf-turnstile-response'] ?? ''

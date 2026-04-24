@@ -70,6 +70,19 @@ describe('rateLimit — per-repo anonymous key scoping', () => {
     expect(limit.mock.calls[0][0]).toEqual({ key: 'ip:203.0.113.3' })
   })
 
+  it('scopes /_data/deps requests by provider/owner/repo for anonymous callers', async () => {
+    const limit = vi.fn<(...a: LimitArgs) => LimitReturn>(async () => ({ success: true }))
+    const { app, env } = buildApp(limit)
+
+    await app.request(
+      'https://x/_data/deps/github/vercel/next.js',
+      { headers: { 'cf-connecting-ip': '203.0.113.10' } },
+      env,
+    )
+
+    expect(limit.mock.calls[0][0]).toEqual({ key: 'ip:203.0.113.10:deps:github/vercel/next.js' })
+  })
+
   it('falls back to plain per-IP key when params are invalid (DoS-resistant)', async () => {
     const limit = vi.fn<(...a: LimitArgs) => LimitReturn>(async () => ({ success: true }))
     const { app, env } = buildApp(limit)
