@@ -982,7 +982,7 @@ export const footerHtml = `
       </div>
     </div>
     <div class="footer-bottom">
-      <span>&copy; ${new Date().getFullYear()} Is It Alive</span>
+      <span>&copy; Is It Alive</span>
       <span>Built with Cloudflare Workers &amp; Hono</span>
     </div>
   </footer>
