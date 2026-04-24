@@ -105,6 +105,26 @@ describe('HTTP surface area hardening', () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(send).toHaveBeenCalledOnce();
   });
+
+  it('rate limits analytics beacons when limiter blocks the request', async () => {
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/_view', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://isitalive.dev',
+        },
+        body: JSON.stringify({ r: 'owner/repo', s: 75, v: 'stable' }),
+      }),
+      {
+        RATE_LIMITER_ANON: { limit: vi.fn(async () => ({ success: false })) },
+        RATE_LIMITER_AUTH: { limit: vi.fn(async () => ({ success: false })) },
+      } as any,
+      executionCtx,
+    );
+
+    expect(response.status).toBe(429);
+  });
 });
 
 describe('/api/manifest request hardening', () => {
@@ -148,6 +168,24 @@ describe('/api/manifest request hardening', () => {
     });
   });
 });
+
+describe('turnstile body limits', () => {
+  it('rejects oversized /_check bodies before processing', async () => {
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/_check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `repo=${'a'.repeat(20 * 1024)}`,
+      }),
+      {} as any,
+      executionCtx,
+    )
+
+    expect(response.status).toBe(413)
+  })
+})
 
 describe('secureHeaders middleware', () => {
   it('sets X-Frame-Options to DENY', async () => {
