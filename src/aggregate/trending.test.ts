@@ -45,8 +45,10 @@ function createMockD1(
       }),
     }),
   }))
+  const session = { prepare } as unknown as D1DatabaseSession
+  const withSession = vi.fn(() => session)
 
-  return { db: { prepare } as unknown as D1Database, reads, writes, prepare }
+  return { db: { prepare, withSession } as unknown as D1Database, reads, writes, prepare, withSession }
 }
 
 describe('aggregate/trending', () => {
@@ -54,16 +56,22 @@ describe('aggregate/trending', () => {
     vi.clearAllMocks()
   })
 
-  it('queries D1 daily rollups for 24h trending checks on the first window', async () => {
-    const { db, reads, writes } = createMockD1([
+  it('queries D1 daily rollups for 24h trusted trending checks on the first window', async () => {
+    const { db, reads, writes, withSession } = createMockD1([
       [{ repo: 'vercel/next.js', checks: 42, score: 91.7, verdict: 'healthy' }],
     ])
 
     const result = await refreshTrending({ DB: db } as any)
 
+    expect(withSession).toHaveBeenCalledWith('first-unconstrained')
     expect(reads).toHaveLength(1)
     expect(reads[0].sql).toContain('FROM daily_usage_repo')
-    expect(reads[0].sql).toContain('GROUP BY repo')
+    expect(reads[0].sql).toContain("source IN ('api', 'browser', 'badge', 'audit', 'github-app')")
+    expect(reads[0].sql).toContain('ROW_NUMBER() OVER')
+    expect(reads[0].sql).toContain('ORDER BY last_seen DESC, day DESC')
+    expect(reads[0].sql).not.toContain('MAX(latest_score)')
+    expect(reads[0].sql).not.toContain('MAX(latest_verdict)')
+    expect(reads[0].sql).not.toContain("source != 'cron'")
     expect(reads[0].values[0]).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
     expect(result).toEqual([
       { repo: 'vercel/next.js', score: 92, verdict: 'healthy' },
@@ -72,6 +80,20 @@ describe('aggregate/trending', () => {
     expect(writes[0].sql).toContain('INSERT INTO system_cache')
     expect(writes[0].values[0]).toBe(TRENDING_KEY)
     expect(JSON.parse(writes[0].values[1] as string).windowUsed).toBe('24 hours')
+  })
+
+  it('maps the latest trusted row score and verdict returned by D1', async () => {
+    const { db } = createMockD1([
+      [
+        { repo: 'vercel/next.js', checks: 42, score: 73.2, verdict: 'stable' },
+        { repo: 'cloudflare/workers-sdk', checks: 10, score: 98.8, verdict: 'healthy' },
+      ],
+    ])
+
+    await expect(refreshTrending({ DB: db } as any)).resolves.toEqual([
+      { repo: 'vercel/next.js', score: 73, verdict: 'stable' },
+      { repo: 'cloudflare/workers-sdk', score: 99, verdict: 'healthy' },
+    ])
   })
 
   it('widens window tiers until one returns rows and flags the result as degraded', async () => {

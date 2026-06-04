@@ -112,7 +112,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const usageCtx = buildUsageCtx(cached.status)
     c.executionCtx.waitUntil(
       buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
+        .then(ue => emitAll(c.env, { usage: [ue] })),
     )
 
     const response = c.json({
@@ -137,7 +137,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const usageCtx = buildUsageCtx('l2-stale')
     bgTasks.push(
       buildUsageEvent(`${owner}/${repo}`, provider, cached.result.score, cached.result.verdict, usageCtx)
-        .then(ue => emitAll(c.env, { usage: [ue], result: [buildResultEvent(cached.result!, 'api')] })),
+        .then(ue => emitAll(c.env, { usage: [ue] })),
     )
 
     c.executionCtx.waitUntil(Promise.all(bgTasks))

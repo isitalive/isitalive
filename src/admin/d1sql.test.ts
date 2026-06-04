@@ -1,12 +1,12 @@
 // ---------------------------------------------------------------------------
-// R2 SQL proxy tests — validation + fuzz-style injection attempts
+// D1 SQL proxy tests — validation + fuzz-style injection attempts
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { validateReadOnly, queryR2SQL, PRESET_QUERIES, optimizeReadQuery } from './r2sql'
+import { validateReadOnly, queryD1SQL, PRESET_QUERIES, optimizeReadQuery } from './d1sql'
 
-describe('r2sql', () => {
+describe('d1sql', () => {
   // ─── validateReadOnly: valid queries ────────────────────────────────
   describe('validateReadOnly: valid queries', () => {
     it('should accept a simple SELECT', () => {
@@ -266,54 +266,46 @@ describe('r2sql', () => {
     })
   })
 
-  // ─── queryR2SQL: auto-LIMIT enforcement ─────────────────────────────
-  // These tests call queryR2SQL directly with mocked fetch to verify
-  // the actual SQL sent to the R2 API has the correct LIMIT applied.
-  describe('queryR2SQL: auto-LIMIT', () => {
-    function makeEnv() {
-      return {
-        CF_ACCOUNT_ID: 'test-account',
-        CF_R2_SQL_TOKEN: 'test-token',
-        CF_R2_WAREHOUSE: 'test-warehouse',
-      } as any
-    }
-
-    function mockFetchCapture(): { calls: string[] } {
-      const state = { calls: [] as string[] }
-      const original = globalThis.fetch
-      vi.stubGlobal('fetch', async (url: string, init: any) => {
-        const body = JSON.parse(init.body)
-        state.calls.push(body.query)
-        return new Response(JSON.stringify({
-          success: true,
-          result: { schema: [{ name: 'x' }], rows: [{ x: 1 }] },
-        }), { status: 200 })
+  // ─── queryD1SQL: auto-LIMIT enforcement ─────────────────────────────
+  // These tests call queryD1SQL directly with a mocked D1 session to verify
+  // the actual SQL sent to D1 has the correct LIMIT applied.
+  describe('queryD1SQL: auto-LIMIT', () => {
+    function makeD1Capture(): { env: Cloudflare.Env; calls: string[] } {
+      const calls: string[] = []
+      const raw = vi.fn(async () => [['x'], [1]])
+      const primaryPrepare = vi.fn((sql: string) => {
+        calls.push(sql)
+        return { raw }
       })
-      return state
+      const withSession = vi.fn(() => ({ prepare: primaryPrepare } as unknown as D1DatabaseSession))
+      return {
+        env: {
+          DB: {
+            withSession,
+          } as unknown as D1Database,
+        } as unknown as Cloudflare.Env,
+        calls,
+      }
     }
-
-    afterEach(() => {
-      vi.restoreAllMocks()
-    })
 
     it('should append LIMIT 1000 when query has no LIMIT', async () => {
-      const cap = mockFetchCapture()
-      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics')
+      const cap = makeD1Capture()
+      await queryD1SQL(cap.env, 'SELECT * FROM analytics')
       expect(cap.calls).toHaveLength(1)
       expect(cap.calls[0]).toContain('LIMIT 1000')
     })
 
     it('should not double-LIMIT queries that already have a LIMIT', async () => {
-      const cap = mockFetchCapture()
-      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics LIMIT 20')
+      const cap = makeD1Capture()
+      await queryD1SQL(cap.env, 'SELECT * FROM analytics LIMIT 20')
       expect(cap.calls).toHaveLength(1)
       expect(cap.calls[0]).not.toContain('LIMIT 1000')
       expect(cap.calls[0]).toContain('LIMIT 20')
     })
 
     it('should handle trailing semicolons when appending LIMIT', async () => {
-      const cap = mockFetchCapture()
-      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics;')
+      const cap = makeD1Capture()
+      await queryD1SQL(cap.env, 'SELECT * FROM analytics;')
       expect(cap.calls).toHaveLength(1)
       expect(cap.calls[0]).toContain('LIMIT 1000')
       // Should not contain the trailing semicolon before LIMIT
@@ -321,22 +313,22 @@ describe('r2sql', () => {
     })
 
     it('should still append LIMIT when LIMIT appears only in a string literal', async () => {
-      const cap = mockFetchCapture()
-      await queryR2SQL(makeEnv(), "SELECT 'LIMIT' AS x FROM analytics")
+      const cap = makeD1Capture()
+      await queryD1SQL(cap.env, "SELECT 'LIMIT' AS x FROM analytics")
       expect(cap.calls).toHaveLength(1)
       expect(cap.calls[0]).toContain('LIMIT 1000')
     })
 
     it('should still append LIMIT when LIMIT appears only in a comment', async () => {
-      const cap = mockFetchCapture()
-      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics -- LIMIT 500')
+      const cap = makeD1Capture()
+      await queryD1SQL(cap.env, 'SELECT * FROM analytics -- LIMIT 500')
       expect(cap.calls).toHaveLength(1)
       expect(cap.calls[0]).toContain('LIMIT 1000')
     })
 
     it('should not have LIMIT trapped inside a trailing line comment', async () => {
-      const cap = mockFetchCapture()
-      await queryR2SQL(makeEnv(), 'SELECT * FROM analytics -- get all')
+      const cap = makeD1Capture()
+      await queryD1SQL(cap.env, 'SELECT * FROM analytics -- get all')
       expect(cap.calls).toHaveLength(1)
       // LIMIT must be on its own line, not inside the comment
       const sent = cap.calls[0]
@@ -360,27 +352,48 @@ describe('r2sql', () => {
     })
   })
 
-  describe('queryR2SQL: query optimization', () => {
-    function makeEnv() {
-      return {
-        CF_ACCOUNT_ID: 'test-account',
-        CF_R2_SQL_TOKEN: 'test-token',
-        CF_R2_WAREHOUSE: 'test-warehouse',
-      } as any
-    }
+  describe('queryD1SQL: D1 session routing', () => {
+    it('executes read-only admin SQL through a primary D1 session', async () => {
+      const raw = vi.fn(async () => [['repo'], ['owner/repo']])
+      const primaryPrepare = vi.fn(() => ({ raw }))
+      const basePrepare = vi.fn()
+      const withSession = vi.fn(() => ({ prepare: primaryPrepare } as unknown as D1DatabaseSession))
+      const env = {
+        DB: {
+          prepare: basePrepare,
+          withSession,
+        },
+      } as unknown as Cloudflare.Env
 
+      const result = await queryD1SQL(env, 'SELECT repo FROM daily_usage_repo LIMIT 1')
+
+      expect(result).toMatchObject({
+        columns: ['repo'],
+        rows: [['owner/repo']],
+        rowCount: 1,
+      })
+      expect(withSession).toHaveBeenCalledWith('first-primary')
+      expect(primaryPrepare).toHaveBeenCalledWith('SELECT repo FROM daily_usage_repo LIMIT 1')
+      expect(basePrepare).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('queryD1SQL: query optimization', () => {
     it('sends DISTINCT instead of GROUP BY for simple dedupe queries', async () => {
       let sentQuery = ''
-      vi.stubGlobal('fetch', async (_url: string, init: any) => {
-        sentQuery = JSON.parse(init.body).query
-        return new Response(JSON.stringify({
-          success: true,
-          result: { schema: [{ name: 'repo' }], rows: [{ repo: 'owner/repo' }] },
-        }), { status: 200 })
+      const raw = vi.fn(async () => [['repo'], ['owner/repo']])
+      const primaryPrepare = vi.fn((sql: string) => {
+        sentQuery = sql
+        return { raw }
       })
+      const env = {
+        DB: {
+          withSession: vi.fn(() => ({ prepare: primaryPrepare } as unknown as D1DatabaseSession)),
+        },
+      } as unknown as Cloudflare.Env
 
-      await queryR2SQL(
-        makeEnv(),
+      await queryD1SQL(
+        env,
         "SELECT repo FROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR GROUP BY repo",
       )
 

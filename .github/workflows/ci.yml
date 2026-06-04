@@ -19,6 +19,7 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npx tsc --noEmit
+      - run: npm run types:check
       - run: npm test
 
   fuzz:

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createEvent } from '../events/envelope'
+import type { ResultEvent } from '../events/result'
 import type { UsageEvent } from '../events/usage'
 import type { QueuedAnalyticsEvent } from '../pipeline/types'
 import { handleEventQueue, pruneArchivedHotEvents } from './consumer'
@@ -26,6 +27,35 @@ function usageEvent(id = 'usage-1'): UsageEvent {
       ip_hash: 'hash',
       oidc_repository: null,
       oidc_owner: null,
+    }),
+    id,
+    timestamp: '2026-06-04T12:34:56.000Z',
+  }
+}
+
+function resultEvent(id = 'result-1'): ResultEvent {
+  return {
+    ...createEvent('result', {
+      project: 'owner/repo',
+      score: 91,
+      verdict: 'healthy',
+      source: 'api',
+      signal_last_commit_score: null,
+      signal_last_commit_value: null,
+      signal_last_release_score: null,
+      signal_last_release_value: null,
+      signal_issue_staleness_score: null,
+      signal_issue_staleness_value: null,
+      signal_pr_responsiveness_score: null,
+      signal_pr_responsiveness_value: null,
+      signal_recent_contributors_score: null,
+      signal_recent_contributors_value: null,
+      signal_stars_score: null,
+      signal_stars_value: null,
+      signal_ci_score: null,
+      signal_ci_value: null,
+      signal_bus_factor_score: null,
+      signal_bus_factor_value: null,
     }),
     id,
     timestamp: '2026-06-04T12:34:56.000Z',
@@ -148,6 +178,28 @@ describe('queue consumer', () => {
 
     expect(state.usageRows).toBe(1)
     expect(state.dailyUsageChecks).toBe(1)
+  })
+
+  it('guards aggregate latest metadata against out-of-order queue events', async () => {
+    const { db, prepared } = createMockD1()
+    const put = vi.fn(async () => null)
+
+    await handleEventQueue(
+      batch([
+        message({ domain: 'usage', event: usageEvent('usage-latest') }),
+        message({ domain: 'result', event: resultEvent('result-latest') }),
+      ]),
+      { DB: db, DATA_BUCKET: { put } } as any,
+    )
+
+    const dailyUsage = prepared.find((statement) => statement.sql.includes('INSERT INTO daily_usage_repo'))
+    const dailyResult = prepared.find((statement) => statement.sql.includes('INSERT INTO daily_result_scores'))
+    expect(dailyUsage?.sql).toContain('WHEN excluded.last_seen >= daily_usage_repo.last_seen')
+    expect(dailyUsage?.sql).toContain('ELSE daily_usage_repo.latest_score')
+    expect(dailyUsage?.sql).toContain('ELSE daily_usage_repo.latest_verdict')
+    expect(dailyResult?.sql).toContain('WHEN excluded.last_seen >= daily_result_scores.last_seen')
+    expect(dailyResult?.sql).toContain('ELSE daily_result_scores.latest_score')
+    expect(dailyResult?.sql).toContain('ELSE daily_result_scores.latest_verdict')
   })
 
   it('prunes hot rows only behind the archived watermark', async () => {

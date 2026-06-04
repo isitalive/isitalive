@@ -5,6 +5,7 @@
 import type { Env } from '../types/env'
 import { TRENDING_KEY } from '../state/keys'
 import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
+import { readReplicaSafeSession, type D1Queryable } from '../db/d1'
 
 /** Trending repo entry (consumed by UI) */
 export interface TrendingRepo {
@@ -47,20 +48,38 @@ function sinceDay(days: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-async function queryTrending(db: D1Database, days: number): Promise<TrendingRepo[]> {
+async function queryTrending(db: D1Queryable, days: number): Promise<TrendingRepo[]> {
   const result = await db
     .prepare(`
-      SELECT
-        repo,
-        SUM(checks) as checks,
-        MAX(latest_score) as score,
-        MAX(latest_verdict) as verdict
-      FROM daily_usage_repo
-      WHERE day >= ?
-        AND repo != ''
-        AND source != 'cron'
-      GROUP BY repo
-      ORDER BY checks DESC
+      WITH trusted AS (
+        SELECT repo, checks, latest_score, latest_verdict, last_seen, day
+        FROM daily_usage_repo
+        WHERE day >= ?
+          AND repo != ''
+          AND source IN ('api', 'browser', 'badge', 'audit', 'github-app')
+      ),
+      counts AS (
+        SELECT repo, SUM(checks) as checks
+        FROM trusted
+        GROUP BY repo
+      ),
+      latest AS (
+        SELECT
+          repo,
+          latest_score as score,
+          latest_verdict as verdict,
+          ROW_NUMBER() OVER (
+            PARTITION BY repo
+            ORDER BY last_seen DESC, day DESC
+          ) as recency_rank
+        FROM trusted
+      )
+      SELECT counts.repo, counts.checks, latest.score, latest.verdict
+      FROM counts
+      JOIN latest
+        ON latest.repo = counts.repo
+       AND latest.recency_rank = 1
+      ORDER BY counts.checks DESC
       LIMIT 250
     `)
     .bind(sinceDay(days))
@@ -81,8 +100,9 @@ export async function refreshTrending(env: Env): Promise<TrendingRepo[]> {
   const db = dbFrom(env)
   if (db) {
     try {
+      const reader = readReplicaSafeSession(db)
       for (const window of WINDOW_TIERS) {
-        const repos = await queryTrending(db, window.days)
+        const repos = await queryTrending(reader, window.days)
         if (repos.length === 0) continue
 
         const payload: TrendingCache = {
@@ -113,8 +133,9 @@ export async function getTrendingCache(store: StateStore): Promise<TrendingCache
   const db = dbFrom(store)
   if (db) {
     try {
+      const reader = readReplicaSafeSession(db)
       for (const window of WINDOW_TIERS) {
-        const repos = await queryTrending(db, window.days)
+        const repos = await queryTrending(reader, window.days)
         if (repos.length > 0) {
           return {
             repos,

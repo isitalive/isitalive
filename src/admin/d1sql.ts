@@ -1,12 +1,9 @@
 // ---------------------------------------------------------------------------
 // D1 SQL proxy — read-only admin query helper
-//
-// Kept under the legacy module/function name so existing imports and tests keep
-// working while the runtime dependency moves away from R2 SQL.
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../types/env'
-import { fetchWithTimeout } from '../utils/http'
+import { readPrimarySession } from '../db/d1'
 
 export interface QueryResult {
   columns: string[]
@@ -20,8 +17,6 @@ export interface QueryResult {
 const BLOCKED_PATTERNS = [
   /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|REPLACE|MERGE)\b/i,
 ]
-
-const R2_SQL_TIMEOUT_MS = 20_000
 
 /**
  * Validate that a SQL query is read-only.
@@ -86,7 +81,7 @@ export function optimizeReadQuery(sql: string): string {
 /**
  * Execute a read-only SQL query against D1.
  */
-export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
+export async function queryD1SQL(env: Env, sql: string): Promise<QueryResult> {
   const start = Date.now()
 
   // Validate
@@ -118,18 +113,6 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
   }
 
   if (!env.DB) {
-    const legacy = env as unknown as {
-      CF_ACCOUNT_ID?: string
-      CF_R2_SQL_TOKEN?: string
-      CF_R2_WAREHOUSE?: string
-    }
-    if (legacy.CF_ACCOUNT_ID && legacy.CF_R2_SQL_TOKEN && legacy.CF_R2_WAREHOUSE) {
-      return queryLegacyR2SQL({
-        CF_ACCOUNT_ID: legacy.CF_ACCOUNT_ID,
-        CF_R2_SQL_TOKEN: legacy.CF_R2_SQL_TOKEN,
-        CF_R2_WAREHOUSE: legacy.CF_R2_WAREHOUSE,
-      }, sql, start)
-    }
     return {
       columns: [],
       rows: [],
@@ -140,7 +123,8 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
   }
 
   try {
-    const raw = await env.DB.prepare(sql).raw({ columnNames: true })
+    const reader = readPrimarySession(env.DB)
+    const raw = await reader.prepare(sql).raw({ columnNames: true })
     const [columns = [], ...rows] = raw as [string[], ...any[][]]
 
     return {
@@ -156,70 +140,6 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
       rowCount: 0,
       timing: Date.now() - start,
       error: `Failed to query D1: ${err.message}`,
-    }
-  }
-}
-
-async function queryLegacyR2SQL(
-  env: { CF_ACCOUNT_ID: string; CF_R2_SQL_TOKEN: string; CF_R2_WAREHOUSE: string },
-  sql: string,
-  start: number,
-): Promise<QueryResult> {
-  try {
-    const response = await fetchWithTimeout(
-      `https://api.sql.cloudflarestorage.com/api/v1/accounts/${env.CF_ACCOUNT_ID}/r2-sql/query/${env.CF_R2_WAREHOUSE}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.CF_R2_SQL_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query: sql }),
-        timeoutMs: R2_SQL_TIMEOUT_MS,
-        timeoutMessage: `R2 SQL request timed out after ${R2_SQL_TIMEOUT_MS}ms`,
-      },
-    )
-
-    if (!response.ok) {
-      const text = await response.text()
-      return {
-        columns: [],
-        rows: [],
-        rowCount: 0,
-        timing: Date.now() - start,
-        error: `R2 SQL API error (${response.status}): ${text.slice(0, 200)}`,
-      }
-    }
-
-    const data = await response.json() as any
-    if (!data.success) {
-      const errors = data.errors?.map((entry: any) => entry.message).join(', ') || 'Unknown error'
-      return { columns: [], rows: [], rowCount: 0, timing: Date.now() - start, error: errors }
-    }
-
-    const result = data.result
-    if (!result || !Array.isArray(result.rows) || result.rows.length === 0) {
-      return { columns: [], rows: [], rowCount: 0, timing: Date.now() - start }
-    }
-
-    const columns: string[] = Array.isArray(result.schema)
-      ? result.schema.map((col: any) => col.name)
-      : Object.keys(result.rows[0])
-    const rows = result.rows.map((row: any) => columns.map((col) => row[col]))
-
-    return {
-      columns,
-      rows,
-      rowCount: rows.length,
-      timing: Date.now() - start,
-    }
-  } catch (err: any) {
-    return {
-      columns: [],
-      rows: [],
-      rowCount: 0,
-      timing: Date.now() - start,
-      error: `Failed to query R2 SQL: ${err.message}`,
     }
   }
 }

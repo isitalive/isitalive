@@ -11,11 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
 - R2 JSONL archive for analytics events under partitioned `events/raw/type=.../dt=.../hour=...` keys, with `archive_batches` coverage tracking and Queue/DLQ retry handling.
 - D1 `discovered_repos` registry for repositories found through external feeds such as GitHub Trending.
+- Authenticated `GET /admin/api/d1-replication` diagnostics for comparing unconstrained and primary D1 session metadata, including served region, primary status, and internal session bookmarks.
 
 ### Changed
 
 - Analytics emission now uses Cloudflare Queues (`EVENT_QUEUE`) instead of Cloudflare Pipelines, preserving existing `emitAll()` call sites.
 - Admin analytics and trending/tracked/sitemap/history reads now query D1 rollups instead of R2 SQL/Iceberg.
+- Replica-safe D1 reads now use `withSession('first-unconstrained')`, while latest-sensitive reads use `withSession('first-primary')`; writes continue through the base D1 binding.
+- Admin query internals were renamed from R2 SQL to D1 SQL to match the current storage backend.
 - Daily ingest now reads the actual GitHub Trending repositories page first, with the previous new-repos Search API kept as a fallback.
 - Refresh workflows now keep externally discovered repositories fresh on a tiered cadence, separate from user/request-tracked repositories.
 - `/health` now probes D1 in production.
@@ -27,6 +30,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Analytics cache-hit paths no longer enqueue duplicate score-producing events, preventing cache traffic from inflating result score aggregates.
+- Trending score metadata now comes from the latest trusted score-bearing row instead of `MAX(latest_score)` / `MAX(latest_verdict)`, and excludes `cron` and `page-view` sources.
+- Page-view analytics beacons ignore client-supplied score/verdict values and store non-authoritative usage metadata only.
+- Queue aggregate upserts preserve latest score/verdict metadata when out-of-order events arrive.
 - Footer copyright text now omits the incorrect year and renders as `© Is It Alive` across shared UI pages.
 - `/_data/recent` now returns an empty list instead of 500 when a local or partially migrated D1 database does not have the optional `recent_queries` table.
 
