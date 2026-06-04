@@ -67,7 +67,11 @@ function isExpired(expiresAt: number | null): boolean {
 }
 
 function isMissingRecentQueriesTable(error: unknown): boolean {
-  return error instanceof Error && error.message.includes('no such table: recent_queries')
+  if (error instanceof Error) return error.message.includes('no such table: recent_queries')
+  if (typeof error === 'object' && error !== null && Object.hasOwn(error, 'message')) {
+    return String((error as { message: unknown }).message).includes('no such table: recent_queries')
+  }
+  return String(error).includes('no such table: recent_queries')
 }
 
 export async function cacheGetText(store: StateStore, key: string): Promise<string | null> {

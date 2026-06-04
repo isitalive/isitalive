@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { getRecentQueries, trackRecentQuery, type RecentQuery } from './recentQueries'
 
 const missingRecentQueriesTable = new Error('D1_ERROR: no such table: recent_queries: SQLITE_ERROR')
+const missingRecentQueriesTableMessage = 'D1_ERROR: no such table: recent_queries: SQLITE_ERROR'
 
-function createReadDb(error: Error): D1Database {
+function createReadDb(error: unknown): D1Database {
   return {
     prepare: vi.fn(() => ({
       bind: vi.fn(() => ({
@@ -15,7 +16,7 @@ function createReadDb(error: Error): D1Database {
   } as unknown as D1Database
 }
 
-function createWriteDb(error: Error): D1Database {
+function createWriteDb(error: unknown): D1Database {
   return {
     prepare: vi.fn(() => ({
       bind: vi.fn(() => ({
@@ -42,6 +43,13 @@ describe('recent query D1 fallback', () => {
 
   it('skips tracking when the optional recent_queries table is missing', async () => {
     await expect(trackRecentQuery(createWriteDb(missingRecentQueriesTable), entry)).resolves.toBeUndefined()
+  })
+
+  it('handles non-Error missing-table throws', async () => {
+    await expect(getRecentQueries(createReadDb(missingRecentQueriesTableMessage))).resolves.toEqual([])
+    await expect(
+      trackRecentQuery(createWriteDb({ message: missingRecentQueriesTableMessage }), entry),
+    ).resolves.toBeUndefined()
   })
 
   it('still surfaces unrelated D1 read errors', async () => {
