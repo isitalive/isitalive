@@ -1,11 +1,13 @@
 # IsItAlive
 
-**Check the health of any open-source project — instantly.**
+**Check whether an open-source dependency is still alive.**
 
 [![Is It Alive?](https://isitalive.dev/api/badge/github/isitalive/isitalive)](https://isitalive.dev/github/isitalive/isitalive)
 <!-- audited by isitalive/audit-action -->
 
-IsItAlive scores open-source projects on 8 maintenance signals and gives you a single health score (0–100). Use it to evaluate dependencies before you adopt them, or monitor the ones you already use.
+IsItAlive scores open-source projects on 8 maintenance signals and gives you a single maintenance-health score (0–100). Use it to evaluate dependencies before humans or AI coding agents adopt them, or monitor the ones you already rely on.
+
+This is a maintenance-risk signal, not a security, license, or compliance verdict.
 
 ## Quick Start
 

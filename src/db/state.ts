@@ -65,6 +65,10 @@ function isExpired(expiresAt: number | null): boolean {
   return expiresAt !== null && expiresAt <= Date.now()
 }
 
+function isMissingRecentQueriesTable(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('no such table: recent_queries')
+}
+
 export async function cacheGetText(store: StateStore, key: string): Promise<string | null> {
   const db = asDb(store)
   if (db) {
@@ -252,22 +256,27 @@ export async function trackFirstSeen(
 export async function getRecentQueries(store: StateStore, limit = 10): Promise<RecentQuery[]> {
   const db = asDb(store)
   if (db) {
-    const result = await db
-      .prepare(`
-        SELECT owner, repo, score, verdict, checked_at
-        FROM recent_queries
-        ORDER BY updated_at DESC
-        LIMIT ?
-      `)
-      .bind(limit)
-      .all<RecentQueryRow>()
-    return result.results.map((row) => ({
-      owner: row.owner,
-      repo: row.repo,
-      score: row.score,
-      verdict: row.verdict,
-      checkedAt: row.checked_at,
-    }))
+    try {
+      const result = await db
+        .prepare(`
+          SELECT owner, repo, score, verdict, checked_at
+          FROM recent_queries
+          ORDER BY updated_at DESC
+          LIMIT ?
+        `)
+        .bind(limit)
+        .all<RecentQueryRow>()
+      return result.results.map((row) => ({
+        owner: row.owner,
+        repo: row.repo,
+        score: row.score,
+        verdict: row.verdict,
+        checkedAt: row.checked_at,
+      }))
+    } catch (error) {
+      if (isMissingRecentQueriesTable(error)) return []
+      throw error
+    }
   }
 
   const kv = asKv(store)
@@ -292,29 +301,34 @@ export async function trackRecentQuery(
   const updatedAt = new Date().toISOString()
 
   if (db) {
-    await db
-      .prepare(`
-        INSERT INTO recent_queries (repo_key, owner, repo, score, verdict, checked_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(repo_key) DO UPDATE SET
-          owner = excluded.owner,
-          repo = excluded.repo,
-          score = excluded.score,
-          verdict = excluded.verdict,
-          checked_at = excluded.checked_at,
-          updated_at = excluded.updated_at
-      `)
-      .bind(repoKey, owner, repo, entry.score, entry.verdict, entry.checkedAt, updatedAt)
-      .run()
-    await db
-      .prepare(`
-        DELETE FROM recent_queries
-        WHERE repo_key NOT IN (
-          SELECT repo_key FROM recent_queries ORDER BY updated_at DESC LIMIT ?
-        )
-      `)
-      .bind(limit)
-      .run()
+    try {
+      await db
+        .prepare(`
+          INSERT INTO recent_queries (repo_key, owner, repo, score, verdict, checked_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(repo_key) DO UPDATE SET
+            owner = excluded.owner,
+            repo = excluded.repo,
+            score = excluded.score,
+            verdict = excluded.verdict,
+            checked_at = excluded.checked_at,
+            updated_at = excluded.updated_at
+        `)
+        .bind(repoKey, owner, repo, entry.score, entry.verdict, entry.checkedAt, updatedAt)
+        .run()
+      await db
+        .prepare(`
+          DELETE FROM recent_queries
+          WHERE repo_key NOT IN (
+            SELECT repo_key FROM recent_queries ORDER BY updated_at DESC LIMIT ?
+          )
+        `)
+        .bind(limit)
+        .run()
+    } catch (error) {
+      if (isMissingRecentQueriesTable(error)) return
+      throw error
+    }
     return
   }
 

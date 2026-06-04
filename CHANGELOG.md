@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Daily ingest now reads the actual GitHub Trending repositories page first, with the previous new-repos Search API kept as a fallback.
 - Refresh workflows now keep externally discovered repositories fresh on a tiered cadence, separate from user/request-tracked repositories.
 - `/health` now probes D1 in production.
+- Public, README, and agent-facing copy now positions Is It Alive as a maintenance-risk signal for humans and AI agents choosing open-source dependencies, not as a security scanner.
 
 ### Removed
 
@@ -27,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 
 - Footer copyright text now omits the incorrect year and renders as `© Is It Alive` across shared UI pages.
+- `/_data/recent` now returns an empty list instead of 500 when a local or partially migrated D1 database does not have the optional `recent_queries` table.
 
 ## [0.12.0] - 2026-04-21
 

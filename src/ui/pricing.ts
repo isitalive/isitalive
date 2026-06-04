@@ -48,7 +48,7 @@ const paidTiers: PaidTier[] = [
     annual: '$990/yr — 2 months free',
     features: [
       'Unlimited private repos',
-      'In-depth security scans',
+      'Private dependency risk reports',
       '15min data freshness',
     ],
   },
@@ -88,10 +88,10 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Pricing — Is It Alive?</title>
-  <meta name="description" content="Is It Alive? is free for open source. Check dependency health, get badges, and automate audits in CI — no cost, no limits for public repos.">
+  <meta name="description" content="Is It Alive? is free for open source. Check maintenance-health, get badges, and automate dependency liveness audits in CI.">
   ${ogTags({
     title: 'Pricing — Is It Alive?',
-    description: 'Free for open source, forever. Paid tiers coming soon for private repos.',
+    description: 'Free for open source, forever. Paid tiers coming soon for private dependency maintenance checks.',
     url: 'https://isitalive.dev/pricing',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -351,7 +351,7 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
 
     <section class="pricing-hero">
       <h1>Know your dependencies are alive.</h1>
-      <p>Free for open source, forever. We believe every developer deserves to know the health of their supply chain.</p>
+      <p>Free for open source, forever. Every developer and AI agent should know whether a dependency still looks maintained before building on it.</p>
     </section>
 
     <div class="tier-card featured">
@@ -363,8 +363,8 @@ export function pricingPage(turnstileSiteKey?: string, analyticsToken?: string):
         </div>
       </div>
       <ul class="tier-features">
-        <li>Health scores for any public repo</li>
-        <li>Dependency audit on every PR</li>
+        <li>Maintenance-health scores for any public repo</li>
+        <li>Dependency liveness audit on every PR</li>
         <li>GitHub Action — zero setup</li>
         <li>Embeddable README badges</li>
         <li>Public REST API</li>

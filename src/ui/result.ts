@@ -191,10 +191,10 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>${owner}/${repo} — Is It Alive?</title>
-  <meta name="description" content="${owner}/${repo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
+  <meta name="description" content="${owner}/${repo} maintenance-health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
   ${ogTags({
     title: `${rawOwner}/${rawRepo} — Is It Alive?`,
-    description: `${rawOwner}/${rawRepo} health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
+    description: `${rawOwner}/${rawRepo} maintenance-health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
     url: `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`,
     image: badgeUrl,
   })}
@@ -642,7 +642,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     <div class="install-cta">
       <div class="install-cta-text">
         <h2>🚀 Automate this in CI</h2>
-        <p>Add dependency health checks to every pull request. Zero config for public repos.</p>
+        <p>Catch stale or abandoned dependencies on every pull request. Zero config for public repos.</p>
         <div class="install-cta-sub">Free for public repos · No API key needed · Powered by OIDC</div>
       </div>
       <a href="${escapeHtml(ctaUrl)}" class="install-cta-btn" target="_blank" rel="noopener">

@@ -13,11 +13,11 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Is It Alive? — Open Source Health Checker</title>
-  <meta name="description" content="Instantly check the maintenance-health of any open-source project. Fast, cached, API-ready.">
+  <title>Is It Alive? — Maintenance Signals for Dependencies</title>
+  <meta name="description" content="Before humans or AI agents add a dependency, check whether the project is still alive. Fast maintenance-health scores with inspectable evidence.">
   ${ogTags({
-    title: 'Is It Alive? — Open Source Health Checker',
-    description: 'Instantly check the maintenance-health of any open-source project. Fast, cached, API-ready.',
+    title: 'Is It Alive? — Maintenance Signals for Dependencies',
+    description: 'Before humans or AI agents add a dependency, check whether the project is still alive. Fast maintenance-health scores with inspectable evidence.',
     url: 'https://isitalive.dev/',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -599,8 +599,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
   <div class="container">    <header>
 
-      <h1>Does this project look maintained?</h1>
-      <p class="subtitle">Check the maintenance-health of any open-source project. One query, one score, inspectable evidence.</p>
+      <h1>Don't let your agent install dead dependencies.</h1>
+      <p class="subtitle">Check maintenance-health for any GitHub project with one score, inspectable evidence, and agent-readable signals.</p>
 
       <div class="search-container">
         <form action="/_check" method="POST" id="searchForm">
@@ -614,13 +614,13 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               autofocus
             />
             <button type="submit" id="searchBtn">
-              <span class="btn-text">Check Health</span>
+              <span class="btn-text">Check Liveness</span>
               <span class="btn-spinner"></span>
             </button>
           </div>
           ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="auto" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
         </form>
-        <p class="search-hint">Paste any GitHub repo or pick a recently checked project</p>
+        <p class="search-hint">Paste any GitHub repo before you adopt, recommend, or automate it</p>
       </div>
     </header>
 
@@ -635,26 +635,26 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     </div>
 
     <section class="adopt-section">
-      <div class="section-label"><span>Add it to your project</span></div>
+      <div class="section-label"><span>Use it where dependencies enter your workflow</span></div>
       <div class="adopt-grid">
         <div class="adopt-block">
           <div class="adopt-header">
             <div class="adopt-icon icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
-            <h3>Show your score</h3>
+            <h3>Check before adopting</h3>
           </div>
-          <p>One line in your README. Live badge, auto-updated.</p>
+          <p>Compare observable maintainer activity before you build on a package.</p>
           <div style="margin-bottom:12px"><svg xmlns="http://www.w3.org/2000/svg" width="182" height="20" role="img" aria-label="is it alive?: 92 · healthy"><title>is it alive?: 92 · healthy</title><linearGradient id="bg" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="cr"><rect width="182" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#cr)"><rect width="80" height="20" fill="#555"/><rect x="80" width="102" height="20" fill="#22c55e"/><rect width="182" height="20" fill="url(#bg)"/></g><g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110"><text x="400" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="700">is it alive?</text><text x="400" y="140" transform="scale(.1)" textLength="700">is it alive?</text><text x="1310" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="920">92 · healthy</text><text x="1310" y="140" transform="scale(.1)" textLength="920">92 · healthy</text></g></svg></div>
           <div class="adopt-code" id="badgeSnippet"><button class="copy-btn" onclick="copySnippet('badgeSnippet')">Copy</button><span class="gr">[![Is It Alive?]</span>
 <span class="gr">(https://isitalive.dev/api/badge/github/ORG/REPO)]</span>
 <span class="gr">(https://isitalive.dev/github/ORG/REPO)</span></div>
-          <span class="adopt-tag">Works with any public repo — no setup needed</span>
+          <span class="adopt-tag">Works with any public GitHub repo — no setup needed</span>
         </div>
         <div class="adopt-block">
           <div class="adopt-header">
             <div class="adopt-icon icon-shield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-            <h3>Guard your dependencies</h3>
+            <h3>Guard PRs in CI</h3>
           </div>
-          <p>Fail the build when a dependency drops below your threshold.</p>
+          <p>Catch stale or abandoned dependencies before they land.</p>
           <div class="adopt-code" id="actionSnippet"><button class="copy-btn" onclick="copySnippet('actionSnippet')">Copy</button><span class="cm"># .github/workflows/deps.yml</span>
 <span class="ac">- uses:</span> isitalive/audit-action@v1
   <span class="ac">with:</span>
@@ -664,9 +664,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         <div class="adopt-block">
           <div class="adopt-header">
             <div class="adopt-icon icon-bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
-            <h3>Enable AI agents</h3>
+            <h3>Give agents a liveness API</h3>
           </div>
-          <p>Let any LLM or MCP server check dependency health with one API call.</p>
+          <p>Let LLMs and MCP servers sanity-check dependencies before recommending or adding them.</p>
           <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/\\
   github/vercel/next.js
 
@@ -679,9 +679,9 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     </section>
 
     <section class="closing-cta">
-      <h2>Ready to ship with confidence?</h2>
+      <h2>A small liveness check before a dependency becomes infrastructure.</h2>
       <a href="/methodology" class="cta-btn">How we calculate scores →</a>
-      <p class="cta-sub">Free for open source. No credit card required.</p>
+      <p class="cta-sub">Maintenance-health only. Free for open source. No credit card required.</p>
     </section>
 
   </div>
