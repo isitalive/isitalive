@@ -50,6 +50,12 @@ function makeExecutionCtx() {
   } as ExecutionContext & { pending: Promise<unknown>[] }
 }
 
+async function drainExecutionCtx(ctx: ExecutionContext & { pending: Promise<unknown>[] }) {
+  for (let i = 0; i < 3; i++) {
+    await Promise.all(ctx.pending)
+  }
+}
+
 function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProjectData {
   return {
     archived: false,
@@ -115,6 +121,20 @@ function createEnv(cacheKv: ReturnType<typeof createMockKV>): Env {
 function seedRepoCache(cacheKv: ReturnType<typeof createMockKV>, result: ReturnType<typeof scoreProject>, storedAt: number) {
   const key = `isitalive:${METHODOLOGY.version}:github/${result.project.split('/')[1]}/${result.project.split('/')[2]}`
   cacheKv._store.set(key, JSON.stringify({ result, storedAt }))
+}
+
+function seedResponseCache(cacheApi: ReturnType<typeof createMockCacheApi>, path: string, body: unknown) {
+  cacheApi._store.set(
+    `https://cache.isitalive.dev/response/${METHODOLOGY.version}${path}`,
+    Response.json(body),
+  )
+}
+
+function queuedDomainBatches(env: Env): string[][] {
+  const sendBatch = vi.mocked((env as any).EVENT_QUEUE.sendBatch)
+  return sendBatch.mock.calls.map((call: [Iterable<{ body: { domain: string } }>]) =>
+    Array.from(call[0]).map((message) => message.body.domain),
+  )
 }
 
 describe('agent-ready health API', () => {
@@ -186,6 +206,79 @@ describe('agent-ready health API', () => {
 
     await Promise.all(ctx.pending)
     expect(fetchSpy).toHaveBeenCalledOnce()
+  })
+
+  it('emits only usage analytics for L1 response-cache hits', async () => {
+    const env = createEnv(cacheKv)
+    seedResponseCache(cacheApi, '/api/check/github/owner/repo', { score: 88, verdict: 'healthy' })
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/github/owner/repo'),
+      env,
+      ctx,
+    )
+
+    expect(response.status).toBe(200)
+    await drainExecutionCtx(ctx)
+    expect(queuedDomainBatches(env)).toEqual([['usage']])
+  })
+
+  it('emits only usage analytics for fresh L2 cache hits', async () => {
+    const rawData = makeRawProjectData()
+    const result = scoreProject(rawData, 'github')
+    seedRepoCache(cacheKv, result, Date.now())
+    const env = createEnv(cacheKv)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/github/owner/repo'),
+      env,
+      ctx,
+    )
+
+    expect(response.status).toBe(200)
+    await drainExecutionCtx(ctx)
+    expect(queuedDomainBatches(env)).toEqual([['usage']])
+  })
+
+  it('separates stale cache-hit usage from revalidation score events', async () => {
+    const rawData = makeRawProjectData()
+    const staleResult = scoreProject(rawData, 'github')
+    seedRepoCache(cacheKv, staleResult, Date.now() - (30 * 60 * 60 * 1000))
+    const env = createEnv(cacheKv)
+    vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/github/owner/repo'),
+      env,
+      ctx,
+    )
+
+    expect(response.status).toBe(200)
+    await drainExecutionCtx(ctx)
+    const batches = queuedDomainBatches(env)
+    expect(batches).toContainEqual(['usage'])
+    expect(batches).toContainEqual(['provider', 'result'])
+    expect(batches).not.toContainEqual(['provider', 'result', 'usage'])
+  })
+
+  it('emits score-producing analytics on cache misses', async () => {
+    const rawData = makeRawProjectData()
+    const env = createEnv(cacheKv)
+    vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/github/owner/repo'),
+      env,
+      ctx,
+    )
+
+    expect(response.status).toBe(200)
+    await drainExecutionCtx(ctx)
+    expect(queuedDomainBatches(env)).toContainEqual(['provider', 'result', 'usage'])
   })
 
   it('keeps manifest audits compact by default but still includes provenance fields', async () => {

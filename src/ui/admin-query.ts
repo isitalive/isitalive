@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { adminLayout } from './admin-layout'
-import { PRESET_QUERIES } from '../admin/r2sql'
+import { PRESET_QUERIES } from '../admin/d1sql'
 
 export function adminQueryPage(): string {
   const presetsJson = JSON.stringify(PRESET_QUERIES)

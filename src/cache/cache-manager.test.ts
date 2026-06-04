@@ -77,6 +77,33 @@ function createMockEnv(kv: ReturnType<typeof createMockKV>): Env {
   return { CACHE_KV: kv } as unknown as Env
 }
 
+function createMockD1(row: unknown = null) {
+  const reads: Array<{ sql: string; values: unknown[] }> = []
+  const writes: Array<{ sql: string; values: unknown[] }> = []
+  const replicaPrepare = vi.fn((sql: string) => ({
+    bind: (...values: unknown[]) => ({
+      first: vi.fn(async () => {
+        reads.push({ sql, values })
+        return row
+      }),
+    }),
+  }))
+  const basePrepare = vi.fn((sql: string) => ({
+    bind: (...values: unknown[]) => ({
+      run: vi.fn(async () => {
+        writes.push({ sql, values })
+        return { success: true, results: [], meta: {} }
+      }),
+    }),
+  }))
+  const withSession = vi.fn(() => ({ prepare: replicaPrepare } as unknown as D1DatabaseSession))
+  const db = {
+    prepare: basePrepare,
+    withSession,
+  } as unknown as D1Database
+  return { db, reads, writes, replicaPrepare, basePrepare, withSession }
+}
+
 // ---------------------------------------------------------------------------
 // Test setup
 // ---------------------------------------------------------------------------
@@ -254,6 +281,24 @@ describe('CacheManager', () => {
       expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(92)
     })
+
+    it('reads D1 L2 cache through a replica session', async () => {
+      const result = makeScoringResult()
+      const d1 = createMockD1({
+        result_json: JSON.stringify(result),
+        stored_at: Date.now(),
+        expires_at: Date.now() + 60_000,
+      })
+      const cm = new CacheManager({ DB: d1.db } as unknown as Env, ctx)
+
+      const cached = await cm.get('github', 'vercel', 'next.js')
+
+      expect(cached.status).toBe('l2-hit')
+      expect(d1.withSession).toHaveBeenCalledWith('first-unconstrained')
+      expect(d1.replicaPrepare).toHaveBeenCalledOnce()
+      expect(d1.basePrepare).not.toHaveBeenCalled()
+      expect(d1.reads[0].sql).toContain('FROM score_cache')
+    })
   })
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -320,6 +365,19 @@ describe('CacheManager', () => {
       expect(cached.status).toBe('l2-hit')
       expect(cached.result!.score).toBe(73)
       expect(cached.result!.verdict).toBe('stable')
+    })
+
+    it('writes D1 L2 cache through the base DB binding', async () => {
+      const result = makeScoringResult()
+      const d1 = createMockD1()
+      const cm = new CacheManager({ DB: d1.db } as unknown as Env)
+
+      await cm.put('github', 'vercel', 'next.js', result)
+
+      expect(d1.withSession).not.toHaveBeenCalled()
+      expect(d1.basePrepare).toHaveBeenCalledOnce()
+      expect(d1.replicaPrepare).not.toHaveBeenCalled()
+      expect(d1.writes[0].sql).toContain('INSERT INTO score_cache')
     })
   })
 

@@ -1,4 +1,5 @@
 import type { Env } from '../types/env'
+import { readReplicaSafeSession } from '../db/d1'
 
 export type DiscoveredTier = 'hot' | 'warm' | 'cold'
 
@@ -116,7 +117,8 @@ export async function getDiscoveredIndex(env: Env): Promise<DiscoveredIndex> {
   const db = dbFrom(env)
   if (!db) return {}
 
-  const result = await db
+  const reader = readReplicaSafeSession(db)
+  const result = await reader
     .prepare(`
       SELECT provider, repo, source, first_discovered, last_discovered, last_refreshed, refresh_count
       FROM discovered_repos
