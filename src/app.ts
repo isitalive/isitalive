@@ -114,10 +114,13 @@ app.get('/health', async (c) => {
   let kv: 'ok' | 'degraded' | undefined;
   try {
     const legacyKv = (c.env as unknown as { CACHE_KV?: KVNamespace }).CACHE_KV
+    const probe = c.env.DB
+      ? c.env.DB.prepare('SELECT 1').first()
+      : legacyKv
+        ? legacyKv.get('health:ping')
+        : Promise.reject(new Error('no storage binding configured'))
     await Promise.race([
-      c.env.DB
-        ? c.env.DB.prepare('SELECT 1').first()
-        : legacyKv?.get('health:ping'),
+      probe,
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health probe timeout')), HEALTH_PROBE_TIMEOUT_MS)),
     ]);
     db = 'ok';

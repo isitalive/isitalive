@@ -60,8 +60,8 @@ describe('aggregate/history', () => {
     expect(reads[0].values).toEqual(['vercel/next.js', 365])
   })
 
-  it('appends score history into D1 daily result rollups', async () => {
-    const { db, writes } = createMockD1()
+  it('leaves D1 daily result rollups to the queue consumer', async () => {
+    const { db, writes, prepare } = createMockD1()
 
     await appendScoreHistory({ DB: db } as any, 'Vercel/Next.js', {
       date: '2026-06-04',
@@ -69,16 +69,8 @@ describe('aggregate/history', () => {
       verdict: 'healthy',
     })
 
-    expect(writes).toHaveLength(1)
-    expect(writes[0].sql).toContain('INSERT INTO daily_result_scores')
-    expect(writes[0].values.slice(0, 5)).toEqual([
-      '2026-06-04',
-      'vercel/next.js',
-      91,
-      91,
-      'healthy',
-    ])
-    expect(writes[0].values[5]).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/))
+    expect(prepare).not.toHaveBeenCalled()
+    expect(writes).toHaveLength(0)
   })
 
   it('falls back to state cache when no D1 binding is available', async () => {
