@@ -9,7 +9,7 @@ import { Hono } from 'hono'
 import type { Env } from '../types/env'
 import { timingSafeEqual, sha256Hex } from '../utils/crypto'
 import { adminAuth, createSession, setSessionCookie, clearSessionCookie } from '../middleware/admin-auth'
-import { getAdminOverview, KVKeyStore } from '../admin/data'
+import { D1KeyStore, getAdminOverview } from '../admin/data'
 import { queryR2SQL } from '../admin/r2sql'
 import { adminLoginPage } from '../ui/admin-login'
 import { adminOverviewPage } from '../ui/admin-overview'
@@ -145,7 +145,7 @@ admin.get('/jobs', (c) => {
 
 // API Keys page
 admin.get('/keys', async (c) => {
-  const store = new KVKeyStore(c.env.KEYS_KV)
+  const store = new D1KeyStore(c.env)
   const keys = await store.list()
   return c.html(adminKeysPage(keys))
 })
@@ -161,12 +161,12 @@ admin.post('/api/keys', async (c) => {
     : 'free'
 
   if (!name) {
-    const store = new KVKeyStore(c.env.KEYS_KV)
+    const store = new D1KeyStore(c.env)
     const keys = await store.list()
     return c.html(adminKeysPage(keys, { type: 'error', message: 'Key name is required.' }))
   }
 
-  const store = new KVKeyStore(c.env.KEYS_KV)
+  const store = new D1KeyStore(c.env)
   const { key } = await store.create(name, tier)
   const keys = await store.list()
 
@@ -180,7 +180,7 @@ admin.post('/api/keys', async (c) => {
 // Revoke API key
 admin.post('/api/keys/:keyId/revoke', async (c) => {
   const keyId = c.req.param('keyId')
-  const store = new KVKeyStore(c.env.KEYS_KV)
+  const store = new D1KeyStore(c.env)
 
   const success = await store.revoke(keyId)
   const keys = await store.list()

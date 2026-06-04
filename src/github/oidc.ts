@@ -8,6 +8,7 @@
 
 import { verifyWithJwks, decode } from 'hono/jwt'
 import type { Env } from '../types/env'
+import { cacheGetText, cachePutText } from '../db/state'
 
 // Local minimal types — avoids relying on Hono's internal hono/utils/jwt/* paths
 export interface JWTPayload {
@@ -86,7 +87,7 @@ function extractClaims(payload: JWTPayload): OidcClaims {
  */
 async function getCachedJwks(env: Env): Promise<HonoJsonWebKey[] | undefined> {
   try {
-    const raw = await env.CACHE_KV.get(JWKS_CACHE_KEY)
+    const raw = await cacheGetText(env, JWKS_CACHE_KEY)
     if (!raw) return undefined
     const parsed = JSON.parse(raw)
     if (parsed?.keys && Array.isArray(parsed.keys)) {
@@ -183,14 +184,14 @@ export async function verifyOidcToken(token: string, env: Env): Promise<OidcClai
 
   // ── Pass 2: Fetch JWKS from GitHub (network, rate-limited) ────────
   // Cooldown check: prevent repeated fetches from attacker-controlled kid values
-  const cooldown = await env.CACHE_KV.get(JWKS_REFETCH_COOLDOWN_KEY)
+  const cooldown = await cacheGetText(env, JWKS_REFETCH_COOLDOWN_KEY)
   if (cooldown) {
     throw new Error('No matching key found in JWKS')
   }
 
   try {
     // Set cooldown before fetching (prevents parallel stampede)
-    await env.CACHE_KV.put(JWKS_REFETCH_COOLDOWN_KEY, '1', { expirationTtl: JWKS_REFETCH_COOLDOWN_S })
+    await cachePutText(env, JWKS_REFETCH_COOLDOWN_KEY, '1', { expirationTtl: JWKS_REFETCH_COOLDOWN_S })
 
     const res = await fetch(GITHUB_JWKS_URI)
     if (!res.ok) {
@@ -208,7 +209,7 @@ export async function verifyOidcToken(token: string, env: Env): Promise<OidcClai
 
     // Cache the freshly-fetched JWKS keys (best-effort, 1h TTL)
     try {
-      await env.CACHE_KV.put(JWKS_CACHE_KEY, jwksText, { expirationTtl: 3600 })
+      await cachePutText(env, JWKS_CACHE_KEY, jwksText, { expirationTtl: 3600 })
     } catch {
       // Caching is best-effort
     }

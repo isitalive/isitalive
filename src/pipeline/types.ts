@@ -1,19 +1,20 @@
 // ---------------------------------------------------------------------------
-// Pipeline Types — derived from generated Worker bindings
-//
-// This module provides a small subset type for helpers that only need the
-// pipeline bindings, while keeping the binding surface sourced from the
-// generated Worker `Env`.
+// Event Queue Types — analytics event transport bindings and message shapes
 // ---------------------------------------------------------------------------
 
-import type { Env, Pipeline } from '../types/env'
+import type { Env } from '../types/env'
+import type { ProviderEvent } from '../events/provider'
+import type { ResultEvent } from '../events/result'
+import type { UsageEvent } from '../events/usage'
+import type { ManifestEvent } from '../events/manifest'
 
-export type { Pipeline }
+export type QueuedAnalyticsEvent =
+  | { domain: 'provider'; event: ProviderEvent }
+  | { domain: 'result'; event: ResultEvent }
+  | { domain: 'usage'; event: UsageEvent }
+  | { domain: 'manifest'; event: ManifestEvent }
 
-/** Pipeline bindings subset of Env — for functions that only need pipelines */
-export interface PipelineBindings {
-  PROVIDER_PIPELINE: Env['PROVIDER_PIPELINE']
-  RESULT_PIPELINE: Env['RESULT_PIPELINE']
-  USAGE_PIPELINE: Env['USAGE_PIPELINE']
-  MANIFEST_PIPELINE: Env['MANIFEST_PIPELINE']
+/** Queue binding subset of Env — for functions that only need event enqueue. */
+export interface EventQueueBindings {
+  EVENT_QUEUE: Env['EVENT_QUEUE']
 }

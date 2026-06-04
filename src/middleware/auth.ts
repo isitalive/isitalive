@@ -1,12 +1,12 @@
 // ---------------------------------------------------------------------------
-// API key + OIDC authentication middleware — KV-backed
+// API key + OIDC authentication middleware — D1-backed
 //
 // Two auth strategies (in priority order):
-//   1. API key:  Authorization: Bearer sk_abc123   → KV lookup in KEYS_KV
+//   1. API key:  Authorization: Bearer sk_abc123   → D1 lookup in api_keys
 //   2. OIDC JWT: Authorization: Bearer eyJ...      → GitHub Actions OIDC verification
 //   3. No auth:                                    → free tier, unauthenticated
 //
-// Keys are stored in the KEYS_KV namespace, managed via CF dashboard:
+// Keys are stored in D1 and managed by the admin UI:
 //   Key:   sk_abc123
 //   Value: { "tier": "pro", "name": "ACME Corp", "active": true, "created": "2026-03-19" }
 //
@@ -17,9 +17,10 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import type { Env, ApiKeyEntry } from '../types/env';
+import type { Env } from '../types/env';
 import type { Tier } from '../cache/index';
 import { verifyOidcToken, type OidcClaims } from '../github/oidc';
+import { getApiKey } from '../db/state';
 
 type AppEnv = {
   Bindings: Env;
@@ -84,7 +85,7 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
     }
 
     // ── API key (existing flow) ─────────────────────────────────────
-    const entry = await c.env.KEYS_KV.get(token, 'json') as ApiKeyEntry | null;
+    const entry = await getApiKey(c.env, token);
 
     if (entry && entry.active !== false) {
       c.set('tier', (entry.tier || 'free') as Tier);

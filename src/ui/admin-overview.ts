@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // Admin dashboard — live operational metrics
 //
-// Fetches metrics client-side via /admin/api/query (R2 SQL).
-// Shows: cache layer perf, request volume, traffic breakdown, pipeline health.
+// Fetches metrics client-side via /admin/api/query (D1).
+// Shows: cache layer perf, request volume, traffic breakdown, ingest health.
 // ---------------------------------------------------------------------------
 
 import { adminLayout } from './admin-layout'
@@ -28,12 +28,12 @@ export function adminOverviewPage(data: AdminOverview): string {
           <div class="card-sub" id="l1-count">Loading…</div>
         </div>
         <div class="card shimmer">
-          <div class="card-label">L2 · KV Fresh</div>
+          <div class="card-label">L2 · D1 Fresh</div>
           <div class="card-value" id="l2-pct">—</div>
           <div class="card-sub" id="l2-count">Loading…</div>
         </div>
         <div class="card shimmer">
-          <div class="card-label">L2 · KV Stale (SWR)</div>
+          <div class="card-label">L2 · D1 Stale (SWR)</div>
           <div class="card-value" id="stale-pct">—</div>
           <div class="card-sub" id="stale-count">Loading…</div>
         </div>
@@ -95,9 +95,9 @@ export function adminOverviewPage(data: AdminOverview): string {
       </div>
     </div>
 
-    <!-- ── Pipeline Health ──────────────────────────── -->
+    <!-- ── Event Ingest Health ──────────────────────── -->
     <div class="admin-section">
-      <div class="admin-section-title">Pipeline Health</div>
+      <div class="admin-section-title">Event Ingest Health</div>
       <div class="admin-table-wrapper">
         <table class="admin-table" id="pipeline-table">
           <thead>
@@ -236,7 +236,7 @@ export function adminOverviewPage(data: AdminOverview): string {
       .card.loaded .card-value { color: var(--text-primary); }
       .card.loaded .card-sub { color: var(--text-secondary); }
 
-      /* Status indicator in pipeline table */
+      /* Status indicator in ingest table */
       .status-fresh { color: var(--green); }
       .status-stale { color: var(--yellow); }
       .status-dead { color: var(--red); }
@@ -250,7 +250,7 @@ export function adminOverviewPage(data: AdminOverview): string {
         cache: \`
           SELECT cache_status, COUNT(*) as count
           FROM usage_events
-          WHERE timestamp > (now() - INTERVAL '24' HOUR)
+          WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
             AND cache_status != 'n/a'
             AND source != 'cron'
           GROUP BY cache_status
@@ -259,33 +259,33 @@ export function adminOverviewPage(data: AdminOverview): string {
           SELECT
             COUNT(*) as total,
             ROUND(AVG(response_time_ms), 1) as avg_rt,
-            ROUND(AVG(CASE WHEN cache_status = 'miss' THEN response_time_ms END), 1) as origin_rt
+            ROUND(AVG(CASE WHEN cache_status = 'l3-miss' THEN response_time_ms END), 1) as origin_rt
           FROM usage_events
-          WHERE timestamp > (now() - INTERVAL '24' HOUR)
+          WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
             AND cache_status != 'n/a'
             AND source != 'cron'
         \`,
         source: \`
           SELECT source, COUNT(*) as count
           FROM usage_events
-          WHERE timestamp > (now() - INTERVAL '24' HOUR)
+          WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
           GROUP BY source
           ORDER BY count DESC
         \`,
         ua: \`
           SELECT user_agent, COUNT(*) as count
           FROM usage_events
-          WHERE timestamp > (now() - INTERVAL '24' HOUR)
+          WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
           GROUP BY user_agent
           ORDER BY count DESC
         \`,
-        pipeline_usage: \`SELECT 'usage_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM usage_events\`,
-        pipeline_result: \`SELECT 'result_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM result_events_v2\`,
-        pipeline_provider: \`SELECT 'provider_events_v2' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM provider_events_v2\`,
-        pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(__ingest_ts) as latest FROM manifest_events\`,
-        freshness_fresh: \`SELECT COUNT(DISTINCT repo) as count FROM usage_events WHERE repo != '' AND timestamp > now() - INTERVAL '6' HOUR\`,
-        freshness_aging: \`SELECT COUNT(DISTINCT repo) as count FROM usage_events WHERE repo != '' AND timestamp <= now() - INTERVAL '6' HOUR AND timestamp > now() - INTERVAL '24' HOUR\`,
-        freshness_stale: \`SELECT COUNT(DISTINCT repo) as count FROM usage_events WHERE repo != '' AND timestamp <= now() - INTERVAL '24' HOUR\`,
+        pipeline_usage: \`SELECT 'usage_events' as tbl, COUNT(*) as rows, MAX(timestamp) as latest FROM usage_events\`,
+        pipeline_result: \`SELECT 'result_events' as tbl, COUNT(*) as rows, MAX(timestamp) as latest FROM result_events\`,
+        pipeline_provider: \`SELECT 'provider_events' as tbl, COUNT(*) as rows, MAX(timestamp) as latest FROM provider_events\`,
+        pipeline_manifest: \`SELECT 'manifest_events' as tbl, COUNT(*) as rows, MAX(timestamp) as latest FROM manifest_events\`,
+        freshness_fresh: \`SELECT COUNT(DISTINCT repo) as count FROM daily_usage_repo WHERE repo != '' AND last_seen > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-6 hours')\`,
+        freshness_aging: \`SELECT COUNT(DISTINCT repo) as count FROM daily_usage_repo WHERE repo != '' AND last_seen <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-6 hours') AND last_seen > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')\`,
+        freshness_stale: \`SELECT COUNT(DISTINCT repo) as count FROM daily_usage_repo WHERE repo != '' AND last_seen <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')\`,
       };
 
       const queryCache = new Map();
@@ -439,7 +439,7 @@ export function adminOverviewPage(data: AdminOverview): string {
       async function loadPipeline() {
         try {
           const pipelineKeys = ['pipeline_usage', 'pipeline_result', 'pipeline_provider', 'pipeline_manifest'];
-          const pipelineNames = ['usage_events', 'result_events_v2', 'provider_events_v2', 'manifest_events'];
+          const pipelineNames = ['usage_events', 'result_events', 'provider_events', 'manifest_events'];
           const results = await Promise.allSettled(pipelineKeys.map(k => runQuery(QUERIES[k])));
           const allRows = [];
           for (let i = 0; i < results.length; i++) {
@@ -479,7 +479,7 @@ export function adminOverviewPage(data: AdminOverview): string {
             </tr>\`;
           }).join('');
         } catch (e) {
-          console.error('Pipeline query failed:', e);
+          console.error('Event ingest query failed:', e);
           document.querySelector('#pipeline-table tbody').innerHTML =
             '<tr><td colspan="4" style="color:var(--red)">Query failed</td></tr>';
         }

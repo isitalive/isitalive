@@ -81,8 +81,7 @@ describe('provider hot-path dedupe', () => {
     env = {
       CACHE_KV: cacheKv,
       GITHUB_TOKEN: 'gh-token',
-      PROVIDER_PIPELINE: { send: vi.fn(async () => {}) },
-      RESULT_PIPELINE: { send: vi.fn(async () => {}) },
+      EVENT_QUEUE: { sendBatch: vi.fn(async () => {}) },
     } as unknown as Env
     executionCtx = {
       waitUntil: vi.fn(),

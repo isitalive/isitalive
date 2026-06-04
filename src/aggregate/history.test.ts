@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../admin/r2sql', () => ({
-  queryR2SQL: vi.fn(),
-}))
-
-import { queryR2SQL } from '../admin/r2sql'
-import { getScoreHistory, computeTrend } from './history'
-import { historyKey, legacyHistoryKey } from '../state/keys'
+import { appendScoreHistory, getScoreHistory, computeTrend } from './history'
+import { historyKey } from '../state/keys'
 
 function createMockKV(store: Record<string, string> = {}): KVNamespace {
   return {
@@ -24,8 +19,24 @@ function createMockKV(store: Record<string, string> = {}): KVNamespace {
   } as any
 }
 
-function makeEnv(store: Record<string, string> = {}) {
-  return { CACHE_KV: createMockKV(store) } as any
+function createMockD1(resultRows: Array<{ day: string; score: number; verdict: string }> = []) {
+  const reads: Array<{ sql: string; values: unknown[] }> = []
+  const writes: Array<{ sql: string; values: unknown[] }> = []
+
+  const prepare = vi.fn((sql: string) => ({
+    bind: (...values: unknown[]) => ({
+      all: vi.fn(async () => {
+        reads.push({ sql, values })
+        return { results: resultRows, success: true, meta: {} }
+      }),
+      run: vi.fn(async () => {
+        writes.push({ sql, values })
+        return { success: true, meta: {} }
+      }),
+    }),
+  }))
+
+  return { db: { prepare } as unknown as D1Database, reads, writes, prepare }
 }
 
 describe('aggregate/history', () => {
@@ -33,90 +44,75 @@ describe('aggregate/history', () => {
     vi.clearAllMocks()
   })
 
-  it('returns the new aggregate KV cache without querying R2 SQL', async () => {
-    const cached = [
-      { date: '2026-06-01', score: 90, verdict: 'healthy' },
-      { date: '2026-06-02', score: 91, verdict: 'healthy' },
-    ]
-    const env = makeEnv({
-      [historyKey('Vercel', 'Next.js')]: JSON.stringify(cached),
-    })
+  it('reads D1 daily result rollups in chronological order', async () => {
+    const { db, reads } = createMockD1([
+      { day: '2026-06-02', score: 92, verdict: 'healthy' },
+      { day: '2026-06-01', score: 88, verdict: 'healthy' },
+    ])
 
-    await expect(getScoreHistory(env, 'Vercel', 'Next.js')).resolves.toEqual(cached)
-    expect(queryR2SQL).not.toHaveBeenCalled()
-  })
-
-  it('queries result_events_v2 with R2-compatible day bucketing and caches rows', async () => {
-    vi.mocked(queryR2SQL).mockResolvedValueOnce({
-      columns: ['day', 'score', 'verdict'],
-      rows: [
-        ['2026-06-01', 88, 'healthy'],
-        ['2026-06-02', 92, 'healthy'],
-      ],
-      rowCount: 2,
-      timing: 10,
-    })
-
-    const env = makeEnv()
-    const history = await getScoreHistory(env, 'Vercel', 'Next.js')
-
-    expect(history).toEqual([
+    await expect(getScoreHistory({ DB: db } as any, 'Vercel', 'Next.js')).resolves.toEqual([
       { date: '2026-06-01', score: 88, verdict: 'healthy' },
       { date: '2026-06-02', score: 92, verdict: 'healthy' },
     ])
 
-    expect(queryR2SQL).toHaveBeenCalledTimes(1)
-    const sql = vi.mocked(queryR2SQL).mock.calls[0][1]
-    expect(sql).toContain('substring(timestamp, 1, 10) as day')
-    expect(sql).not.toContain('DATE(')
-    expect(sql).toContain('FROM result_events_v2')
-    expect(sql).toContain("WHERE project = 'vercel/next.js'")
-
-    expect(env.CACHE_KV.put).toHaveBeenCalledTimes(1)
-    const [key, value, options] = vi.mocked(env.CACHE_KV.put).mock.calls[0] as any
-    expect(key).toBe(historyKey('Vercel', 'Next.js'))
-    expect(JSON.parse(value)).toEqual(history)
-    expect(options).toEqual({ expirationTtl: 21600 })
+    expect(reads).toHaveLength(1)
+    expect(reads[0].sql).toContain('FROM daily_result_scores')
+    expect(reads[0].values).toEqual(['vercel/next.js', 365])
   })
 
-  it('falls back to legacy KV history when the R2 query errors', async () => {
-    const legacy = [
-      { date: '2026-05-18', score: 99, verdict: 'healthy' },
-      { date: '2026-05-19', score: 100, verdict: 'healthy' },
-    ]
-    const env = makeEnv({
-      [legacyHistoryKey('vercel', 'next.js')]: JSON.stringify(legacy),
+  it('appends score history into D1 daily result rollups', async () => {
+    const { db, writes } = createMockD1()
+
+    await appendScoreHistory({ DB: db } as any, 'Vercel/Next.js', {
+      date: '2026-06-04',
+      score: 91,
+      verdict: 'healthy',
     })
 
-    vi.mocked(queryR2SQL).mockResolvedValueOnce({
-      columns: [],
-      rows: [],
-      rowCount: 0,
-      timing: 1,
-      error: 'R2 SQL unavailable',
-    })
-
-    await expect(getScoreHistory(env, 'vercel', 'next.js')).resolves.toEqual(legacy)
-    expect(env.CACHE_KV.put).not.toHaveBeenCalled()
+    expect(writes).toHaveLength(1)
+    expect(writes[0].sql).toContain('INSERT INTO daily_result_scores')
+    expect(writes[0].values.slice(0, 5)).toEqual([
+      '2026-06-04',
+      'vercel/next.js',
+      91,
+      91,
+      'healthy',
+    ])
+    expect(writes[0].values[5]).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/))
   })
 
-  it('falls back to legacy KV history when R2 returns no rows', async () => {
-    const legacy = [
-      { date: '2026-04-18', score: 99, verdict: 'healthy' },
+  it('falls back to state cache when no D1 binding is available', async () => {
+    const cached = [
+      { date: '2026-06-01', score: 90, verdict: 'healthy' },
+      { date: '2026-06-02', score: 91, verdict: 'healthy' },
     ]
-    const env = makeEnv({
-      [legacyHistoryKey('zitadel', 'zitadel')]: JSON.stringify(legacy),
+    const kv = createMockKV({
+      [historyKey('Vercel', 'Next.js')]: JSON.stringify(cached),
     })
 
-    vi.mocked(queryR2SQL).mockResolvedValueOnce({
-      columns: [],
-      rows: [],
-      rowCount: 0,
-      timing: 1,
+    await expect(getScoreHistory({ CACHE_KV: kv } as any, 'Vercel', 'Next.js')).resolves.toEqual(cached)
+  })
+
+  it('dedupes cache fallback snapshots by day when appending without D1', async () => {
+    const kv = createMockKV({
+      [historyKey('vercel', 'next.js')]: JSON.stringify([
+        { date: '2026-06-01', score: 80, verdict: 'stable' },
+        { date: '2026-06-02', score: 88, verdict: 'healthy' },
+      ]),
     })
 
-    await expect(getScoreHistory(env, 'zitadel', 'zitadel')).resolves.toEqual(legacy)
-    expect(env.CACHE_KV.put).not.toHaveBeenCalled()
+    await appendScoreHistory({ CACHE_KV: kv } as any, 'vercel/next.js', {
+      date: '2026-06-02',
+      score: 91,
+      verdict: 'healthy',
+    })
+
+    const [, value, options] = vi.mocked(kv.put).mock.calls[0]
+    expect(JSON.parse(String(value))).toEqual([
+      { date: '2026-06-01', score: 80, verdict: 'stable' },
+      { date: '2026-06-02', score: 91, verdict: 'healthy' },
+    ])
+    expect(options).toEqual({ expirationTtl: 86400 * 400 })
   })
 
   it('computes trend from aggregate score history', () => {

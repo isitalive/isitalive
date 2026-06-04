@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
+- R2 JSONL archive for analytics events under partitioned `events/raw/type=.../dt=.../hour=...` keys, with `archive_batches` coverage tracking and Queue/DLQ retry handling.
+- D1 `discovered_repos` registry for repositories found through external feeds such as GitHub Trending.
+
+### Changed
+
+- Analytics emission now uses Cloudflare Queues (`EVENT_QUEUE`) instead of Cloudflare Pipelines, preserving existing `emitAll()` call sites.
+- Admin analytics and trending/tracked/sitemap/history reads now query D1 rollups instead of R2 SQL/Iceberg.
+- Daily ingest now reads the actual GitHub Trending repositories page first, with the previous new-repos Search API kept as a fallback.
+- Refresh workflows now keep externally discovered repositories fresh on a tiered cadence, separate from user/request-tracked repositories.
+- `/health` now probes D1 in production.
+
+### Removed
+
+- Runtime Pipeline bindings, KV namespace bindings, and R2 SQL Worker secrets from `wrangler.toml`.
+
 ### Fixed
 
 - Footer copyright text now omits the incorrect year and renders as `© Is It Alive` across shared UI pages.

@@ -1,25 +1,26 @@
 // ---------------------------------------------------------------------------
-// Three-tier caching with stale-while-revalidate
+// Cache API + D1 caching with stale-while-revalidate
 //
 // IMPORTANT (ADR-006): CDN-Cache-Control / s-maxage does NOT prevent Worker
 // invocations. Every request wakes the Worker (~$0.30/M). The Cache API (L1)
 // is Worker-internal (free read/write ops), not CDN-external.
 //
 // L1: Cloudflare Cache API — free ops, ~0ms, per-datacenter, volatile
-// L2: Workers KV — $0.50/M reads, ~1ms, globally replicated, persistent
-// SWR: managed via KV storedAt timestamps (Cache API doesn't support SWR)
+// L2: D1 — persistent operational cache
+// SWR: managed via D1 storedAt timestamps (Cache API doesn't support SWR)
 //
 // Flow:
 //   1. Check Cache API (L1) — instant, free, same-datacenter
-//   2. Miss → Check KV (L2) — fast, persistent, globally replicated
+//   2. Miss → Check D1 (L2) — persistent and queryable
 //      a. Write result to Cache API for next same-datacenter hit
 //   3. Miss → Fetch from provider, write to both L1 + L2
-//   4. Stale (KV only) → serve + trigger background revalidation
+//   4. Stale (D1 only) → serve + trigger background revalidation
 // ---------------------------------------------------------------------------
 
 import type { ScoringResult } from '../scoring/types';
 import type { Env } from '../types/env';
 import { METHODOLOGY } from '../scoring/methodology';
+export { trackFirstSeen, getFirstSeen } from '../db/state'
 
 const CACHE_PREFIX = `isitalive:${METHODOLOGY.version}:`;
 
@@ -33,9 +34,9 @@ const CACHE_DOMAIN = 'https://cache.isitalive.dev';
 export type Tier = 'free' | 'pro' | 'enterprise';
 
 interface TierConfig {
-  /** Max age in seconds before a result is considered stale (KV) */
+  /** Max age in seconds before a result is considered stale (D1) */
   freshTtl: number;
-  /** Max age in seconds before a stale result is too old to serve at all (KV) */
+  /** Max age in seconds before a stale result is too old to serve at all (D1) */
   staleTtl: number;
   /** Cache API TTL — how long L1 holds the result */
   l1Ttl: number;
@@ -59,17 +60,23 @@ export const TIERS: Record<Tier, TierConfig> = {
   },
 };
 
-/** KV max TTL — also the hard cap for the degraded-fallback window. */
-const KV_MAX_TTL = 7 * 24 * 60 * 60;
-const DEGRADED_FALLBACK_MAX_AGE_S = KV_MAX_TTL;
+/** L2 max TTL — also the hard cap for the degraded-fallback window. */
+const L2_MAX_TTL = 7 * 24 * 60 * 60;
+const DEGRADED_FALLBACK_MAX_AGE_S = L2_MAX_TTL;
 
 // ---------------------------------------------------------------------------
-// Stored shape (wraps ScoringResult with metadata for KV)
+// Stored shape (wraps ScoringResult with metadata for D1)
 // ---------------------------------------------------------------------------
 
 interface CachedEntry {
   result: ScoringResult;
   storedAt: number; // epoch ms
+}
+
+interface ScoreCacheRow {
+  result_json: string
+  stored_at: number
+  expires_at: number
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +107,14 @@ export class CacheManager {
 
   private kvKey(provider: string, owner: string, repo: string): string {
     return `${CACHE_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  }
+
+  private db(): D1Database | null {
+    return this.env.DB ?? null
+  }
+
+  private legacyKv(): KVNamespace | null {
+    return (this.env as unknown as { CACHE_KV?: KVNamespace }).CACHE_KV ?? null
   }
 
   private l1CacheUrl(provider: string, owner: string, repo: string): string {
@@ -161,6 +176,81 @@ export class CacheManager {
     }
   }
 
+  private async getL2(
+    provider: string,
+    owner: string,
+    repo: string,
+  ): Promise<CachedEntry | null> {
+    const key = this.kvKey(provider, owner, repo)
+    const db = this.db()
+
+    if (db) {
+      try {
+        const row = await db
+          .prepare('SELECT result_json, stored_at, expires_at FROM score_cache WHERE cache_key = ?')
+          .bind(key)
+          .first<ScoreCacheRow>()
+        if (!row) return null
+        if (row.expires_at <= Date.now()) {
+          await db.prepare('DELETE FROM score_cache WHERE cache_key = ?').bind(key).run()
+          return null
+        }
+        return {
+          result: JSON.parse(row.result_json) as ScoringResult,
+          storedAt: row.stored_at,
+        }
+      } catch {
+        return null
+      }
+    }
+
+    const kv = this.legacyKv()
+    if (!kv) return null
+    try {
+      return await kv.get(key, 'json') as CachedEntry | null
+    } catch {
+      return null
+    }
+  }
+
+  private async putL2(
+    provider: string,
+    owner: string,
+    repo: string,
+    entry: CachedEntry,
+  ): Promise<void> {
+    const key = this.kvKey(provider, owner, repo)
+    const db = this.db()
+
+    if (db) {
+      await db
+        .prepare(`
+          INSERT INTO score_cache (cache_key, provider, owner, repo, result_json, stored_at, expires_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(cache_key) DO UPDATE SET
+            result_json = excluded.result_json,
+            stored_at = excluded.stored_at,
+            expires_at = excluded.expires_at
+        `)
+        .bind(
+          key,
+          provider,
+          owner.toLowerCase(),
+          repo.toLowerCase(),
+          JSON.stringify(entry.result),
+          entry.storedAt,
+          entry.storedAt + L2_MAX_TTL * 1000,
+        )
+        .run()
+      return
+    }
+
+    const kv = this.legacyKv()
+    if (kv) {
+      await kv.put(key, JSON.stringify(entry), { expirationTtl: L2_MAX_TTL })
+    }
+  }
+
   /**
    * Consolidates L1 fast-path and L2 check. Returns the same robust CacheResult.
    */
@@ -176,9 +266,8 @@ export class CacheManager {
       return { result: l1Result, status: 'l1-hit', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
     }
 
-    // ── L2: KV (persistent, global) ───────────────────────────────
-    const key = this.kvKey(provider, owner, repo);
-    const entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
+    // ── L2: D1 (persistent) ───────────────────────────────────────
+    const entry = await this.getL2(provider, owner, repo);
 
     if (!entry) {
       return { result: null, status: 'l3-miss', ageSeconds: null, storedAt: null, freshUntil: null, staleUntil: null };
@@ -191,8 +280,8 @@ export class CacheManager {
     const staleUntil = new Date(entry.storedAt + config.staleTtl * 1000).toISOString();
 
     if (ageSeconds <= config.freshTtl) {
-      // Fresh from KV — also populate L1 for next same-datacenter hit
-      // We don't await putL1 here to avoid blocking KV hit
+      // Fresh from D1 — also populate L1 for next same-datacenter hit
+      // We don't await putL1 here to avoid blocking the D1 hit
       const p = this.putL1(provider, owner, repo, entry.result, tier);
       if (this.ctx) {
         this.ctx.waitUntil(p);
@@ -227,12 +316,11 @@ export class CacheManager {
     owner: string,
     repo: string,
   ): Promise<{ result: ScoringResult; ageSeconds: number; storedAt: string } | null> {
-    const key = this.kvKey(provider, owner, repo);
     let entry: CachedEntry | null;
     try {
-      entry = await this.env.CACHE_KV.get(key, 'json') as CachedEntry | null;
+      entry = await this.getL2(provider, owner, repo);
     } catch {
-      // KV degraded is exactly when serve-stale matters — don't let a read
+      // L2 degraded is exactly when serve-stale matters — don't let a read
       // failure promote the upstream error into a 500.
       return null;
     }
@@ -256,24 +344,21 @@ export class CacheManager {
     result: ScoringResult,
     tier: Tier = 'free',
   ): Promise<void> {
-    const key = this.kvKey(provider, owner, repo);
     const entry: CachedEntry = {
       result,
       storedAt: Date.now(),
     };
 
-    // L2: KV (persistent)
-    const kvPromise = this.env.CACHE_KV.put(key, JSON.stringify(entry), {
-      expirationTtl: KV_MAX_TTL,
-    });
+    // L2: D1 (persistent)
+    const l2Promise = this.putL2(provider, owner, repo, entry);
     
     // L1: Cache API (free, same-datacenter)
     const l1Promise = this.putL1(provider, owner, repo, result, tier);
 
     if (this.ctx) {
-      this.ctx.waitUntil(Promise.all([kvPromise, l1Promise]));
+      this.ctx.waitUntil(Promise.all([l2Promise, l1Promise]));
     } else {
-      await Promise.all([kvPromise, l1Promise]);
+      await Promise.all([l2Promise, l1Promise]);
     }
   }
 
@@ -354,40 +439,3 @@ export function cacheControlHeaders(tier: Tier, isAuthenticated: boolean): Cache
 }
 
 // ---------------------------------------------------------------------------
-// First-seen tracking — records when a repo was first indexed
-// ---------------------------------------------------------------------------
-
-const FIRST_SEEN_PREFIX = 'isitalive:first-seen:';
-
-/**
- * Record the first time we ever saw a repo (idempotent — only writes once).
- *
- * Uses a read-before-write pattern to preserve the original "first seen"
- * timestamp. The KV read ($0.50/M) only happens on cache misses, so the
- * cost is acceptable for data accuracy.
- */
-export async function trackFirstSeen(
-  kv: KVNamespace,
-  provider: string,
-  owner: string,
-  repo: string,
-): Promise<void> {
-  const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
-  const existing = await kv.get(key);
-  if (!existing) {
-    await kv.put(key, new Date().toISOString(), { expirationTtl: 365 * 24 * 60 * 60 });
-  }
-}
-
-/**
- * Get the first time a repo was indexed (null if never seen).
- */
-export async function getFirstSeen(
-  kv: KVNamespace,
-  provider: string,
-  owner: string,
-  repo: string,
-): Promise<string | null> {
-  const key = `${FIRST_SEEN_PREFIX}${provider}/${owner.toLowerCase()}/${repo.toLowerCase()}`;
-  return await kv.get(key);
-}

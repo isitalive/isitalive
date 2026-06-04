@@ -23,6 +23,7 @@ import { METHODOLOGY } from '../scoring/methodology';
 import { bufferToHex } from '../utils/crypto';
 import { runWithConcurrency } from '../utils/concurrency';
 import type { Env } from '../types/env';
+import { auditCacheGetText, auditCachePutText } from '../db/state';
 
 const github = providers.github;
 
@@ -137,7 +138,7 @@ export async function scoreAudit(
 
   // ── 1. Check for a cached full audit by manifest hash ──────────────
   const auditCacheKey = buildAuditCacheKey(contentHash);
-  const cachedAudit = await env.CACHE_KV.get(auditCacheKey);
+  const cachedAudit = await auditCacheGetText(env, auditCacheKey);
   if (cachedAudit) {
     const parsed = JSON.parse(cachedAudit) as AuditResult;
     if (parsed.complete) return parsed;
@@ -431,7 +432,7 @@ async function persistAuditResult(
   auditResult: AuditResult,
 ): Promise<void> {
   const json = JSON.stringify(auditResult)
-  await env.CACHE_KV.put(auditCacheKey, json, {
+  await auditCachePutText(env, auditCacheKey, auditResult.auditHash, json, {
     expirationTtl: AUDIT_CACHE_TTL,
   })
 }

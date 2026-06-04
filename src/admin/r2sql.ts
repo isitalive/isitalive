@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// R2 SQL proxy — thin wrapper around the Cloudflare R2 SQL HTTP API
+// D1 SQL proxy — read-only admin query helper
 //
-// Only allows read-only queries (SELECT). Proxies through the Worker
-// so the CF_R2_SQL_TOKEN is never exposed to the browser.
+// Kept under the legacy module/function name so existing imports and tests keep
+// working while the runtime dependency moves away from R2 SQL.
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../types/env'
@@ -16,12 +16,12 @@ export interface QueryResult {
   error?: string
 }
 
-const R2_SQL_TIMEOUT_MS = 20_000
-
 /** SQL statements we refuse to proxy */
 const BLOCKED_PATTERNS = [
   /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|REPLACE|MERGE)\b/i,
 ]
+
+const R2_SQL_TIMEOUT_MS = 20_000
 
 /**
  * Validate that a SQL query is read-only.
@@ -84,7 +84,7 @@ export function optimizeReadQuery(sql: string): string {
 }
 
 /**
- * Execute a read-only SQL query against R2 SQL API.
+ * Execute a read-only SQL query against D1.
  */
 export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
   const start = Date.now()
@@ -117,27 +117,61 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
     sql = sql + '\nLIMIT 1000'
   }
 
-  const accountId = env.CF_ACCOUNT_ID
-  const token = env.CF_R2_SQL_TOKEN
-  const warehouse = env.CF_R2_WAREHOUSE
-
-  if (!accountId || !token || !warehouse) {
+  if (!env.DB) {
+    const legacy = env as unknown as {
+      CF_ACCOUNT_ID?: string
+      CF_R2_SQL_TOKEN?: string
+      CF_R2_WAREHOUSE?: string
+    }
+    if (legacy.CF_ACCOUNT_ID && legacy.CF_R2_SQL_TOKEN && legacy.CF_R2_WAREHOUSE) {
+      return queryLegacyR2SQL({
+        CF_ACCOUNT_ID: legacy.CF_ACCOUNT_ID,
+        CF_R2_SQL_TOKEN: legacy.CF_R2_SQL_TOKEN,
+        CF_R2_WAREHOUSE: legacy.CF_R2_WAREHOUSE,
+      }, sql, start)
+    }
     return {
       columns: [],
       rows: [],
       rowCount: 0,
       timing: Date.now() - start,
-      error: 'R2 SQL is not configured. Set CF_ACCOUNT_ID, CF_R2_SQL_TOKEN, and CF_R2_WAREHOUSE in Worker secrets.',
+      error: 'D1 is not configured. Bind the isitalive-db database as DB.',
     }
   }
 
   try {
+    const raw = await env.DB.prepare(sql).raw({ columnNames: true })
+    const [columns = [], ...rows] = raw as [string[], ...any[][]]
+
+    return {
+      columns,
+      rows,
+      rowCount: rows.length,
+      timing: Date.now() - start,
+    }
+  } catch (err: any) {
+    return {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      timing: Date.now() - start,
+      error: `Failed to query D1: ${err.message}`,
+    }
+  }
+}
+
+async function queryLegacyR2SQL(
+  env: { CF_ACCOUNT_ID: string; CF_R2_SQL_TOKEN: string; CF_R2_WAREHOUSE: string },
+  sql: string,
+  start: number,
+): Promise<QueryResult> {
+  try {
     const response = await fetchWithTimeout(
-      `https://api.sql.cloudflarestorage.com/api/v1/accounts/${accountId}/r2-sql/query/${warehouse}`,
+      `https://api.sql.cloudflarestorage.com/api/v1/accounts/${env.CF_ACCOUNT_ID}/r2-sql/query/${env.CF_R2_WAREHOUSE}`,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${env.CF_R2_SQL_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query: sql }),
@@ -158,10 +192,8 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
     }
 
     const data = await response.json() as any
-
-    // R2 SQL API returns { success, result: { schema, rows, metrics }, errors, messages }
     if (!data.success) {
-      const errors = data.errors?.map((e: any) => e.message).join(', ') || 'Unknown error'
+      const errors = data.errors?.map((entry: any) => entry.message).join(', ') || 'Unknown error'
       return { columns: [], rows: [], rowCount: 0, timing: Date.now() - start, error: errors }
     }
 
@@ -170,13 +202,10 @@ export async function queryR2SQL(env: Env, sql: string): Promise<QueryResult> {
       return { columns: [], rows: [], rowCount: 0, timing: Date.now() - start }
     }
 
-    // Extract column names from schema or fall back to row keys
     const columns: string[] = Array.isArray(result.schema)
       ? result.schema.map((col: any) => col.name)
       : Object.keys(result.rows[0])
-
-    // Rows are objects — convert to arrays matching column order
-    const rows = result.rows.map((row: any) => columns.map(col => row[col]))
+    const rows = result.rows.map((row: any) => columns.map((col) => row[col]))
 
     return {
       columns,
@@ -208,17 +237,17 @@ export interface PresetQuery {
 export const PRESET_QUERIES: PresetQuery[] = [
   {
     label: 'Daily Volume (30d)',
-    sql: `SELECT substring(timestamp, 1, 10) as day, COUNT(*) as checks\nFROM usage_events\nWHERE timestamp > NOW() - INTERVAL '30 days'\nGROUP BY day\nORDER BY day`,
+    sql: `SELECT day, SUM(checks) as checks\nFROM daily_usage_repo\nWHERE day >= date('now', '-30 days')\nGROUP BY day\nORDER BY day`,
     chart: 'line',
   },
   {
     label: 'Verdict Distribution',
-    sql: `SELECT verdict, COUNT(*) as count\nFROM usage_events\nWHERE verdict != ''\nGROUP BY verdict\nORDER BY count DESC`,
+    sql: `SELECT latest_verdict as verdict, SUM(checks) as count\nFROM daily_usage_repo\nWHERE latest_verdict != ''\nGROUP BY latest_verdict\nORDER BY count DESC`,
     chart: 'donut',
   },
   {
     label: 'Top 20 Repos',
-    sql: `SELECT repo, COUNT(*) as checks\nFROM usage_events\nWHERE repo != ''\nGROUP BY repo\nORDER BY checks DESC\nLIMIT 20`,
+    sql: `SELECT repo, SUM(checks) as checks\nFROM daily_usage_repo\nWHERE repo != ''\nGROUP BY repo\nORDER BY checks DESC\nLIMIT 20`,
     chart: 'hbar',
   },
   {
@@ -248,7 +277,7 @@ export const PRESET_QUERIES: PresetQuery[] = [
   },
   {
     label: 'Score Distribution',
-    sql: `SELECT\n  CASE\n    WHEN score >= 80 THEN 'healthy (80-100)'\n    WHEN score >= 60 THEN 'stable (60-79)'\n    WHEN score >= 40 THEN 'degraded (40-59)'\n    WHEN score >= 20 THEN 'critical (20-39)'\n    ELSE 'unmaintained (0-19)'\n  END as bucket,\n  COUNT(*) as count\nFROM result_events_v2\nGROUP BY bucket\nORDER BY count DESC`,
+    sql: `SELECT\n  CASE\n    WHEN score >= 80 THEN 'healthy (80-100)'\n    WHEN score >= 60 THEN 'stable (60-79)'\n    WHEN score >= 40 THEN 'degraded (40-59)'\n    WHEN score >= 20 THEN 'critical (20-39)'\n    ELSE 'unmaintained (0-19)'\n  END as bucket,\n  COUNT(*) as count\nFROM result_events\nGROUP BY bucket\nORDER BY count DESC`,
     chart: 'donut',
   },
   {
@@ -258,17 +287,17 @@ export const PRESET_QUERIES: PresetQuery[] = [
   },
   {
     label: 'Language Distribution',
-    sql: `SELECT language, COUNT(*) as count\nFROM provider_events_v2\nWHERE language IS NOT NULL\nGROUP BY language\nORDER BY count DESC\nLIMIT 15`,
+    sql: `SELECT json_extract(data_json, '$.data.language') as language, COUNT(*) as count\nFROM provider_events\nWHERE json_extract(data_json, '$.data.language') IS NOT NULL\nGROUP BY language\nORDER BY count DESC\nLIMIT 15`,
     chart: 'bar',
   },
   {
     label: 'Top Repos by Stars',
-    sql: `SELECT owner || '/' || repo as project, MAX(stars) as stars\nFROM provider_events_v2\nGROUP BY project\nORDER BY stars DESC\nLIMIT 20`,
+    sql: `SELECT owner || '/' || repo as project, MAX(stars) as stars\nFROM provider_events\nGROUP BY project\nORDER BY stars DESC\nLIMIT 20`,
     chart: 'hbar',
   },
   {
     label: 'Signal Averages',
-    sql: `SELECT\n  ROUND(AVG(signal_last_commit_score), 1) as last_commit,\n  ROUND(AVG(signal_last_release_score), 1) as last_release,\n  ROUND(AVG(signal_stars_score), 1) as stars,\n  ROUND(AVG(signal_ci_score), 1) as ci,\n  ROUND(AVG(signal_bus_factor_score), 1) as bus_factor,\n  ROUND(AVG(signal_issue_staleness_score), 1) as issues,\n  ROUND(AVG(signal_pr_responsiveness_score), 1) as prs,\n  ROUND(AVG(signal_recent_contributors_score), 1) as contributors\nFROM result_events_v2`,
+    sql: `SELECT\n  ROUND(AVG(json_extract(data_json, '$.data.signal_last_commit_score')), 1) as last_commit,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_last_release_score')), 1) as last_release,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_stars_score')), 1) as stars,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_ci_score')), 1) as ci,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_bus_factor_score')), 1) as bus_factor,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_issue_staleness_score')), 1) as issues,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_pr_responsiveness_score')), 1) as prs,\n  ROUND(AVG(json_extract(data_json, '$.data.signal_recent_contributors_score')), 1) as contributors\nFROM result_events`,
     chart: 'bar',
   },
 ]

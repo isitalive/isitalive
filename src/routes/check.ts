@@ -161,7 +161,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
 
     const bgTasks: Promise<unknown>[] = [
       cacheManager.put(provider, owner, repo, result, tier),
-      trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
+      trackFirstSeen(c.env, provider, owner, repo),
     ]
 
     // Always emit result/provider events on cache miss (powers trending + data freshness)

@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Cron handler — periodic aggregation + daily snapshot
 //
-// Every 10 min: Queries Iceberg for trending/tracked/sitemap, caches in KV,
+// Every 10 min: Refreshes D1 aggregate views and prunes archived hot events,
 //               and dispatches RefreshWorkflow to keep cache warm.
 //
 // Daily (6AM UTC): Dispatches the IngestWorkflow to re-check top repos.
@@ -12,6 +12,8 @@ import { refreshTrending, getTrending as getAggTrending } from '../aggregate/tre
 import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap, getSitemapRepos as getAggSitemapRepos } from '../aggregate/sitemap'
 import type { TrendingRepo } from '../aggregate/trending'
+import { pruneArchivedHotEvents } from '../queue/consumer'
+import { cleanupExpiredState } from '../db/state'
 
 // Re-export reads for consumer use (UI, sitemap route, etc.)
 export { getAggTrending as getTrending, getAggSitemapRepos as getSitemapRepos }
@@ -22,11 +24,13 @@ export type { TrendingRepo }
  */
 export async function handleScheduled(env: Env, trigger?: string): Promise<{ trending: TrendingRepo[]; sitemap: string[]; snapshots?: number; error?: string }> {
   try {
-    // Refresh materialized views from Iceberg → KV
+    // Refresh D1-backed materialized reads and cleanup expired hot/cache data
     const [trending, , sitemap] = await Promise.all([
       refreshTrending(env),
       refreshTracked(env),
       refreshSitemap(env),
+      cleanupExpiredState(env),
+      pruneArchivedHotEvents(env),
     ])
 
     // Dispatch RefreshWorkflow to keep tracked repos' score cache warm

@@ -1,13 +1,18 @@
 // ---------------------------------------------------------------------------
 // Admin data helpers — server-side functions for admin dashboards
 //
-// Reads from KV / R2 and returns structured data for the admin UI.
+// Reads from D1 and returns structured data for the admin UI.
 // Keeps route handlers thin — they just call these + render templates.
 // ---------------------------------------------------------------------------
 
 import type { Env, ApiKeyEntry } from '../types/env'
-import { getTrackedIndex, type TrackedIndex } from '../aggregate/tracked'
+import { getTrackedIndex } from '../aggregate/tracked'
 import { getTrending } from '../aggregate/trending'
+import {
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
+} from '../db/state'
 
 // ---------------------------------------------------------------------------
 // Overview stats
@@ -28,8 +33,8 @@ export async function getAdminOverview(env: Env): Promise<AdminOverview> {
   // and the legacy bare-array KV payload — reading TRENDING_KEY directly
   // would silently return 0 for the new wrapper shape.
   const [tracked, trending] = await Promise.all([
-    getTrackedIndex(env.CACHE_KV),
-    getTrending(env.CACHE_KV),
+    getTrackedIndex(env),
+    getTrending(env),
   ])
 
   let hot = 0, warm = 0, cold = 0
@@ -69,8 +74,28 @@ export interface KeyStore {
 }
 
 /**
+ * D1-backed key store.
+ * Keys are stored in D1 with sk_ prefix.
+ */
+export class D1KeyStore implements KeyStore {
+  constructor(private env: Env) {}
+
+  async list(): Promise<KeyEntry[]> {
+    return listApiKeys(this.env)
+  }
+
+  async create(name: string, tier: ApiKeyEntry['tier']): Promise<{ key: string; entry: KeyEntry }> {
+    return createApiKey(this.env, name, tier)
+  }
+
+  async revoke(keyId: string): Promise<boolean> {
+    return revokeApiKey(this.env, keyId)
+  }
+}
+
+/**
  * KV-backed key store — initial implementation.
- * Keys stored in KEYS_KV with sk_ prefix.
+ * Keys stored in KV with sk_ prefix.
  * Future: swap with StripeKeyStore without changing admin UI/API.
  */
 export class KVKeyStore implements KeyStore {
@@ -131,7 +156,7 @@ export interface TrackedRepoDisplay {
 }
 
 export async function getTrackedRepos(env: Env): Promise<TrackedRepoDisplay[]> {
-  const index = await getTrackedIndex(env.CACHE_KV)
+  const index = await getTrackedIndex(env)
   return Object.entries(index)
     .map(([repo, entry]) => ({
       repo,

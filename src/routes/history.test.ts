@@ -1,27 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../admin/r2sql', () => ({
-  queryR2SQL: vi.fn(),
-}))
-
-import { queryR2SQL } from '../admin/r2sql'
 import { app } from '../app'
-import { legacyHistoryKey } from '../state/keys'
 
-function createMockKV(store: Record<string, string> = {}): KVNamespace {
-  return {
-    get: vi.fn(async (key: string, format?: string) => {
-      const value = store[key]
-      if (!value) return null
-      return format === 'json' ? JSON.parse(value) : value
+function createMockD1(resultRows: Array<{ day: string; score: number; verdict: string }> = []) {
+  const reads: Array<{ sql: string; values: unknown[] }> = []
+
+  const prepare = vi.fn((sql: string) => ({
+    bind: (...values: unknown[]) => ({
+      all: vi.fn(async () => {
+        reads.push({ sql, values })
+        return { results: resultRows, success: true, meta: {} }
+      }),
     }),
-    put: vi.fn(async (key: string, value: string) => {
-      store[key] = value
-    }),
-    delete: vi.fn(async () => {}),
-    list: vi.fn(async () => ({ keys: [], list_complete: true, cursor: '' })),
-    getWithMetadata: vi.fn(),
-  } as any
+  }))
+
+  return { db: { prepare } as unknown as D1Database, reads, prepare }
 }
 
 const executionCtx: ExecutionContext = {
@@ -35,26 +28,15 @@ describe('/_data/history route', () => {
     vi.clearAllMocks()
   })
 
-  it('returns R2-derived aggregate history instead of stale legacy-only KV history', async () => {
-    vi.mocked(queryR2SQL).mockResolvedValueOnce({
-      columns: ['day', 'score', 'verdict'],
-      rows: [
-        ['2026-06-01', 89, 'healthy'],
-        ['2026-06-02', 91, 'healthy'],
-      ],
-      rowCount: 2,
-      timing: 12,
-    })
+  it('returns D1-derived aggregate score history', async () => {
+    const { db, reads } = createMockD1([
+      { day: '2026-06-02', score: 91, verdict: 'healthy' },
+      { day: '2026-06-01', score: 89, verdict: 'healthy' },
+    ])
 
     const response = await app.fetch(
       new Request('https://isitalive.dev/_data/history/github/Vercel/Next.js'),
-      {
-        CACHE_KV: createMockKV({
-          [legacyHistoryKey('vercel', 'next.js')]: JSON.stringify([
-            { date: '2026-05-19', score: 100, verdict: 'healthy' },
-          ]),
-        }),
-      } as any,
+      { DB: db } as any,
       executionCtx,
     )
 
@@ -66,8 +48,8 @@ describe('/_data/history route', () => {
       ],
     })
 
-    expect(queryR2SQL).toHaveBeenCalledTimes(1)
-    const sql = vi.mocked(queryR2SQL).mock.calls[0][1]
-    expect(sql).toContain("WHERE project = 'vercel/next.js'")
+    expect(reads).toHaveLength(1)
+    expect(reads[0].sql).toContain('FROM daily_result_scores')
+    expect(reads[0].values).toEqual(['vercel/next.js', 365])
   })
 })

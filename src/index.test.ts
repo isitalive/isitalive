@@ -84,7 +84,7 @@ describe('HTTP surface area hardening', () => {
   });
 
   it('accepts analytics beacons from the real site origin', async () => {
-    const send = vi.fn().mockResolvedValue(undefined);
+    const sendBatch = vi.fn().mockResolvedValue(undefined);
 
     const response = await app.fetch(
       new Request('https://isitalive.dev/_view', {
@@ -96,14 +96,14 @@ describe('HTTP surface area hardening', () => {
         body: JSON.stringify({ r: 'owner/repo', s: 75, v: 'stable' }),
       }),
       {
-        USAGE_PIPELINE: { send },
+        EVENT_QUEUE: { sendBatch },
       } as any,
       executionCtx,
     );
 
     expect(response.status).toBe(202);
     await expect(response.json()).resolves.toEqual({ ok: true });
-    expect(send).toHaveBeenCalledOnce();
+    expect(sendBatch).toHaveBeenCalledOnce();
   });
 
   it('rate limits analytics beacons when limiter blocks the request', async () => {
