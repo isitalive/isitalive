@@ -22,7 +22,7 @@
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   function formatDate(d) {
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
   }
 
   function renderChart(data) {
@@ -39,11 +39,12 @@
     });
 
     // Build fixed 30-day window ending today
-    var today = new Date();
+    var now = new Date();
+    var today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     var days = [];
     for (var i = DAYS - 1; i >= 0; i--) {
       var d = new Date(today);
-      d.setDate(d.getDate() - i);
+      d.setUTCDate(d.getUTCDate() - i);
       var key = formatDate(d);
       days.push({ date: key, score: scoreMap[key] !== undefined ? scoreMap[key] : null });
     }

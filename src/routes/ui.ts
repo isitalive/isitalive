@@ -24,7 +24,7 @@ import { getTrending, getSitemapRepos } from '../cron/handler'
 import { trendingPage } from '../ui/trending'
 import { parseChangelog as parseChangelogMd } from '../changelog/parser'
 import changelogMd from '../../CHANGELOG.md'
-import { getScoreHistory, computeTrend } from '../ingest/processor'
+import { getScoreHistory, computeTrend } from '../aggregate/history'
 import { apiDocsPage } from '../ui/api-docs'
 import { auditResultPage } from '../ui/audit-result'
 import { pricingPage } from '../ui/pricing'
@@ -271,7 +271,7 @@ ui.get('/_data/history/:provider/:owner/:repo', async (c) => {
 
   const owner = rawOwner.toLowerCase()
   const repo = rawRepo.toLowerCase()
-  const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
+  const history = await getScoreHistory(c.env, owner, repo)
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.json({ history })
@@ -638,7 +638,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       ]))
       const [firstIndexed, history] = await Promise.all([
         getFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-        getScoreHistory(c.env.CACHE_KV, owner, repo),
+        getScoreHistory(c.env, owner, repo),
       ])
       const trend = computeTrend(history)
       c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
@@ -671,7 +671,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
     const [firstIndexed, history] = await Promise.all([
       getFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-      getScoreHistory(c.env.CACHE_KV, owner, repo),
+      getScoreHistory(c.env, owner, repo),
     ])
     const trend = computeTrend(history)
     

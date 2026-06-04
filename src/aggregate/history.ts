@@ -7,7 +7,7 @@
 
 import type { Env } from '../types/env'
 import { queryR2SQL } from '../admin/r2sql'
-import { historyKey } from '../state/keys'
+import { historyKey, legacyHistoryKey } from '../state/keys'
 
 /** Score snapshot — one data point per day */
 export interface ScoreSnapshot {
@@ -28,6 +28,20 @@ export interface Trend {
 
 const MIN_TREND_DAYS = 7
 const TREND_THRESHOLD = 5
+const HISTORY_CACHE_TTL_SECONDS = 21600
+
+async function getLegacyScoreHistory(
+  env: Env,
+  owner: string,
+  repo: string,
+): Promise<ScoreSnapshot[]> {
+  try {
+    const legacy = await env.CACHE_KV.get(legacyHistoryKey(owner, repo), 'json') as ScoreSnapshot[] | null
+    return legacy ?? []
+  } catch {
+    return []
+  }
+}
 
 /**
  * Get score history for a repo. Reads from KV cache first,
@@ -50,7 +64,7 @@ export async function getScoreHistory(
   const repoSlug = `${owner}/${repo}`.toLowerCase()
   const sql = `
     SELECT
-      DATE(timestamp) as day,
+      substring(timestamp, 1, 10) as day,
       CAST(AVG(score) AS INTEGER) as score,
       MAX(verdict) as verdict
     FROM result_events_v2
@@ -63,7 +77,7 @@ export async function getScoreHistory(
 
   const result = await queryR2SQL(env, sql)
   if (result.error || result.rows.length === 0) {
-    return []
+    return getLegacyScoreHistory(env, owner, repo)
   }
 
   const history: ScoreSnapshot[] = result.rows.map(row => ({
@@ -74,7 +88,7 @@ export async function getScoreHistory(
 
   // Cache for 6 hours (refreshed by cron daily snapshot)
   await env.CACHE_KV.put(key, JSON.stringify(history), {
-    expirationTtl: 21600,
+    expirationTtl: HISTORY_CACHE_TTL_SECONDS,
   })
 
   return history
