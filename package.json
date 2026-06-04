@@ -16,14 +16,14 @@
     "test:fuzz": "FC_NUM_RUNS=10000 vitest run"
   },
   "dependencies": {
-    "hono": "^4.7.0"
+    "hono": "^4.12.23"
   },
   "devDependencies": {
-    "@types/node": "^24.6.0",
-    "@fast-check/vitest": "^0.3.0",
-    "fast-check": "^4.6.0",
-    "typescript": "^5.8.0",
-    "vitest": "^3.0.0",
-    "wrangler": "^4.5.0"
+    "@fast-check/vitest": "^0.4.1",
+    "@types/node": "^25.9.1",
+    "fast-check": "^4.8.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "wrangler": "^4.97.0"
   }
 }
