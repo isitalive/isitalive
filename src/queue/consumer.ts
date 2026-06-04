@@ -177,8 +177,14 @@ function usageStatements(db: D1Database, event: UsageEvent, archivedAt: string):
         WHERE changes() = 1
         ON CONFLICT(day, repo, source) DO UPDATE SET
           checks = daily_usage_repo.checks + 1,
-          latest_score = excluded.latest_score,
-          latest_verdict = excluded.latest_verdict,
+          latest_score = CASE
+            WHEN excluded.last_seen >= daily_usage_repo.last_seen THEN excluded.latest_score
+            ELSE daily_usage_repo.latest_score
+          END,
+          latest_verdict = CASE
+            WHEN excluded.last_seen >= daily_usage_repo.last_seen THEN excluded.latest_verdict
+            ELSE daily_usage_repo.latest_verdict
+          END,
           last_seen = MAX(daily_usage_repo.last_seen, excluded.last_seen)
       `)
       .bind(day, data.repo, data.provider, data.source, data.score, data.verdict, event.timestamp),
@@ -226,8 +232,14 @@ function resultStatements(db: D1Database, event: ResultEvent, archivedAt: string
         ON CONFLICT(day, project) DO UPDATE SET
           score_sum = daily_result_scores.score_sum + excluded.score_sum,
           score_count = daily_result_scores.score_count + 1,
-          latest_score = excluded.latest_score,
-          latest_verdict = excluded.latest_verdict,
+          latest_score = CASE
+            WHEN excluded.last_seen >= daily_result_scores.last_seen THEN excluded.latest_score
+            ELSE daily_result_scores.latest_score
+          END,
+          latest_verdict = CASE
+            WHEN excluded.last_seen >= daily_result_scores.last_seen THEN excluded.latest_verdict
+            ELSE daily_result_scores.latest_verdict
+          END,
           last_seen = MAX(daily_result_scores.last_seen, excluded.last_seen)
       `)
       .bind(day, data.project, data.score, data.score, data.verdict, event.timestamp),

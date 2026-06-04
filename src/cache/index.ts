@@ -20,6 +20,7 @@
 import type { ScoringResult } from '../scoring/types';
 import type { Env } from '../types/env';
 import { METHODOLOGY } from '../scoring/methodology';
+import { readReplicaSession } from '../db/d1'
 export { trackFirstSeen, getFirstSeen } from '../db/state'
 
 const CACHE_PREFIX = `isitalive:${METHODOLOGY.version}:`;
@@ -186,7 +187,8 @@ export class CacheManager {
 
     if (db) {
       try {
-        const row = await db
+        const reader = readReplicaSession(db)
+        const row = await reader
           .prepare('SELECT result_json, stored_at, expires_at FROM score_cache WHERE cache_key = ?')
           .bind(key)
           .first<ScoreCacheRow>()

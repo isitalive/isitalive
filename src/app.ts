@@ -15,6 +15,7 @@ import { ui } from './routes/ui';
 import { openApiSpec } from './routes/openapi';
 import { llmsTxt, llmsFullTxt } from './routes/llms';
 import { aiPluginManifest } from './routes/aiPlugin';
+import { d1ReplicationDiagnostic, readReplicaSession, type D1ReplicationDiagnostic } from './db/d1'
 
 const HEALTH_PROBE_TIMEOUT_MS = 500;
 
@@ -112,23 +113,33 @@ app.get('/health', async (c) => {
   const start = Date.now();
   let db: 'ok' | 'degraded' = 'degraded';
   let kv: 'ok' | 'degraded' | undefined;
+  let d1: D1ReplicationDiagnostic | undefined;
   try {
     const legacyKv = (c.env as unknown as { CACHE_KV?: KVNamespace }).CACHE_KV
-    const probe = c.env.DB
-      ? c.env.DB.prepare('SELECT 1').first()
-      : legacyKv
-        ? legacyKv.get('health:ping')
-        : Promise.reject(new Error('no storage binding configured'))
-    await Promise.race([
-      probe,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health probe timeout')), HEALTH_PROBE_TIMEOUT_MS)),
-    ]);
+    if (c.env.DB) {
+      const reader = readReplicaSession(c.env.DB)
+      const result = await Promise.race([
+        reader.prepare('SELECT 1 as ok').all<{ ok: number }>(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health probe timeout')), HEALTH_PROBE_TIMEOUT_MS)),
+      ])
+      d1 = d1ReplicationDiagnostic(reader, result)
+    } else if (legacyKv) {
+      await Promise.race([
+        legacyKv.get('health:ping'),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health probe timeout')), HEALTH_PROBE_TIMEOUT_MS)),
+      ])
+    } else {
+      throw new Error('no storage binding configured')
+    }
     db = 'ok';
     if (!c.env.DB) kv = 'ok';
   } catch {
     if (!c.env.DB) kv = 'degraded';
   }
-  return c.json({ status: db, db, kv, version, probeMs: Date.now() - start }, db === 'ok' ? 200 : 503);
+  const body = d1
+    ? { status: db, db, kv, version, probeMs: Date.now() - start, d1 }
+    : { status: db, db, kv, version, probeMs: Date.now() - start }
+  return c.json(body, db === 'ok' ? 200 : 503);
 });
 
 // Global error handler — content-negotiated response for unhandled exceptions.

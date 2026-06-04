@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// Fuzz tests for R2 SQL validation — security-focused property invariants
+// Fuzz tests for D1 SQL validation — security-focused property invariants
 // ---------------------------------------------------------------------------
 
 import { describe, expect, it } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { validateReadOnly } from './r2sql'
+import { validateReadOnly } from './d1sql'
 
 const dangerousKeyword = fc.constantFrom(
   'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE',

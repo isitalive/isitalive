@@ -20,7 +20,7 @@ class QueueTimeoutError extends Error {
 
 /** Fire-and-forget enqueue with per-attempt timeout + bounded retry. Errors are absorbed. */
 export async function sendWithRetry(
-  send: () => Promise<void>,
+  send: () => Promise<unknown>,
   label: string,
 ): Promise<void> {
   for (let attempt = 0; attempt <= QUEUE_RETRY_DELAYS_MS.length; attempt++) {

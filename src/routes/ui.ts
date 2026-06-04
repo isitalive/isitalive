@@ -187,12 +187,10 @@ ui.post('/_view', async (c) => {
     }
 
     const [owner, repo] = repoSlug.split('/')
-    const score = typeof body.s === 'number' ? body.s : 0
-    const verdict = typeof body.v === 'string' ? body.v : 'unknown'
 
     // Pipeline: usage event for page view
     c.executionCtx.waitUntil(
-      emitAll(c.env, { usage: [buildPageViewUsageEvent('github', owner, repo, score, verdict)] }),
+      emitAll(c.env, { usage: [buildPageViewUsageEvent('github', owner, repo, 0, 'unknown')] }),
     )
 
     return c.json({ ok: true }, 202)

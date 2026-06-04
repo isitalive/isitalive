@@ -1,5 +1,6 @@
 import type { Env, ApiKeyEntry } from '../types/env'
 import type { RecentQuery } from '../cache/recentQueries'
+import { readPrimarySession, readReplicaSession } from './d1'
 
 type LegacyKvEnv = { CACHE_KV?: KVNamespace; KEYS_KV?: KVNamespace; WAITLIST_KV?: KVNamespace }
 export type StateStore = Env | D1Database | KVNamespace | LegacyKvEnv
@@ -68,7 +69,8 @@ function isExpired(expiresAt: number | null): boolean {
 export async function cacheGetText(store: StateStore, key: string): Promise<string | null> {
   const db = asDb(store)
   if (db) {
-    const row = await db
+    const reader = readReplicaSession(db)
+    const row = await reader
       .prepare('SELECT value_text, expires_at FROM system_cache WHERE cache_key = ?')
       .bind(key)
       .first<SystemCacheRow>()
@@ -144,7 +146,8 @@ export async function cacheDelete(store: StateStore, key: string): Promise<void>
 export async function auditCacheGetText(store: StateStore, key: string): Promise<string | null> {
   const db = asDb(store)
   if (db) {
-    const row = await db
+    const reader = readReplicaSession(db)
+    const row = await reader
       .prepare('SELECT result_json, expires_at FROM audit_cache WHERE cache_key = ?')
       .bind(key)
       .first<AuditCacheRow>()
@@ -207,7 +210,8 @@ export async function getFirstSeen(
   const normalizedRepo = repo.toLowerCase()
 
   if (db) {
-    const row = await db
+    const reader = readReplicaSession(db)
+    const row = await reader
       .prepare('SELECT first_seen FROM first_seen WHERE provider = ? AND owner = ? AND repo = ?')
       .bind(provider, normalizedOwner, normalizedRepo)
       .first<{ first_seen: string }>()
@@ -252,7 +256,8 @@ export async function trackFirstSeen(
 export async function getRecentQueries(store: StateStore, limit = 10): Promise<RecentQuery[]> {
   const db = asDb(store)
   if (db) {
-    const result = await db
+    const reader = readReplicaSession(db)
+    const result = await reader
       .prepare(`
         SELECT owner, repo, score, verdict, checked_at
         FROM recent_queries
@@ -328,7 +333,8 @@ export async function trackRecentQuery(
 export async function getApiKey(store: StateStore, keyId: string): Promise<ApiKeyEntry | null> {
   const db = asDb(store)
   if (db) {
-    const row = await db
+    const reader = readPrimarySession(db)
+    const row = await reader
       .prepare('SELECT key_id, tier, name, active, created FROM api_keys WHERE key_id = ?')
       .bind(keyId)
       .first<ApiKeyRow>()
@@ -348,7 +354,8 @@ export async function getApiKey(store: StateStore, keyId: string): Promise<ApiKe
 export async function listApiKeys(store: StateStore): Promise<KeyEntry[]> {
   const db = asDb(store)
   if (db) {
-    const result = await db
+    const reader = readPrimarySession(db)
+    const result = await reader
       .prepare('SELECT key_id, tier, name, active, created FROM api_keys ORDER BY created DESC')
       .all<ApiKeyRow>()
     return result.results.map((row) => ({
@@ -455,7 +462,8 @@ export async function getOidcQuota(
   const period = new Date().toISOString().slice(0, 7)
 
   if (db) {
-    const row = await db
+    const reader = readPrimarySession(db)
+    const row = await reader
       .prepare('SELECT used FROM monthly_oidc_usage WHERE period = ? AND repository = ?')
       .bind(period, repository)
       .first<{ used: number }>()

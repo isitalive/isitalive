@@ -10,7 +10,7 @@ import type { Env } from '../types/env'
 import { timingSafeEqual, sha256Hex } from '../utils/crypto'
 import { adminAuth, createSession, setSessionCookie, clearSessionCookie } from '../middleware/admin-auth'
 import { D1KeyStore, getAdminOverview } from '../admin/data'
-import { queryR2SQL } from '../admin/r2sql'
+import { queryD1SQL } from '../admin/d1sql'
 import { adminLoginPage } from '../ui/admin-login'
 import { adminOverviewPage } from '../ui/admin-overview'
 import { adminKeysPage } from '../ui/admin-keys'
@@ -20,6 +20,7 @@ import { handleScheduled } from '../cron/handler'
 import { refreshTrending } from '../aggregate/trending'
 import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap } from '../aggregate/sitemap'
+import { d1ReplicationDiagnostic, readPrimarySession, readReplicaSession } from '../db/d1'
 import type { ApiKeyEntry } from '../types/env'
 
 /**
@@ -118,6 +119,25 @@ admin.post('/api/sitemap', async (c) => {
   return c.json({ ok: true, count: sitemap.length })
 })
 
+admin.get('/api/d1-replication', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ ok: false, error: 'D1 is not configured' }, 503)
+  }
+
+  const firstUnconstrained = readReplicaSession(c.env.DB)
+  const firstPrimary = readPrimarySession(c.env.DB)
+  const [unconstrainedResult, primaryResult] = await Promise.all([
+    firstUnconstrained.prepare('SELECT 1 as ok').all<{ ok: number }>(),
+    firstPrimary.prepare('SELECT 1 as ok').all<{ ok: number }>(),
+  ])
+
+  return c.json({
+    ok: true,
+    first_unconstrained: d1ReplicationDiagnostic(firstUnconstrained, unconstrainedResult),
+    first_primary: d1ReplicationDiagnostic(firstPrimary, primaryResult),
+  })
+})
+
 // Dispatch ingest workflow
 admin.post('/api/ingest', async (c) => {
   try {
@@ -192,12 +212,12 @@ admin.post('/api/keys/:keyId/revoke', async (c) => {
   return c.html(adminKeysPage(keys, { type: 'error', message: 'Key not found.' }))
 })
 
-// R2 SQL Query Console page
+// D1 SQL Query Console page
 admin.get('/query', (c) => {
   return c.html(adminQueryPage())
 })
 
-// R2 SQL Query API
+// D1 SQL Query API
 admin.post('/api/query', async (c) => {
   try {
     const body = await c.req.json() as { sql?: string }
@@ -207,7 +227,7 @@ admin.post('/api/query', async (c) => {
       return c.json({ error: 'SQL query is required', columns: [], rows: [], rowCount: 0, timing: 0 }, 400)
     }
 
-    const result = await queryR2SQL(c.env, sql)
+    const result = await queryD1SQL(c.env, sql)
     return c.json(result)
   } catch (err: any) {
     return c.json({ error: `Invalid request: ${err.message}`, columns: [], rows: [], rowCount: 0, timing: 0 }, 400)
