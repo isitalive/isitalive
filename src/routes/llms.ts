@@ -17,7 +17,7 @@ const cacheStatusTable = CACHE_STATUS_DEFINITIONS
 
 export const llmsTxt = `# Is It Alive?
 
-> Check if an open-source project looks actively maintained.
+> Check whether an open-source dependency still looks maintained before a human or AI agent builds on it.
 
 ## API
 
@@ -26,7 +26,7 @@ Base URL: https://isitalive.dev
 ### Check Project Health
 \`GET /api/check/{provider}/{owner}/{repo}\`
 
-Returns a maintenance-health score (0-100), verdict, methodology metadata, signal breakdown, and top score drivers.
+Returns a maintenance-health score (0-100), verdict, methodology metadata, signal breakdown, and top score drivers for dependency decisions.
 
 **Example:**
 \`\`\`
@@ -48,7 +48,7 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 ### Audit Dependency Manifest
 \`POST /api/manifest\`
 
-**Requires authentication** (API key). Upload a go.mod or package.json and get a scored health report for every dependency. Synchronous, idempotent, cache-first.
+**Requires authentication** (API key). Upload a go.mod or package.json and get a scored maintenance-health report for every dependency. Synchronous, idempotent, cache-first.
 
 **Optional query params:**
 - \`include=drivers\`: include per-dependency top drivers
@@ -93,7 +93,7 @@ Returns an SVG badge for README embedding.
 
 ## Authentication
 
-Optional for health checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` for higher rate limits and access to all endpoints.
+Optional for project checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` for higher rate limits and access to all endpoints.
 
 Rate limiting is infrastructure protection (not billing). Usage quotas are tracked separately.
 
@@ -106,7 +106,7 @@ Rate limiting is infrastructure protection (not billing). Usage quotas are track
 
 Methodology version: \`${METHODOLOGY.version}\`
 
-The score is a **maintenance-health** signal only. It is not a security, license, or compliance verdict.
+The score is a **maintenance-health** signal only. It helps humans and AI agents judge maintainer activity and project durability before choosing dependencies. It is not a security, license, or compliance verdict.
 
 | Signal | Weight | Measurement | What it measures |
 |--------|--------|-------------|------------------|

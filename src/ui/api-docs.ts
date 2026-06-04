@@ -62,10 +62,10 @@ export function apiDocsPage(analyticsToken?: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>API Reference — Is It Alive?</title>
-  <meta name="description" content="API documentation for Is It Alive? — inspect maintenance-health scores, evidence, and cache behavior with a single HTTP request.">
+  <meta name="description" content="API documentation for Is It Alive? — let humans and AI agents inspect dependency maintenance-health with a single HTTP request.">
   ${ogTags({
     title: 'API Reference — Is It Alive?',
-    description: 'API documentation for Is It Alive? — inspect maintenance-health scores, evidence, and cache behavior with a single HTTP request.',
+    description: 'API documentation for Is It Alive? — let humans and AI agents inspect dependency maintenance-health with a single HTTP request.',
     url: 'https://isitalive.dev/api',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -305,22 +305,22 @@ export function apiDocsPage(analyticsToken?: string): string {
 
   <div class="container">
     <h1>📡 API Reference</h1>
-    <p class="page-subtitle">Inspect the maintenance-health of any open-source project, with methodology metadata and agent-readable evidence.</p>
+    <p class="page-subtitle">Inspect dependency maintenance-health before a human or AI agent recommends, adds, or audits a package.</p>
 
     <h2>Base URL</h2>
     <div class="code-block">https://isitalive.dev</div>
 
     <h2>Authentication</h2>
-    <p>Authentication is optional for health checks and badges. It is <strong>required</strong> for the manifest audit endpoint. Use an API key for all repos, or GitHub Actions OIDC for public-repo audits:</p>
+    <p>Authentication is optional for project checks and badges. It is <strong>required</strong> for the manifest audit endpoint. Use an API key for all repos, or GitHub Actions OIDC for public-repo audits:</p>
     <div class="code-block"><span class="comment"># Add to any request</span><br>Authorization: Bearer sk_your_api_key</div>
 
     <h2>Endpoints</h2>
 
-    <h3>Check Project Health</h3>
+    <h3>Check Project Maintenance</h3>
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>
       <span class="endpoint-path">/api/check/{provider}/{owner}/{repo}</span>
-      <p class="endpoint-desc">Returns a 0-100 maintenance-health score, verdict, methodology metadata, top drivers, and signal evidence for any GitHub repository. Add <span class="inline-code">?include=metrics</span> when you need normalized raw measurements.</p>
+      <p class="endpoint-desc">Returns a 0-100 maintenance-health score, verdict, methodology metadata, top drivers, and signal evidence for any GitHub repository. Use it before recommending, adding, or automating a dependency. Add <span class="inline-code">?include=metrics</span> when you need normalized raw measurements.</p>
 
       <table class="params-table">
         <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
@@ -416,7 +416,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </table>
 
     <div class="note-box">
-      This is a <strong>maintenance-health</strong> score only. It helps humans and AI agents judge maintainer activity and project durability. It is not a security, license, or compliance verdict.
+      This is a <strong>maintenance-health</strong> score only. It helps humans and AI agents judge maintainer activity and project durability before choosing dependencies. It is not a security, license, or compliance verdict.
     </div>
 
     <h3>Audit Dependency Manifest</h3>
@@ -482,7 +482,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>
       <span class="endpoint-path">/api/badge/{provider}/{owner}/{repo}</span>
-      <p class="endpoint-desc">Returns an SVG health badge for README embedding. Edge-cached for 24 hours.</p>
+      <p class="endpoint-desc">Returns an SVG maintenance-health badge for README embedding. Edge-cached for 24 hours.</p>
     </div>
 
     <div class="code-block"><span class="comment"># Markdown</span><br>[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)<br><br><span class="comment"># HTML</span><br>&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;<br>&nbsp;&nbsp;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;<br>&lt;/a&gt;</div>

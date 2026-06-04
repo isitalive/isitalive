@@ -57,7 +57,9 @@ src/
 
 ## PR and commit conventions
 
-- Commit messages: `type(scope): description` (e.g., `feat(github): add PR comments`)
+- Use Conventional Commit style for both PR titles and commit messages: `type(scope): description`.
+- PR titles should be semantic-release friendly because the squash/merge title may drive versioning and changelog output.
+- Prefer standard types such as `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, or `ci`; include a concise scope when useful, for example `fix(ui): handle missing recent queries`.
 - Keep PRs focused — one feature or fix per PR
 - Update `CHANGELOG.md` for user-facing changes
 

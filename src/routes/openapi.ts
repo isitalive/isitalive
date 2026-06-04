@@ -9,7 +9,7 @@ export const openApiSpec = {
   info: {
     title: 'Is It Alive? API',
     version: '0.7.2',
-    description: 'Check the maintenance-health of open-source GitHub projects. Returns a weighted 0-100 maintenance-health score, verdict, methodology metadata, and agent-readable evidence. This is not a security, license, or compliance verdict.',
+    description: 'Check the maintenance-health of open-source GitHub projects before humans or AI agents choose a dependency. Returns a weighted 0-100 score, verdict, methodology metadata, and agent-readable evidence. This is not a security, license, or compliance verdict.',
     license: {
       name: 'AGPL-3.0',
       url: 'https://www.gnu.org/licenses/agpl-3.0.html',
@@ -28,8 +28,8 @@ export const openApiSpec = {
     '/api/check/{provider}/{owner}/{repo}': {
       get: {
         operationId: 'checkProject',
-        summary: 'Check project health',
-        description: 'Returns a health score, verdict, signal breakdown, and cache metadata for the specified open-source project. Results are cached with tiered TTLs based on your API key tier.',
+        summary: 'Check project maintenance',
+        description: 'Returns a maintenance-health score, verdict, signal breakdown, and cache metadata for the specified open-source project. Use before recommending, adding, or auditing a dependency. Results are cached with tiered TTLs based on your API key tier.',
         parameters: [
           {
             name: 'provider',
@@ -63,7 +63,7 @@ export const openApiSpec = {
         security: [{ bearerAuth: [] }, {}],
         responses: {
           '200': {
-            description: 'Project health check result',
+            description: 'Project maintenance-health check result',
             headers: {
               'X-Cache': {
                 description: 'Cache status header used by the route handler. `L2-STALE-DEGRADED` means the upstream provider was unavailable and the response was served from the last known cache (within a 7-day fallback window); such responses also set `Cache-Control: no-store` and include `degraded: true` in the body.',
@@ -246,8 +246,8 @@ export const openApiSpec = {
     '/api/badge/{provider}/{owner}/{repo}': {
       get: {
         operationId: 'getBadge',
-        summary: 'Get SVG health badge',
-        description: 'Returns an SVG badge showing the project health score. Use in README files with `![Is It Alive?](https://isitalive.dev/api/badge/github/owner/repo)`.',
+        summary: 'Get SVG maintenance badge',
+        description: 'Returns an SVG badge showing the project maintenance-health score. Use in README files with `![Is It Alive?](https://isitalive.dev/api/badge/github/owner/repo)`.',
         parameters: [
           {
             name: 'provider',
@@ -284,7 +284,7 @@ export const openApiSpec = {
       post: {
         operationId: 'auditManifest',
         summary: 'Audit dependency manifest',
-        description: 'Upload a go.mod or package.json file and receive a scored health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
+        description: 'Upload a go.mod or package.json file and receive a scored maintenance-health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -426,7 +426,7 @@ export const openApiSpec = {
             type: 'integer',
             minimum: 0,
             maximum: 100,
-            description: 'Weighted health score',
+            description: 'Weighted maintenance-health score',
           },
           verdict: {
             type: 'string',
@@ -448,7 +448,7 @@ export const openApiSpec = {
           signals: {
             type: 'array',
             items: { $ref: '#/components/schemas/Signal' },
-            description: 'Individual health signals that make up the score',
+            description: 'Individual maintenance signals that make up the score',
           },
           drivers: {
             type: 'array',
@@ -660,7 +660,7 @@ export const openApiSpec = {
           dev: { type: 'boolean', description: 'Whether this is a dev/indirect dependency' },
           ecosystem: { type: 'string', enum: ['go', 'npm'] },
           github: { type: 'string', nullable: true, description: 'Resolved GitHub owner/repo (e.g. "vercel/next.js") or null' },
-          score: { type: 'integer', nullable: true, description: 'Health score 0-100, or null if unresolved' },
+          score: { type: 'integer', nullable: true, description: 'Maintenance-health score 0-100, or null if unresolved' },
           verdict: { type: 'string', enum: ['healthy', 'stable', 'degraded', 'critical', 'unmaintained', 'pending', 'unresolved'] },
           resolvedFrom: { type: 'string', nullable: true, enum: ['direct', 'vanity', 'registry', 'cache', null], description: 'How the dependency was resolved to GitHub' },
           checkedAt: { type: 'string', format: 'date-time', nullable: true, description: 'When the underlying repo score was computed' },

@@ -150,7 +150,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Dependency Audit — Is It Alive?</title>
-  <meta name="description" content="Dependency health audit: ${result.scored} of ${result.total} dependencies scored, avg score ${avgScore}/100. Checked by Is It Alive?">
+  <meta name="description" content="Dependency maintenance audit: ${result.scored} of ${result.total} dependencies scored, avg score ${avgScore}/100. Checked by Is It Alive?">
   ${ogTags({
     title: 'Dependency Health Audit — Is It Alive?',
     description: `${result.scored}/${result.total} dependencies scored, avg score ${avgScore}/100`,
@@ -474,7 +474,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
     <div class="install-cta">
       <div class="install-cta-text">
         <h2>🚀 Automate this in CI</h2>
-        <p>Add dependency health checks to every pull request. Zero config for public repos.</p>
+        <p>Catch stale or abandoned dependencies on every pull request. Zero config for public repos.</p>
         <div class="install-cta-sub">Free for public repos · No API key needed · Powered by OIDC</div>
       </div>
       <a href="${escapeHtml(installUrl)}" class="install-cta-btn" target="_blank" rel="noopener">

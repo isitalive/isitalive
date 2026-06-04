@@ -959,7 +959,7 @@ export const footerHtml = `
     <div class="footer-top">
       <div class="footer-brand">
         <a href="/" class="footer-logo"><span class="brand-dot"></span>Is It Alive</a>
-        <p class="footer-tagline">Open-source health, one score at a time.</p>
+        <p class="footer-tagline">Maintenance signals for dependency decisions.</p>
       </div>
       <div class="footer-links">
         <div class="footer-col">

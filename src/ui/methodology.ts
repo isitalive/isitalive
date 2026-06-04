@@ -86,10 +86,10 @@ export function methodologyPage(analyticsToken?: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>How We Score — Is It Alive?</title>
-  <meta name="description" content="Understand how Is It Alive? calculates open-source project health scores. 8 weighted signals, transparent methodology.">
+  <meta name="description" content="Understand how Is It Alive? calculates maintenance-health scores for open-source dependency decisions. 8 weighted signals, transparent methodology.">
   ${ogTags({
     title: 'How We Score — Is It Alive?',
-    description: 'Understand how Is It Alive? calculates open-source project health scores. 8 weighted signals, transparent methodology.',
+    description: 'Understand how Is It Alive? calculates maintenance-health scores for open-source dependency decisions. 8 weighted signals, transparent methodology.',
     url: 'https://isitalive.dev/methodology',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -340,7 +340,7 @@ export function methodologyPage(analyticsToken?: string): string {
     <h1>How We Score</h1>
     <p class="intro">${METHODOLOGY.description} Every project is evaluated across 8 weighted GitHub-backed signals and combined into a single 0-100 score.</p>
     <div class="note-box">
-      <strong>Scope:</strong> This is a maintenance-health score. It is designed to help humans and AI agents decide whether a dependency looks actively maintained. It is not a security, license, or compliance verdict.
+      <strong>Scope:</strong> This is a maintenance-health score. It is designed to help humans and AI agents decide whether a dependency still looks actively maintained. It is not a security, license, or compliance verdict.
     </div>
 
     <!-- Weight visualization bar -->
