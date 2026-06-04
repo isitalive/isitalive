@@ -79,24 +79,29 @@ async function queryTrending(db: D1Database, days: number): Promise<TrendingRepo
  */
 export async function refreshTrending(env: Env): Promise<TrendingRepo[]> {
   const db = dbFrom(env)
-  if (!db) return getTrending(env)
+  if (db) {
+    try {
+      for (const window of WINDOW_TIERS) {
+        const repos = await queryTrending(db, window.days)
+        if (repos.length === 0) continue
 
-  for (const window of WINDOW_TIERS) {
-    const repos = await queryTrending(db, window.days)
-    if (repos.length === 0) continue
+        const payload: TrendingCache = {
+          repos,
+          generatedAt: new Date().toISOString(),
+          windowUsed: window.label,
+          degraded: window.label !== '24 hours',
+        }
 
-    const payload: TrendingCache = {
-      repos,
-      generatedAt: new Date().toISOString(),
-      windowUsed: window.label,
-      degraded: window.label !== '24 hours',
+        await cachePutJson(env, TRENDING_KEY, payload, { expirationTtl: 7200 })
+        return repos
+      }
+    } catch {
+      // Fall through to the last-known-good cache.
     }
-
-    await cachePutJson(env, TRENDING_KEY, payload, { expirationTtl: 7200 })
-    return repos
   }
 
-  return getTrending(env)
+  const cache = await readStoredTrendingCache(env)
+  return cache.repos
 }
 
 export async function getTrending(store: StateStore): Promise<TrendingRepo[]> {
@@ -107,19 +112,27 @@ export async function getTrending(store: StateStore): Promise<TrendingRepo[]> {
 export async function getTrendingCache(store: StateStore): Promise<TrendingCache> {
   const db = dbFrom(store)
   if (db) {
-    for (const window of WINDOW_TIERS) {
-      const repos = await queryTrending(db, window.days)
-      if (repos.length > 0) {
-        return {
-          repos,
-          generatedAt: new Date().toISOString(),
-          windowUsed: window.label as WindowLabel,
-          degraded: window.label !== '24 hours',
+    try {
+      for (const window of WINDOW_TIERS) {
+        const repos = await queryTrending(db, window.days)
+        if (repos.length > 0) {
+          return {
+            repos,
+            generatedAt: new Date().toISOString(),
+            windowUsed: window.label as WindowLabel,
+            degraded: window.label !== '24 hours',
+          }
         }
       }
+    } catch {
+      // Fall through to the last-known-good cache.
     }
   }
 
+  return readStoredTrendingCache(store)
+}
+
+async function readStoredTrendingCache(store: StateStore): Promise<TrendingCache> {
   const raw = await cacheGetJson<TrendingCache | TrendingRepo[]>(store, TRENDING_KEY)
   if (!raw) return emptyCache()
   if (Array.isArray(raw)) {

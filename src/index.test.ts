@@ -65,6 +65,19 @@ describe('HTTP surface area hardening', () => {
     expect(body.kv).toBe('degraded');
   });
 
+  it('returns 503 from /health when no storage binding is configured', async () => {
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/health'),
+      {} as any,
+      executionCtx,
+    );
+
+    expect(response.status).toBe(503);
+    const body = await response.json() as { status: string; kv: string };
+    expect(body.status).toBe('degraded');
+    expect(body.kv).toBe('degraded');
+  });
+
   it('rejects analytics beacons from lookalike origins', async () => {
     const response = await app.fetch(
       new Request('https://isitalive.dev/_view', {

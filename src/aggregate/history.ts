@@ -45,28 +45,8 @@ export async function appendScoreHistory(
 ): Promise<void> {
   const db = dbFrom(store)
   if (db) {
-    await db
-      .prepare(`
-        INSERT INTO daily_result_scores (
-          day, project, score_sum, score_count, latest_score, latest_verdict, last_seen
-        )
-        VALUES (?, ?, ?, 1, ?, ?, ?)
-        ON CONFLICT(day, project) DO UPDATE SET
-          score_sum = daily_result_scores.score_sum + excluded.score_sum,
-          score_count = daily_result_scores.score_count + 1,
-          latest_score = excluded.latest_score,
-          latest_verdict = excluded.latest_verdict,
-          last_seen = MAX(daily_result_scores.last_seen, excluded.last_seen)
-      `)
-      .bind(
-        snapshot.date,
-        repoSlug.toLowerCase(),
-        snapshot.score,
-        snapshot.score,
-        snapshot.verdict,
-        new Date().toISOString(),
-      )
-      .run()
+    // D1 daily_result_scores is written by the queue consumer so result events
+    // and cron snapshots cannot double-count the same score.
     return
   }
 

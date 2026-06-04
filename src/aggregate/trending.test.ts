@@ -19,14 +19,25 @@ function createMockKV(store: Record<string, string> = {}): KVNamespace {
   } as any
 }
 
-function createMockD1(resultSets: Array<Array<{ repo: string; checks: number; score: number; verdict: string }>>) {
+function createMockD1(
+  resultSets: Array<Array<{ repo: string; checks: number; score: number; verdict: string }> | Error>,
+  firstRows: Array<unknown> = [],
+) {
   const writes: Array<{ sql: string; values: unknown[] }> = []
   const reads: Array<{ sql: string; values: unknown[] }> = []
   const prepare = vi.fn((sql: string) => ({
     bind: (...values: unknown[]) => ({
       all: vi.fn(async () => {
         reads.push({ sql, values })
-        return { results: resultSets.shift() ?? [], success: true, meta: {} }
+        const next = resultSets.shift()
+        if (next instanceof Error) throw next
+        return { results: next ?? [], success: true, meta: {} }
+      }),
+      first: vi.fn(async () => {
+        reads.push({ sql, values })
+        const next = firstRows.shift()
+        if (next instanceof Error) throw next
+        return next ?? null
       }),
       run: vi.fn(async () => {
         writes.push({ sql, values })
@@ -100,5 +111,25 @@ describe('aggregate/trending', () => {
     expect(cache.repos).toEqual(legacy)
     expect(cache.windowUsed).toBe('24 hours')
     expect(cache.degraded).toBe(false)
+  })
+
+  it('getTrendingCache falls back to stored cache when D1 rollup reads fail', async () => {
+    const cached = {
+      repos: [{ repo: 'cloudflare/workers-sdk', score: 88, verdict: 'healthy' }],
+      generatedAt: '2026-06-04T00:00:00.000Z',
+      windowUsed: '24 hours' as const,
+      degraded: false,
+    }
+    const { db, reads } = createMockD1(
+      [new Error('daily rollup unavailable')],
+      [{ value_text: JSON.stringify(cached), expires_at: Date.now() + 60_000 }],
+    )
+
+    await expect(getTrendingCache({ DB: db } as any)).resolves.toEqual(cached)
+
+    expect(reads).toHaveLength(2)
+    expect(reads[0].sql).toContain('FROM daily_usage_repo')
+    expect(reads[1].sql).toContain('FROM system_cache')
+    expect(reads[1].values).toEqual([TRENDING_KEY])
   })
 })
