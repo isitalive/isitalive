@@ -8,7 +8,7 @@ import { navbarHtml, footerHtml, componentCss, themeCss, themeScript, themeHeadS
 import { escapeHtml } from './error';
 import { ogTags } from './og';
 import { analyticsScript } from './analytics';
-import type { Trend } from '../ingest/processor';
+import type { Trend } from '../aggregate/history';
 
 const VERDICT_COLORS: Record<Verdict, string> = {
   healthy: '#22c55e',
