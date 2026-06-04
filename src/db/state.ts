@@ -1,6 +1,6 @@
 import type { Env, ApiKeyEntry } from '../types/env'
 import type { RecentQuery } from '../cache/recentQueries'
-import { readPrimarySession, readReplicaSession } from './d1'
+import { readPrimarySession, readReplicaSafeSession } from './d1'
 
 type LegacyKvEnv = { CACHE_KV?: KVNamespace; KEYS_KV?: KVNamespace; WAITLIST_KV?: KVNamespace }
 export type StateStore = Env | D1Database | KVNamespace | LegacyKvEnv
@@ -69,7 +69,7 @@ function isExpired(expiresAt: number | null): boolean {
 export async function cacheGetText(store: StateStore, key: string): Promise<string | null> {
   const db = asDb(store)
   if (db) {
-    const reader = readReplicaSession(db)
+    const reader = readReplicaSafeSession(db)
     const row = await reader
       .prepare('SELECT value_text, expires_at FROM system_cache WHERE cache_key = ?')
       .bind(key)
@@ -146,7 +146,7 @@ export async function cacheDelete(store: StateStore, key: string): Promise<void>
 export async function auditCacheGetText(store: StateStore, key: string): Promise<string | null> {
   const db = asDb(store)
   if (db) {
-    const reader = readReplicaSession(db)
+    const reader = readReplicaSafeSession(db)
     const row = await reader
       .prepare('SELECT result_json, expires_at FROM audit_cache WHERE cache_key = ?')
       .bind(key)
@@ -210,7 +210,7 @@ export async function getFirstSeen(
   const normalizedRepo = repo.toLowerCase()
 
   if (db) {
-    const reader = readReplicaSession(db)
+    const reader = readReplicaSafeSession(db)
     const row = await reader
       .prepare('SELECT first_seen FROM first_seen WHERE provider = ? AND owner = ? AND repo = ?')
       .bind(provider, normalizedOwner, normalizedRepo)
@@ -256,7 +256,7 @@ export async function trackFirstSeen(
 export async function getRecentQueries(store: StateStore, limit = 10): Promise<RecentQuery[]> {
   const db = asDb(store)
   if (db) {
-    const reader = readReplicaSession(db)
+    const reader = readReplicaSafeSession(db)
     const result = await reader
       .prepare(`
         SELECT owner, repo, score, verdict, checked_at

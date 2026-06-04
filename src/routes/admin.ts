@@ -20,7 +20,7 @@ import { handleScheduled } from '../cron/handler'
 import { refreshTrending } from '../aggregate/trending'
 import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap } from '../aggregate/sitemap'
-import { d1ReplicationDiagnostic, readPrimarySession, readReplicaSession } from '../db/d1'
+import { d1ReplicationDiagnostic, readPrimarySession, readReplicaSafeSession } from '../db/d1'
 import type { ApiKeyEntry } from '../types/env'
 
 /**
@@ -124,7 +124,7 @@ admin.get('/api/d1-replication', async (c) => {
     return c.json({ ok: false, error: 'D1 is not configured' }, 503)
   }
 
-  const firstUnconstrained = readReplicaSession(c.env.DB)
+  const firstUnconstrained = readReplicaSafeSession(c.env.DB)
   const firstPrimary = readPrimarySession(c.env.DB)
   const [unconstrainedResult, primaryResult] = await Promise.all([
     firstUnconstrained.prepare('SELECT 1 as ok').all<{ ok: number }>(),

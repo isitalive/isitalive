@@ -15,7 +15,7 @@ import { ui } from './routes/ui';
 import { openApiSpec } from './routes/openapi';
 import { llmsTxt, llmsFullTxt } from './routes/llms';
 import { aiPluginManifest } from './routes/aiPlugin';
-import { d1ReplicationDiagnostic, readReplicaSession, type D1ReplicationDiagnostic } from './db/d1'
+import { d1ReplicationDiagnostic, readReplicaSafeSession, type D1ReplicationDiagnostic } from './db/d1'
 
 const HEALTH_PROBE_TIMEOUT_MS = 500;
 
@@ -117,7 +117,7 @@ app.get('/health', async (c) => {
   try {
     const legacyKv = (c.env as unknown as { CACHE_KV?: KVNamespace }).CACHE_KV
     if (c.env.DB) {
-      const reader = readReplicaSession(c.env.DB)
+      const reader = readReplicaSafeSession(c.env.DB)
       const result = await Promise.race([
         reader.prepare('SELECT 1 as ok').all<{ ok: number }>(),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health probe timeout')), HEALTH_PROBE_TIMEOUT_MS)),

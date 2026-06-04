@@ -5,7 +5,7 @@
 import type { Env } from '../types/env'
 import { TRENDING_KEY } from '../state/keys'
 import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
-import { readReplicaSession, type D1Queryable } from '../db/d1'
+import { readReplicaSafeSession, type D1Queryable } from '../db/d1'
 
 /** Trending repo entry (consumed by UI) */
 export interface TrendingRepo {
@@ -100,7 +100,7 @@ export async function refreshTrending(env: Env): Promise<TrendingRepo[]> {
   const db = dbFrom(env)
   if (db) {
     try {
-      const reader = readReplicaSession(db)
+      const reader = readReplicaSafeSession(db)
       for (const window of WINDOW_TIERS) {
         const repos = await queryTrending(reader, window.days)
         if (repos.length === 0) continue
@@ -133,7 +133,7 @@ export async function getTrendingCache(store: StateStore): Promise<TrendingCache
   const db = dbFrom(store)
   if (db) {
     try {
-      const reader = readReplicaSession(db)
+      const reader = readReplicaSafeSession(db)
       for (const window of WINDOW_TIERS) {
         const repos = await queryTrending(reader, window.days)
         if (repos.length > 0) {

@@ -5,7 +5,7 @@
 import type { Env } from '../types/env'
 import { SITEMAP_KEY } from '../state/keys'
 import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
-import { readReplicaSession, type D1Queryable } from '../db/d1'
+import { readReplicaSafeSession, type D1Queryable } from '../db/d1'
 
 interface SitemapRow {
   repo: string
@@ -44,14 +44,14 @@ export async function refreshSitemap(env: Env): Promise<string[]> {
   const db = dbFrom(env)
   if (!db) return getSitemapRepos(env)
 
-  const repos = await querySitemap(readReplicaSession(db))
+  const repos = await querySitemap(readReplicaSafeSession(db))
   await cachePutJson(env, SITEMAP_KEY, repos, { expirationTtl: 172800 })
   return repos
 }
 
 export async function getSitemapRepos(store: StateStore): Promise<string[]> {
   const db = dbFrom(store)
-  if (db) return querySitemap(readReplicaSession(db))
+  if (db) return querySitemap(readReplicaSafeSession(db))
 
   return await cacheGetJson<string[]>(store, SITEMAP_KEY) ?? []
 }

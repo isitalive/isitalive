@@ -14,7 +14,12 @@ function hasSessionApi(db: D1Database): db is D1WithSession {
   return typeof (db as { withSession?: unknown }).withSession === 'function'
 }
 
-export function readReplicaSession(db: D1Database): D1Queryable {
+/**
+ * Creates a session for reads that are safe to serve from a D1 replica.
+ * `first-unconstrained` lets D1 choose any available instance for the first
+ * query, so production may still serve the read from the primary.
+ */
+export function readReplicaSafeSession(db: D1Database): D1Queryable {
   return hasSessionApi(db) ? db.withSession('first-unconstrained') : db
 }
 

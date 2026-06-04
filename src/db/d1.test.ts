@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   d1ReplicationDiagnostic,
   readPrimarySession,
-  readReplicaSession,
+  readReplicaSafeSession,
 } from './d1'
 
 function createSession(bookmark: string | null = 'bookmark-1'): D1DatabaseSession {
@@ -15,13 +15,13 @@ function createSession(bookmark: string | null = 'bookmark-1'): D1DatabaseSessio
 }
 
 describe('db/d1 sessions', () => {
-  it('uses first-unconstrained sessions for replica reads', () => {
+  it('uses first-unconstrained sessions for replica-safe reads', () => {
     const session = createSession()
     const db = {
       withSession: vi.fn(() => session),
     } as unknown as D1Database
 
-    expect(readReplicaSession(db)).toBe(session)
+    expect(readReplicaSafeSession(db)).toBe(session)
     expect(db.withSession).toHaveBeenCalledWith('first-unconstrained')
   })
 
@@ -38,7 +38,7 @@ describe('db/d1 sessions', () => {
   it('falls back to the original DB object when sessions are unavailable', () => {
     const db = { prepare: vi.fn() } as unknown as D1Database
 
-    expect(readReplicaSession(db)).toBe(db)
+    expect(readReplicaSafeSession(db)).toBe(db)
     expect(readPrimarySession(db)).toBe(db)
   })
 

@@ -5,7 +5,7 @@
 import type { Env } from '../types/env'
 import { TRACKED_KEY } from '../state/keys'
 import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
-import { readReplicaSession, type D1Queryable } from '../db/d1'
+import { readReplicaSafeSession, type D1Queryable } from '../db/d1'
 
 export interface TrackedRepo {
   repo: string
@@ -74,14 +74,14 @@ export async function refreshTracked(env: Env): Promise<TrackedIndex> {
   const db = dbFrom(env)
   if (!db) return getTrackedIndex(env)
 
-  const index = await queryTracked(readReplicaSession(db))
+  const index = await queryTracked(readReplicaSafeSession(db))
   await cachePutJson(env, TRACKED_KEY, index, { expirationTtl: 86400 * 2 })
   return index
 }
 
 export async function getTrackedIndex(store: StateStore): Promise<TrackedIndex> {
   const db = dbFrom(store)
-  if (db) return queryTracked(readReplicaSession(db))
+  if (db) return queryTracked(readReplicaSafeSession(db))
 
   return await cacheGetJson<TrackedIndex>(store, TRACKED_KEY) ?? {}
 }

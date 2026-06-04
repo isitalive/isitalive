@@ -5,7 +5,7 @@
 import type { Env } from '../types/env'
 import { historyKey } from '../state/keys'
 import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
-import { readReplicaSession } from '../db/d1'
+import { readReplicaSafeSession } from '../db/d1'
 
 /** Score snapshot — one data point per day */
 export interface ScoreSnapshot {
@@ -68,7 +68,7 @@ export async function getScoreHistory(
   const repoSlug = `${owner}/${repo}`.toLowerCase()
 
   if (db) {
-    const reader = readReplicaSession(db)
+    const reader = readReplicaSafeSession(db)
     const result = await reader
       .prepare(`
         SELECT
