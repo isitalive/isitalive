@@ -5,6 +5,8 @@
 import type { Env } from './types/env';
 import { app } from './app';
 import { handleScheduled } from './cron/handler';
+import { handleEventQueue } from './queue/consumer';
+import type { QueuedAnalyticsEvent } from './pipeline/types';
 
 // Surface silent waitUntil/background rejections in Cloudflare Observability.
 try {
@@ -23,6 +25,9 @@ try {
 
 export default {
   fetch: app.fetch,
+  async queue(batch: MessageBatch<QueuedAnalyticsEvent>, env: Env, _ctx: ExecutionContext) {
+    await handleEventQueue(batch, env);
+  },
   async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
     // Detect daily cron (6 AM UTC) vs every-10-min aggregation
     const trigger = event.cron === '0 6 * * *' ? 'daily' : 'hourly';

@@ -1,16 +1,13 @@
 // ---------------------------------------------------------------------------
-// Refresh Workflow — background freshness for tracked repos
+// Refresh Workflow — background freshness for tracked + discovered repos
 //
-// Runs periodically, reads the tracked repos index from Iceberg-cached KV,
-// and refreshes stale repos within a configurable budget. Uses priority tiers:
-//   Hot  (requested in last 7d)  → refresh if data >1h old
-//   Warm (requested in last 30d) → refresh if data >6h old
-//   Cold (requested 30–90d ago)  → refresh if data >24h old
+// Runs periodically, reads user-tracked repos from D1 daily usage rollups plus
+// externally discovered repos, and refreshes stale repos within a budget.
 //
 // Budget: 2,500 GitHub API calls per run (leaves 2,500 for live requests).
 //
-// The tracked index is now derived from Iceberg (usage_events) and cached
-// in KV by the cron handler. This workflow only reads it, never writes.
+// The tracked index is derived from queue-consumed user/API usage events.
+// The discovered index is populated by daily external-source ingest.
 // ---------------------------------------------------------------------------
 
 import {
@@ -23,9 +20,9 @@ import type { Env } from '../types/env'
 import { snapshotRepo } from './processor'
 import {
   getTrackedIndex,
-  TIER_STALENESS,
-  type TrackedIndex,
 } from '../aggregate/tracked'
+import { getDiscoveredIndex } from './discovered'
+import { buildRefreshCandidates } from './refresh-plan'
 import { CacheManager } from '../cache/index'
 
 const BUDGET_PER_RUN = 2500
@@ -33,37 +30,42 @@ const BATCH_SIZE = 10
 
 export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
   async run(_event: WorkflowEvent<{}>, step: WorkflowStep) {
-    // Step 1: Read tracked index (populated by cron from Iceberg) and plan
+    // Step 1: Read tracked/discovered indexes and plan refreshes.
     const plan = await step.do('plan-refresh', async () => {
-      const index = await getTrackedIndex(this.env.CACHE_KV)
-      const totalTracked = Object.keys(index).length
+      const [trackedIndex, discoveredIndex] = await Promise.all([
+        getTrackedIndex(this.env),
+        getDiscoveredIndex(this.env),
+      ])
+      const candidates = buildRefreshCandidates(trackedIndex, discoveredIndex)
+      const totalTracked = Object.keys(trackedIndex).length
+      const totalDiscovered = Object.keys(discoveredIndex).length
 
-      if (totalTracked === 0) {
-        console.log('Refresh: no tracked repos found (Iceberg index may not be populated yet)')
-        return { repos: [], totalTracked: 0, totalStale: 0, selected: 0 }
+      if (candidates.length === 0) {
+        console.log('Refresh: no tracked or discovered repos found yet')
+        return { repos: [], totalTracked, totalDiscovered, totalStale: 0, selected: 0 }
       }
 
-      // Find repos that need refreshing based on their tier staleness
-      const toRefresh: { repo: string; tier: string; staleMs: number }[] = []
+      const toRefresh: { repo: string; tier: string; reason: string; staleMs: number }[] = []
       const cacheManager = new CacheManager(this.env)
 
-      for (const [repo, entry] of Object.entries(index)) {
-        const maxStaleness = TIER_STALENESS[entry.tier]
-
-        // Check how old the cached score is
-        const parts = repo.split('/')
+      for (const candidate of candidates) {
+        const parts = candidate.repo.split('/')
         if (parts.length < 2) continue
         const [owner, repoName] = parts
 
-        // Use the cached result's storedAt timestamp to determine staleness
-        const cached = await cacheManager.get('github', owner, repoName)
-        const lastCheckedMs = cached.storedAt
+        const cached = await cacheManager.getAny('github', owner, repoName)
+        const lastCheckedMs = cached?.storedAt
           ? new Date(cached.storedAt).getTime()
           : 0 // never cached = infinitely stale
         const staleMs = Date.now() - lastCheckedMs
 
-        if (staleMs > maxStaleness) {
-          toRefresh.push({ repo, tier: entry.tier, staleMs })
+        if (staleMs > candidate.maxStalenessMs) {
+          toRefresh.push({
+            repo: candidate.repo,
+            tier: candidate.tier,
+            reason: candidate.reason,
+            staleMs,
+          })
         }
       }
 
@@ -71,11 +73,12 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
       toRefresh.sort((a, b) => b.staleMs - a.staleMs)
       const selected = toRefresh.slice(0, BUDGET_PER_RUN)
 
-      console.log(`Refresh: ${totalTracked} tracked, ${toRefresh.length} stale, selected ${selected.length} (budget: ${BUDGET_PER_RUN})`)
+      console.log(`Refresh: ${totalTracked} tracked + ${totalDiscovered} discovered, ${toRefresh.length} stale, selected ${selected.length} (budget: ${BUDGET_PER_RUN})`)
 
       return {
         repos: selected.map(r => r.repo),
         totalTracked,
+        totalDiscovered,
         totalStale: toRefresh.length,
         selected: selected.length,
       }
@@ -84,8 +87,9 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
     if (plan.repos.length === 0) {
       return {
         success: true,
-        message: 'All tracked repos are fresh',
+        message: 'All tracked and discovered repos are fresh',
         totalTracked: plan.totalTracked,
+        totalDiscovered: plan.totalDiscovered,
         refreshed: 0,
       }
     }
@@ -131,6 +135,7 @@ export class RefreshWorkflow extends WorkflowEntrypoint<Env, {}> {
     return {
       success: true,
       totalTracked: plan.totalTracked,
+      totalDiscovered: plan.totalDiscovered,
       totalStale: plan.totalStale,
       selected: plan.selected,
       refreshed: successCount,

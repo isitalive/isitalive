@@ -6,6 +6,8 @@
 // ---------------------------------------------------------------------------
 
 import type { ManifestFormat } from './parsers'
+import type { StateStore } from '../db/state'
+import { cacheDelete, cacheGetText, cachePutText } from '../db/state'
 
 export interface DiscoveredManifest {
   /** Filename at repo root */
@@ -31,26 +33,26 @@ const DISCOVERY_ERROR_TTL = 5 * 60       // 5 min on error
  * Makes a single GitHub REST API call to list root directory contents,
  * then filters for known manifest filenames (package.json, go.mod).
  *
- * Results are cached in KV to avoid repeated API calls.
+ * Results are cached in D1 to avoid repeated API calls.
  */
 export async function discoverManifests(
   owner: string,
   repo: string,
   token: string,
-  kv: KVNamespace,
+  store: StateStore,
 ): Promise<DiscoveredManifest[]> {
   // Normalize to lowercase to avoid case-sensitive cache duplicates
   const normalizedOwner = owner.toLowerCase()
   const normalizedRepo = repo.toLowerCase()
   const cacheKey = `${DISCOVERY_CACHE_PREFIX}${normalizedOwner}/${normalizedRepo}`
 
-  const cached = await kv.get(cacheKey)
+  const cached = await cacheGetText(store, cacheKey)
   if (cached !== null) {
     try {
       return JSON.parse(cached) as DiscoveredManifest[]
     } catch {
       // Corrupted cache entry — evict and recompute
-      await kv.delete(cacheKey)
+      await cacheDelete(store, cacheKey)
     }
   }
 
@@ -72,7 +74,7 @@ export async function discoverManifests(
 
     if (!res.ok) {
       // Non-critical — cache briefly to avoid hammering the API on repeated failures
-      await kv.put(cacheKey, '[]', { expirationTtl: DISCOVERY_ERROR_TTL })
+      await cachePutText(store, cacheKey, '[]', { expirationTtl: DISCOVERY_ERROR_TTL })
       return []
     }
 
@@ -97,12 +99,12 @@ export async function discoverManifests(
       }))
   } catch {
     // Network/timeout error — cache empty result briefly to avoid hammering
-    await kv.put(cacheKey, '[]', { expirationTtl: DISCOVERY_ERROR_TTL })
+    await cachePutText(store, cacheKey, '[]', { expirationTtl: DISCOVERY_ERROR_TTL })
     return []
   }
 
   // Cache the result (full TTL for successful responses)
-  await kv.put(cacheKey, JSON.stringify(manifests), {
+  await cachePutText(store, cacheKey, JSON.stringify(manifests), {
     expirationTtl: DISCOVERY_CACHE_TTL,
   })
 

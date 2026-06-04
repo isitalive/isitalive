@@ -1,19 +1,16 @@
 // ---------------------------------------------------------------------------
-// Aggregate: History — derive score history from Iceberg, cache in KV
-//
-// Replaces the KV-maintained score history in ingest/processor.ts.
-// Each repo's trend data is queried from result_events on demand and cached.
+// Aggregate: History — score history from D1 daily result rollups
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../types/env'
-import { queryR2SQL } from '../admin/r2sql'
 import { historyKey } from '../state/keys'
+import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
 
 /** Score snapshot — one data point per day */
 export interface ScoreSnapshot {
-  date: string     // YYYY-MM-DD
-  score: number    // 0-100
-  verdict: string  // e.g. "healthy"
+  date: string
+  score: number
+  verdict: string
 }
 
 export type TrendDirection = 'improving' | 'stable' | 'declining'
@@ -26,58 +23,103 @@ export interface Trend {
   minDaysRequired: number
 }
 
+interface HistoryRow {
+  day: string
+  score: number
+  verdict: string
+}
+
 const MIN_TREND_DAYS = 7
 const TREND_THRESHOLD = 5
+const SCORE_HISTORY_MAX = 365
 
-/**
- * Get score history for a repo. Reads from KV cache first,
- * falls back to Iceberg query if not cached.
- */
+function dbFrom(store: StateStore): D1Database | null {
+  if ('prepare' in store && typeof store.prepare === 'function') return store as D1Database
+  return (store as Env).DB ?? null
+}
+
+export async function appendScoreHistory(
+  store: StateStore,
+  repoSlug: string,
+  snapshot: ScoreSnapshot,
+): Promise<void> {
+  const db = dbFrom(store)
+  if (db) {
+    await db
+      .prepare(`
+        INSERT INTO daily_result_scores (
+          day, project, score_sum, score_count, latest_score, latest_verdict, last_seen
+        )
+        VALUES (?, ?, ?, 1, ?, ?, ?)
+        ON CONFLICT(day, project) DO UPDATE SET
+          score_sum = daily_result_scores.score_sum + excluded.score_sum,
+          score_count = daily_result_scores.score_count + 1,
+          latest_score = excluded.latest_score,
+          latest_verdict = excluded.latest_verdict,
+          last_seen = MAX(daily_result_scores.last_seen, excluded.last_seen)
+      `)
+      .bind(
+        snapshot.date,
+        repoSlug.toLowerCase(),
+        snapshot.score,
+        snapshot.score,
+        snapshot.verdict,
+        new Date().toISOString(),
+      )
+      .run()
+    return
+  }
+
+  const key = historyKeyFromRepo(repoSlug)
+  const history = await getHistoryFromCache(store, key)
+  const deduped = history.filter((item) => item.date !== snapshot.date)
+  deduped.push(snapshot)
+  const trimmed = deduped.slice(Math.max(0, deduped.length - SCORE_HISTORY_MAX))
+  await cachePutJson(store, key, trimmed, { expirationTtl: 86400 * 400 })
+}
+
 export async function getScoreHistory(
-  env: Env,
+  store: StateStore,
   owner: string,
   repo: string,
 ): Promise<ScoreSnapshot[]> {
-  const key = historyKey(owner, repo)
-
-  // Try KV cache first
-  try {
-    const cached = await env.CACHE_KV.get(key, 'json') as ScoreSnapshot[] | null
-    if (cached && cached.length > 0) return cached
-  } catch {}
-
-  // Query Iceberg
+  const db = dbFrom(store)
   const repoSlug = `${owner}/${repo}`.toLowerCase()
-  const sql = `
-    SELECT
-      DATE(timestamp) as day,
-      CAST(AVG(score) AS INTEGER) as score,
-      MAX(verdict) as verdict
-    FROM result_events_v2
-    WHERE project = '${repoSlug}'
-      AND timestamp > NOW() - INTERVAL '90 days'
-      AND score > 0
-    GROUP BY day
-    ORDER BY day
-  `
 
-  const result = await queryR2SQL(env, sql)
-  if (result.error || result.rows.length === 0) {
-    return []
+  if (db) {
+    const result = await db
+      .prepare(`
+        SELECT
+          day,
+          ROUND(score_sum * 1.0 / score_count) as score,
+          latest_verdict as verdict
+        FROM daily_result_scores
+        WHERE project = ?
+        ORDER BY day DESC
+        LIMIT ?
+      `)
+      .bind(repoSlug, SCORE_HISTORY_MAX)
+      .all<HistoryRow>()
+
+    return result.results
+      .map((row) => ({
+        date: row.day,
+        score: Number(row.score),
+        verdict: row.verdict,
+      }))
+      .reverse()
   }
 
-  const history: ScoreSnapshot[] = result.rows.map(row => ({
-    date: String(row[0]),
-    score: Number(row[1]),
-    verdict: String(row[2]),
-  }))
+  return getHistoryFromCache(store, historyKey(owner, repo))
+}
 
-  // Cache for 6 hours (refreshed by cron daily snapshot)
-  await env.CACHE_KV.put(key, JSON.stringify(history), {
-    expirationTtl: 21600,
-  })
+async function getHistoryFromCache(store: StateStore, key: string): Promise<ScoreSnapshot[]> {
+  return await cacheGetJson<ScoreSnapshot[]>(store, key) ?? []
+}
 
-  return history
+function historyKeyFromRepo(repoSlug: string): string {
+  const [owner, repo] = repoSlug.split('/')
+  return historyKey(owner ?? '', repo ?? '')
 }
 
 /**
@@ -100,8 +142,8 @@ export function computeTrend(history: ScoreSnapshot[]): Trend {
   }
 
   const third = Math.max(1, Math.floor(sorted.length / 3))
-  const earlyAvg = sorted.slice(0, third).reduce((s, h) => s + h.score, 0) / third
-  const lateAvg = sorted.slice(-third).reduce((s, h) => s + h.score, 0) / third
+  const earlyAvg = sorted.slice(0, third).reduce((sum, item) => sum + item.score, 0) / third
+  const lateAvg = sorted.slice(-third).reduce((sum, item) => sum + item.score, 0) / third
   const delta = Math.round(lateAvg - earlyAvg)
 
   let direction: TrendDirection

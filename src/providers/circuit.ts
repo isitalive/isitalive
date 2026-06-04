@@ -6,6 +6,7 @@
 // per isolate.
 
 import type { Env } from '../types/env'
+import { cacheGetJson, cachePutJson } from '../db/state'
 
 const THRESHOLD = 3
 const WINDOW_MS = 60_000
@@ -35,7 +36,7 @@ async function loadState(env: Env, name: string): Promise<BreakerState> {
   if (!hydrated.has(name)) {
     hydrated.add(name)
     try {
-      const persisted = await env.CACHE_KV.get(kvKey(name), 'json') as BreakerState | null
+      const persisted = await cacheGetJson<BreakerState>(env, kvKey(name))
       if (persisted) {
         memory.set(name, persisted)
         return persisted
@@ -52,7 +53,7 @@ async function loadState(env: Env, name: string): Promise<BreakerState> {
 async function persist(env: Env, name: string, state: BreakerState): Promise<void> {
   memory.set(name, state)
   try {
-    await env.CACHE_KV.put(kvKey(name), JSON.stringify(state), { expirationTtl: KV_TTL_S })
+    await cachePutJson(env, kvKey(name), state, { expirationTtl: KV_TTL_S })
   } catch {
     // best-effort; memory is authoritative for this isolate
   }

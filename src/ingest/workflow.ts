@@ -18,6 +18,7 @@ import type { Env } from '../types/env';
 import { gitHubTrendingSource } from './sources/github';
 import { snapshotRepo } from './processor';
 import { getTrackedIndex } from '../aggregate/tracked';
+import { recordDiscoveredRepos } from './discovered';
 
 type IngestParams = {
   trigger: 'daily' | 'hourly';
@@ -25,18 +26,22 @@ type IngestParams = {
 
 export class IngestWorkflow extends WorkflowEntrypoint<Env, IngestParams> {
   async run(event: WorkflowEvent<IngestParams>, step: WorkflowStep) {
-    // Step 1: Gather repos from tracked index + GitHub trending
+    // Step 1: Gather repos from user-tracked index + today's GitHub Trending.
+    // Trending discoveries are persisted separately so RefreshWorkflow can keep
+    // them warm after they fall off the external feed.
     const repos = await step.do('gather-sources', async () => {
       const [trackedIndex, ghRepos] = await Promise.all([
-        getTrackedIndex(this.env.CACHE_KV),
+        getTrackedIndex(this.env),
         gitHubTrendingSource.getRepos(this.env),
       ]);
+
+      await recordDiscoveredRepos(this.env, 'github', ghRepos, 'github-trending');
 
       const trackedRepos = Object.keys(trackedIndex);
 
       // Deduplicate
       const all = [...new Set([...trackedRepos, ...ghRepos])];
-      console.log(`Workflow: gathered ${trackedRepos.length} tracked + ${ghRepos.length} GitHub trending = ${all.length} unique repos`);
+      console.log(`Workflow: gathered ${trackedRepos.length} tracked + ${ghRepos.length} GitHub trending/discovered = ${all.length} unique repos`);
       return all;
     });
 

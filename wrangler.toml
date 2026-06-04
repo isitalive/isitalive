@@ -21,21 +21,6 @@ routes = [
   { pattern = "isitalive.dev", custom_domain = true }
 ]
 
-# Workers KV — response cache
-[[kv_namespaces]]
-binding = "CACHE_KV"
-id = "660634f39fe641c5b186ac3cb7259ead"
-
-# Workers KV — API key store (create in CF dashboard, paste ID below)
-[[kv_namespaces]]
-binding = "KEYS_KV"
-id = "8d18f5fa0e6046568eb3979c7a57b0eb"
-
-# Workers KV — waitlist email signups (tier interest tracking)
-[[kv_namespaces]]
-binding = "WAITLIST_KV"
-id = "69924ff9b17b4b7b90249fc9567426c3"
-
 # Native Rate Limiting — two-level infra protection (not billing)
 # Note: CDN-Cache-Control does NOT prevent Worker invocations (ADR-006).
 # Every request — anonymous or authenticated — wakes the Worker (~$0.30/M).
@@ -71,27 +56,29 @@ binding = "REFRESH_WORKFLOW"
 class_name = "RefreshWorkflow"
 
 
-# R2 — data lake (Iceberg tables via R2 Data Catalog)
+# D1 — operational state, hot analytics, and long-term rollups
+[[d1_databases]]
+binding = "DB"
+database_name = "isitalive-db"
+database_id = "f23c66f8-1690-4609-a4b7-beadc8c9bff1"
+migrations_dir = "migrations"
+
+# R2 — raw JSONL analytics archive
 [[r2_buckets]]
 binding = "DATA_BUCKET"
 bucket_name = "isitalive-data"
 
-# Pipelines — event streams → Iceberg tables (R2 Data Catalog)
-[[pipelines]]
-binding = "PROVIDER_PIPELINE"
-pipeline = "e1e5011bcbf84d9d9747d3c083af3688"
+# Queues — event ingestion with retry + DLQ
+[[queues.producers]]
+queue = "isitalive-events"
+binding = "EVENT_QUEUE"
 
-[[pipelines]]
-binding = "RESULT_PIPELINE"
-pipeline = "11f72a89892e4f10808b2f2732371c26"
-
-[[pipelines]]
-binding = "USAGE_PIPELINE"
-pipeline = "c0c9974a46f1409383bbe28e82fab329"
-
-[[pipelines]]
-binding = "MANIFEST_PIPELINE"
-pipeline = "aceb9a448fc6426ca418d233579a5bc9"
+[[queues.consumers]]
+queue = "isitalive-events"
+max_batch_size = 100
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "isitalive-events-dlq"
 
 # Cron Triggers — every 10 min aggregation + daily snapshot (6 AM UTC)
 [triggers]
@@ -107,9 +94,6 @@ CF_ANALYTICS_TOKEN = "c075f9d44e444ec099e35a6f1859a688"
 # Secrets (set via Cloudflare dashboard → Settings → Variables and Secrets):
 # - GITHUB_TOKEN: GitHub personal access token for API auth
 # - TURNSTILE_SECRET_KEY: Cloudflare Turnstile secret key
-# - CF_ACCOUNT_ID: Cloudflare account ID (for R2 SQL API in Cron)
-# - CF_R2_SQL_TOKEN: Read-only scoped token for R2 SQL queries
-#     → Create Custom Token: Account → R2 Data Catalog + R2 Storage + R2 SQL → Read
 [secrets]
 required = [
   "GITHUB_TOKEN",
@@ -118,9 +102,6 @@ required = [
   "GITHUB_WEBHOOK_SECRET",
   "TURNSTILE_SECRET_KEY",
   "ADMIN_SECRET",
-  "CF_ACCOUNT_ID",
-  "CF_R2_SQL_TOKEN",
-  "CF_R2_WAREHOUSE",
 ]
 
 # Observability — logs and traces

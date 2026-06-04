@@ -10,6 +10,7 @@
 
 import type { Env } from '../types/env';
 import { sign } from 'hono/jwt';
+import { cacheGetJson, cachePutJson } from '../db/state';
 
 const GITHUB_API = 'https://api.github.com';
 const TOKEN_CACHE_PREFIX = 'gh-app:token:';
@@ -30,7 +31,7 @@ export async function getInstallationToken(
   const cacheKey = `${TOKEN_CACHE_PREFIX}${installationId}`;
 
   // Check KV cache
-  const cached = await env.CACHE_KV.get(cacheKey, 'json') as CachedToken | null;
+  const cached = await cacheGetJson<CachedToken>(env, cacheKey);
   if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_MARGIN_MS) {
     return cached.token;
   }
@@ -62,10 +63,10 @@ export async function getInstallationToken(
   const expiresAt = new Date(data.expires_at).getTime();
   const ttlSeconds = Math.max(1, Math.floor((expiresAt - Date.now()) / 1000) - 60);
 
-  await env.CACHE_KV.put(cacheKey, JSON.stringify({
+  await cachePutJson(env, cacheKey, {
     token: data.token,
     expiresAt,
-  } satisfies CachedToken), { expirationTtl: ttlSeconds });
+  } satisfies CachedToken, { expirationTtl: ttlSeconds });
 
   return data.token;
 }

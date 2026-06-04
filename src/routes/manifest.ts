@@ -25,6 +25,7 @@ import { emitAll } from '../pipeline/emit';
 import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
 import { includeKey, parseIncludeFlags, shapeAuditResult, type IncludeFlags } from '../utils/healthResponse';
 import { METHODOLOGY } from '../scoring/methodology';
+import { auditCacheDelete, auditCacheGetText, getOidcQuota } from '../db/state';
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
@@ -89,10 +90,10 @@ audit.post('/', async (c) => {
     }, 401)
   }
 
-  // ── OIDC quota enforcement — read KV counter (populated by cron) ───
+  // ── OIDC quota enforcement — read D1 aggregate counter ─────────────
   const oidcClaims = c.get('oidcClaims') ?? null
   if (oidcClaims) {
-    const quotaEntry = await c.env.CACHE_KV.get(`oidc:quota:${oidcClaims.repository}`, 'json') as { used: number; limit?: number; period: string } | null
+    const quotaEntry = await getOidcQuota(c.env, oidcClaims.repository, OIDC_FREE_QUOTA_LIMIT)
     const limit = quotaEntry?.limit ?? OIDC_FREE_QUOTA_LIMIT
     if (quotaEntry && quotaEntry.used >= limit) {
       return c.json({
@@ -121,17 +122,17 @@ audit.post('/', async (c) => {
       return l1Hit;
     }
 
-    // L2: KV cache hit
-    const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
-    if (kvCached) {
-      const response = buildCachedAuditResponse(kvCached, clientHash, c.req.header('If-None-Match'), includeFlags)
+    // L2: D1 cache hit
+    const d1Cached = await auditCacheGetText(c.env, auditCacheKey);
+    if (d1Cached) {
+      const response = buildCachedAuditResponse(d1Cached, clientHash, c.req.header('If-None-Match'), includeFlags)
       if (!response) {
-        c.executionCtx.waitUntil(c.env.CACHE_KV.delete(auditCacheKey))
+        c.executionCtx.waitUntil(auditCacheDelete(c.env, auditCacheKey))
       } else {
         if (response.headers.get('Cache-Control') !== 'no-cache') {
           c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()))
         }
-        c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c))
+        c.executionCtx.waitUntil(emitUsageFromCached(d1Cached, c))
         return response
       }
     }
@@ -187,15 +188,15 @@ audit.post('/', async (c) => {
     return l1Hit;
   }
 
-  // ── L2: KV cache (global, persistent) ─────────────────────────────
-  // Check KV BEFORE parsing/resolving — skips expensive npm lookups.
+  // ── L2: D1 cache (persistent) ────────────────────────────────────
+  // Check D1 BEFORE parsing/resolving — skips expensive npm lookups.
   // Only complete results are ever written to this key, so no need to
   // parse and re-serialize — return the raw JSON string directly.
-  const kvCached = await c.env.CACHE_KV.get(auditCacheKey);
-  if (kvCached) {
-    const response = buildCachedAuditResponse(kvCached, contentHash, c.req.header('If-None-Match'), includeFlags)
+  const d1Cached = await auditCacheGetText(c.env, auditCacheKey);
+  if (d1Cached) {
+    const response = buildCachedAuditResponse(d1Cached, contentHash, c.req.header('If-None-Match'), includeFlags)
     if (!response) {
-      c.executionCtx.waitUntil(c.env.CACHE_KV.delete(auditCacheKey))
+      c.executionCtx.waitUntil(auditCacheDelete(c.env, auditCacheKey))
     } else {
       if (response.headers.get('Cache-Control') !== 'no-cache') {
         c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()))
@@ -205,7 +206,7 @@ audit.post('/', async (c) => {
       // is sent so it doesn't affect latency.
       // NOTE: these events have cacheStatus='l2-hit' so quota aggregation
       // cron must exclude them (ADR-004: only Layer 3 misses consume quota).
-      c.executionCtx.waitUntil(emitUsageFromCached(kvCached, c));
+      c.executionCtx.waitUntil(emitUsageFromCached(d1Cached, c));
       return response;
     }
   }
@@ -263,7 +264,7 @@ audit.post('/', async (c) => {
     c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
   }
 
-  // ── Emit events to Pipeline (background) ────────────────────────────
+  // ── Emit events to queue (background) ───────────────────────────────
   // Usage events for each scored dep → powers trending + tracked indexes
   // Manifest event → audit analytics
   c.executionCtx.waitUntil((async () => {

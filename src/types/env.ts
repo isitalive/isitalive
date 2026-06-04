@@ -2,15 +2,14 @@
 // Worker environment types
 //
 // `Env` is generated from wrangler.toml via `wrangler types` and is the single
-// source of truth for Worker bindings, vars, workflows, pipelines, and declared
+// source of truth for Worker bindings, vars, workflows, queues, and declared
 // secrets. This module stays intentionally thin so app code has one stable
 // import path for infrastructure types.
 // ---------------------------------------------------------------------------
 
 export type Env = Cloudflare.Env
-export type Pipeline = Env['PROVIDER_PIPELINE']
 
-/** Shape of an API key entry in KEYS_KV */
+/** Shape of an API key entry in D1 */
 export interface ApiKeyEntry {
   tier: 'free' | 'pro' | 'enterprise';
   name: string;

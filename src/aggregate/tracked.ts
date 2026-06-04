@@ -1,15 +1,11 @@
 // ---------------------------------------------------------------------------
-// Aggregate: Tracked — derive tracked repos from Iceberg, cache in KV
-//
-// Replaces the queue consumer's TrackedIndex maintenance.
-// The RefreshWorkflow reads this to decide which repos to refresh.
+// Aggregate: Tracked — derive refresh set from D1 daily usage rollups
 // ---------------------------------------------------------------------------
 
 import type { Env } from '../types/env'
-import { queryR2SQL } from '../admin/r2sql'
 import { TRACKED_KEY } from '../state/keys'
+import { cacheGetJson, cachePutJson, type StateStore } from '../db/state'
 
-/** Tracked repo entry (cached in KV) */
 export interface TrackedRepo {
   repo: string
   lastSeen: string
@@ -18,25 +14,23 @@ export interface TrackedRepo {
   tier: 'hot' | 'warm' | 'cold'
 }
 
-/** Full tracked index (repo slug → TrackedRepo) */
 export type TrackedIndex = Record<string, TrackedRepo>
 
-// Sourced from usage_events (the freshest, most-reliable pipeline) rather
-// than result_events_v2. Excluding source='cron' prevents a self-reinforcing
-// loop where the refresh workflow's own synthetic usage events keep the
-// tracked set frozen regardless of real traffic.
-const TRACKED_SQL = `
-SELECT
-  repo,
-  MAX(timestamp) as last_seen,
-  COUNT(*) as request_count
-FROM usage_events
-WHERE timestamp > NOW() - INTERVAL '30 days'
-  AND repo != ''
-  AND source != 'cron'
-GROUP BY repo
-ORDER BY request_count DESC
-`
+interface TrackedRow {
+  repo: string
+  last_seen: string
+  request_count: number
+}
+
+function dbFrom(store: StateStore): D1Database | null {
+  if ('prepare' in store && typeof store.prepare === 'function') return store as D1Database
+  return (store as Env).DB ?? null
+}
+
+function sinceDay(days: number): string {
+  const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  return date.toISOString().slice(0, 10)
+}
 
 /** Classify a repo into a refresh tier based on last-seen age */
 function classifyTier(lastSeen: string): TrackedRepo['tier'] {
@@ -46,53 +40,54 @@ function classifyTier(lastSeen: string): TrackedRepo['tier'] {
   return 'cold'
 }
 
-/**
- * Query Iceberg for all tracked repos (seen in the last 30d, excluding
- * synthetic cron traffic) and cache in KV. Called by the cron handler
- * every 10 minutes.
- */
-export async function refreshTracked(env: Env): Promise<TrackedIndex> {
-  const result = await queryR2SQL(env, TRACKED_SQL)
-
-  if (result.error) {
-    console.error('Aggregate: tracked query failed:', result.error)
-    return getTrackedIndex(env.CACHE_KV)
-  }
+async function queryTracked(db: D1Database): Promise<TrackedIndex> {
+  const result = await db
+    .prepare(`
+      SELECT
+        repo,
+        MAX(last_seen) as last_seen,
+        SUM(checks) as request_count
+      FROM daily_usage_repo
+      WHERE day >= ?
+        AND repo != ''
+        AND source != 'cron'
+      GROUP BY repo
+      ORDER BY request_count DESC
+    `)
+    .bind(sinceDay(30))
+    .all<TrackedRow>()
 
   const index: TrackedIndex = {}
-  for (const row of result.rows) {
-    const repo = String(row[0])
-    const lastSeen = String(row[1])
-    index[repo] = {
-      repo,
-      lastSeen,
-      requestCount: Number(row[2]),
-      tier: classifyTier(lastSeen),
+  for (const row of result.results) {
+    index[row.repo] = {
+      repo: row.repo,
+      lastSeen: row.last_seen,
+      requestCount: Number(row.request_count),
+      tier: classifyTier(row.last_seen),
     }
   }
-
-  await env.CACHE_KV.put(TRACKED_KEY, JSON.stringify(index), {
-    expirationTtl: 86400 * 2, // 2d safety net
-  })
-
   return index
 }
 
-/**
- * Read cached tracked index from KV.
- */
-export async function getTrackedIndex(kv: KVNamespace): Promise<TrackedIndex> {
-  try {
-    const data = await kv.get(TRACKED_KEY, 'json') as TrackedIndex | null
-    return data ?? {}
-  } catch {
-    return {}
-  }
+export async function refreshTracked(env: Env): Promise<TrackedIndex> {
+  const db = dbFrom(env)
+  if (!db) return getTrackedIndex(env)
+
+  const index = await queryTracked(db)
+  await cachePutJson(env, TRACKED_KEY, index, { expirationTtl: 86400 * 2 })
+  return index
+}
+
+export async function getTrackedIndex(store: StateStore): Promise<TrackedIndex> {
+  const db = dbFrom(store)
+  if (db) return queryTracked(db)
+
+  return await cacheGetJson<TrackedIndex>(store, TRACKED_KEY) ?? {}
 }
 
 /** Maximum staleness before a repo needs refreshing (by tier) */
 export const TIER_STALENESS: Record<TrackedRepo['tier'], number> = {
-  hot: 1 * 3600 * 1000,   // 1 hour
-  warm: 6 * 3600 * 1000,  // 6 hours
-  cold: 24 * 3600 * 1000, // 24 hours
+  hot: 1 * 3600 * 1000,
+  warm: 6 * 3600 * 1000,
+  cold: 24 * 3600 * 1000,
 }

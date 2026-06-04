@@ -39,6 +39,14 @@ import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
 import { fetchWithTimeout, readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http'
 import { isValidParam } from '../utils/validate'
+import {
+  auditCacheGetText,
+  auditCachePutText,
+  cacheDelete,
+  cacheGetText,
+  cachePutText,
+  upsertWaitlistSignup,
+} from '../db/state'
 
 // Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
@@ -113,7 +121,7 @@ function hasAllowedViewOrigin(originHeader: string): boolean {
 
 // Sitemap — dynamic XML based on top repos
 ui.get('/sitemap.xml', async (c) => {
-  const repos = await getSitemapRepos(c.env.CACHE_KV)
+  const repos = await getSitemapRepos(c.env)
   const baseUrl = 'https://isitalive.dev'
   
   const staticPages = [
@@ -157,7 +165,7 @@ ui.get('/', (c) => {
 // Recent queries API — lightweight JSON for client-side hydration
 // Mounted under /_data/ to avoid /api/* rate-limit + auth middleware
 ui.get('/_data/recent', async (c) => {
-  const recent = await getRecentQueries(c.env.CACHE_KV)
+  const recent = await getRecentQueries(c.env)
   c.header('Cache-Control', 'public, max-age=60, s-maxage=60')
   c.header('CDN-Cache-Control', 'public, s-maxage=60')
   return c.json(recent)
@@ -224,7 +232,7 @@ ui.get('/trending', (c) => {
 // Trending data — paginated JSON for client-side hydration
 // Mounted under /_data/ to avoid /api/* rate-limit + auth middleware
 ui.get('/_data/trending', async (c) => {
-  const allRepos = await getTrending(c.env.CACHE_KV)
+  const allRepos = await getTrending(c.env)
   const limit = Math.max(1, parseInt(c.req.query('limit') || '20', 10))
   const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10))
   const page = allRepos.slice(offset, offset + limit)
@@ -271,7 +279,7 @@ ui.get('/_data/history/:provider/:owner/:repo', async (c) => {
 
   const owner = rawOwner.toLowerCase()
   const repo = rawRepo.toLowerCase()
-  const history = await getScoreHistory(c.env.CACHE_KV, owner, repo)
+  const history = await getScoreHistory(c.env, owner, repo)
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.json({ history })
@@ -336,11 +344,7 @@ ui.post('/_data/waitlist', async (c) => {
   const hashHex = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('')
 
   // Always upsert — no timing difference between new and existing
-  await c.env.WAITLIST_KV.put(`waitlist:${hashHex}`, JSON.stringify({
-    email,
-    tier,
-    timestamp: new Date().toISOString(),
-  }))
+  await upsertWaitlistSignup(c.env, hashHex, email, tier)
 
   return c.json(ok)
 })
@@ -358,7 +362,7 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
   const owner = rawOwner.toLowerCase()
   const repo = rawRepo.toLowerCase()
   const depsCacheKey = `deps:github:${owner}/${repo}`
-  const cachedDeps = await c.env.CACHE_KV.get(depsCacheKey)
+  const cachedDeps = await cacheGetText(c.env, depsCacheKey)
   if (cachedDeps) {
     try {
       const parsed = JSON.parse(cachedDeps) as unknown as { complete?: boolean; pending?: number }
@@ -373,7 +377,7 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
         typeof (parsed as { pending?: number }).pending === 'number' &&
         (parsed as { pending: number }).pending > 0
       ) {
-        await c.env.CACHE_KV.delete(depsCacheKey)
+        await cacheDelete(c.env, depsCacheKey)
       } else {
         c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
         c.header('CDN-Cache-Control', 'public, s-maxage=3600')
@@ -381,7 +385,7 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
       }
     } catch {
       // Corrupted cache entry — evict and recompute
-      await c.env.CACHE_KV.delete(depsCacheKey)
+      await cacheDelete(c.env, depsCacheKey)
     }
   }
 
@@ -394,12 +398,12 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
       503,
     )
   }
-  const manifests = await discoverManifests(owner, repo, c.env.GITHUB_TOKEN, c.env.CACHE_KV)
+  const manifests = await discoverManifests(owner, repo, c.env.GITHUB_TOKEN, c.env)
 
   if (manifests.length === 0) {
     const empty = { manifests: [] as string[] }
     // Cache the "no manifests" result briefly (1 hour)
-    await c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
+    await cachePutText(c.env, depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     c.header('CDN-Cache-Control', 'public, s-maxage=3600')
     return c.json(empty)
@@ -434,7 +438,7 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
 
   if (allDeps.length === 0) {
     const empty = { manifests: manifestNames, dependencies: [], summary: { healthy: 0, stable: 0, degraded: 0, critical: 0, unmaintained: 0, avgScore: 0 }, total: 0, scored: 0, pending: 0, complete: true }
-    await c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
+    await cachePutText(c.env, depsCacheKey, JSON.stringify(empty), { expirationTtl: 3600 })
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     c.header('CDN-Cache-Control', 'public, s-maxage=3600')
     return c.json(empty)
@@ -475,7 +479,7 @@ ui.get('/_data/deps/:provider/:owner/:repo', async (c) => {
   // Cache complete results for 6 hours, partial for 5 min
   const ttl = auditResult.complete ? 6 * 60 * 60 : 5 * 60
   c.executionCtx.waitUntil(
-    c.env.CACHE_KV.put(depsCacheKey, JSON.stringify(result), { expirationTtl: ttl }),
+    cachePutText(c.env, depsCacheKey, JSON.stringify(result), { expirationTtl: ttl }),
   )
 
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
@@ -549,7 +553,7 @@ ui.get('/audit/:hash', async (c) => {
     return c.html(errorPage('Invalid audit hash.'), 400)
   }
 
-  const cached = await c.env.CACHE_KV.get(`audit:result:${hash}`)
+  const cached = await auditCacheGetText(c.env, `audit:result:${hash}`)
   if (!cached) {
     return c.html(errorPage('Audit not found. This result may have expired or the manifest has not been audited yet.'), 404)
   }
@@ -574,7 +578,7 @@ ui.get('/_data/audit/:hash', async (c) => {
     return c.json({ error: 'Invalid hash' }, 400)
   }
 
-  const cached = await c.env.CACHE_KV.get(`audit:result:${hash}`)
+  const cached = await auditCacheGetText(c.env, `audit:result:${hash}`)
   if (!cached) {
     return c.json({ error: 'Not found' }, 404)
   }
@@ -632,13 +636,13 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
           responseTimeMs: Date.now() - startTime,
           cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
         }).then(ue => emitAll(c.env, { usage: [ue] })),
-        trackRecentQuery(c.env.CACHE_KV, {
+        trackRecentQuery(c.env, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
         }),
       ]))
       const [firstIndexed, history] = await Promise.all([
-        getFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-        getScoreHistory(c.env.CACHE_KV, owner, repo),
+        getFirstSeen(c.env, provider, owner, repo),
+        getScoreHistory(c.env, owner, repo),
       ])
       const trend = computeTrend(history)
       c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
@@ -654,8 +658,8 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     // Emit result/provider events on miss (powers trending) and track for landing page.
     c.executionCtx.waitUntil(Promise.all([
       cacheManager.put(provider, owner, repo, result),
-      trackFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-      trackRecentQuery(c.env.CACHE_KV, {
+      trackFirstSeen(c.env, provider, owner, repo),
+      trackRecentQuery(c.env, {
         owner, repo, score: result.score, verdict: result.verdict, checkedAt: result.checkedAt,
       }),
       buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, {
@@ -670,8 +674,8 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     ]))
 
     const [firstIndexed, history] = await Promise.all([
-      getFirstSeen(c.env.CACHE_KV, provider, owner, repo),
-      getScoreHistory(c.env.CACHE_KV, owner, repo),
+      getFirstSeen(c.env, provider, owner, repo),
+      getScoreHistory(c.env, owner, repo),
     ])
     const trend = computeTrend(history)
     
@@ -739,7 +743,7 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
   // Hash + check cache first
   const contentHash = await hashManifest(content)
   const auditCacheKey = `audit:result:${contentHash}`
-  const cached = await c.env.CACHE_KV.get(auditCacheKey)
+  const cached = await auditCacheGetText(c.env, auditCacheKey)
 
   if (cached) {
     // Already scored — redirect straight to result page
@@ -765,7 +769,7 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
   // waitUntil for complete results, so the redirect could race.
   // Always persist (even partial results) so /audit/:hash can render.
   const auditCacheKey2 = `audit:result:${contentHash}`
-  await c.env.CACHE_KV.put(auditCacheKey2, JSON.stringify(auditResult), {
+  await auditCachePutText(c.env, auditCacheKey2, contentHash, JSON.stringify(auditResult), {
     expirationTtl: 6 * 60 * 60, // 6 hours
   })
 

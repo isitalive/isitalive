@@ -12,7 +12,7 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
     content: `
     <div class="admin-header">
       <h1>API Keys</h1>
-      <p>Manage API keys for authenticated access. Keys are stored in Workers KV.</p>
+      <p>Manage API keys for authenticated access. Keys are stored in D1.</p>
     </div>
 
     ${flash ? `

@@ -11,6 +11,7 @@ import type { ParsedDep } from './parsers';
 import type { Env } from '../types/env';
 import { fetchWithTimeout } from '../utils/http';
 import { runWithConcurrency } from '../utils/concurrency';
+import { cacheGetText, cachePutText } from '../db/state';
 
 export interface ResolvedDep extends ParsedDep {
   /** GitHub owner/repo, or null if unresolvable */
@@ -67,7 +68,7 @@ async function resolveSingle(
 ): Promise<ResolvedDep> {
   // Check cache first
   const cacheKey = `${RESOLVE_CACHE_PREFIX}${dep.ecosystem}:${dep.name}`;
-  const cached = await env.CACHE_KV.get(cacheKey);
+  const cached = await cacheGetText(env, cacheKey);
   if (cached) {
     const parsed = JSON.parse(cached);
     if (parsed.github) {
@@ -86,7 +87,7 @@ async function resolveSingle(
   const cacheValue = result.github
     ? { github: result.github }
     : { github: null, reason: result.unresolvedReason };
-  const putPromise = env.CACHE_KV.put(cacheKey, JSON.stringify(cacheValue), {
+  const putPromise = cachePutText(env, cacheKey, JSON.stringify(cacheValue), {
     expirationTtl: RESOLVE_CACHE_TTL,
   });
   if (ctx) {

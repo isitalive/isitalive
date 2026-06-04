@@ -108,10 +108,7 @@ function createEnv(cacheKv: ReturnType<typeof createMockKV>): Env {
     RATE_LIMITER_ANON: { limit: vi.fn(async () => ({ success: true })) },
     RATE_LIMITER_AUTH: { limit: vi.fn(async () => ({ success: true })) },
     GITHUB_TOKEN: 'gh-token',
-    PROVIDER_PIPELINE: { send: vi.fn(async () => {}) },
-    RESULT_PIPELINE: { send: vi.fn(async () => {}) },
-    USAGE_PIPELINE: { send: vi.fn(async () => {}) },
-    MANIFEST_PIPELINE: { send: vi.fn(async () => {}) },
+    EVENT_QUEUE: { sendBatch: vi.fn(async () => {}) },
   } as unknown as Env
 }
 

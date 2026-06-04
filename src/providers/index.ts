@@ -15,6 +15,7 @@ import { emitAll } from '../pipeline/emit';
 import type { Env } from '../types/env';
 import { isProviderError, ProviderError } from './errors';
 import * as circuit from './circuit';
+import { cacheGetText, cachePutText } from '../db/state';
 
 export const providers = {
   github: new GitHubProvider(),
@@ -87,10 +88,10 @@ async function acquireRevalidationLease(
   repo: string,
 ): Promise<boolean> {
   const key = `${REVALIDATE_LOCK_PREFIX}${projectKey(provider, owner, repo)}`
-  const existing = await env.CACHE_KV.get(key)
+  const existing = await cacheGetText(env, key)
   if (existing) return false
 
-  await env.CACHE_KV.put(key, String(Date.now()), {
+  await cachePutText(env, key, String(Date.now()), {
     expirationTtl: REVALIDATE_LOCK_TTL_S,
   })
   return true
@@ -117,7 +118,7 @@ export async function scheduleRevalidation(
  * Background revalidation — fetches fresh data, scores it, and updates cache.
  * Used by check, badge, and UI routes for stale-while-revalidate.
  *
- * Archives the raw response via the Provider Pipeline.
+ * Archives the raw response via the event queue.
  */
 export async function revalidateInBackground(
   env: Env,
@@ -130,7 +131,7 @@ export async function revalidateInBackground(
     const { rawData, result } = await fetchAndScoreProject(env, provider, owner, repo)
     const cacheManager = new CacheManager(env)
     await cacheManager.put(provider, owner, repo, result)
-    // Archive raw data via Pipeline
+    // Archive raw data via the event queue
     await emitAll(env, {
       provider: [buildProviderEvent(prov.name, owner, repo, rawData)],
       result: [buildResultEvent(result, 'revalidation')],

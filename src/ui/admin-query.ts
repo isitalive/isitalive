@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Admin R2 SQL Query Console — with integrated chart visualization
+// Admin D1 Query Console — with integrated chart visualization
 //
 // Features:
 // - Textarea for custom SQL queries
@@ -144,7 +144,7 @@ export function adminQueryPage(): string {
     content: `
     <div class="admin-header">
       <h1>Query Console</h1>
-      <p>Run SQL queries against the R2 analytics Iceberg table</p>
+      <p>Run read-only SQL queries against D1 analytics tables</p>
     </div>
 
     <div class="query-toolbar">

@@ -27,8 +27,8 @@ describe('sendWithRetry', () => {
     expect(errSpy).toHaveBeenCalledTimes(1)
     const logged = errSpy.mock.calls[0][0] as string
     const parsed = JSON.parse(logged)
-    expect(parsed.msg).toBe('pipeline_send_failed')
-    expect(parsed.pipeline).toBe('usage')
+    expect(parsed.msg).toBe('event_enqueue_failed')
+    expect(parsed.queue).toBe('usage')
     expect(parsed.reason).toBe('error')
     errSpy.mockRestore()
   })

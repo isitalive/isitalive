@@ -16,6 +16,8 @@ import { openApiSpec } from './routes/openapi';
 import { llmsTxt, llmsFullTxt } from './routes/llms';
 import { aiPluginManifest } from './routes/aiPlugin';
 
+const HEALTH_PROBE_TIMEOUT_MS = 500;
+
 export const app = new Hono<{ Bindings: Env }>();
 
 // Security headers — applied globally via Hono's secureHeaders middleware
@@ -108,15 +110,22 @@ app.get('/.well-known/ai-plugin.json', (c) => {
 app.get('/health', async (c) => {
   c.header('Cache-Control', 'no-store');
   const start = Date.now();
-  let kv: 'ok' | 'degraded' = 'degraded';
+  let db: 'ok' | 'degraded' = 'degraded';
+  let kv: 'ok' | 'degraded' | undefined;
   try {
+    const legacyKv = (c.env as unknown as { CACHE_KV?: KVNamespace }).CACHE_KV
     await Promise.race([
-      c.env.CACHE_KV.get('health:ping'),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('kv timeout')), 80)),
+      c.env.DB
+        ? c.env.DB.prepare('SELECT 1').first()
+        : legacyKv?.get('health:ping'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('health probe timeout')), HEALTH_PROBE_TIMEOUT_MS)),
     ]);
-    kv = 'ok';
-  } catch { /* kv stays 'degraded' */ }
-  return c.json({ status: kv, kv, version, probeMs: Date.now() - start }, kv === 'ok' ? 200 : 503);
+    db = 'ok';
+    if (!c.env.DB) kv = 'ok';
+  } catch {
+    if (!c.env.DB) kv = 'degraded';
+  }
+  return c.json({ status: db, db, kv, version, probeMs: Date.now() - start }, db === 'ok' ? 200 : 503);
 });
 
 // Global error handler — content-negotiated response for unhandled exceptions.

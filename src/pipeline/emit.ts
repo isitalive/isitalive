@@ -1,150 +1,108 @@
 // ---------------------------------------------------------------------------
-// Pipeline Emit — typed functions to send events to Cloudflare Pipelines
+// Event Emit — enqueue analytics events for D1 + R2 archive consumption
 //
-// Each function sends to the corresponding Pipeline binding.
-// All sends are fire-and-forget (use with waitUntil).
-//
-// Events are flattened before sending: envelope fields (domain, timestamp, id)
-// are merged with data fields into a single flat object to match the Iceberg
-// schema defined in schemas/*.json.
+// The public helper names stay stable so route handlers do not care whether
+// events travel through Pipelines or Queues.
 // ---------------------------------------------------------------------------
 
 import type { ProviderEvent } from '../events/provider'
 import type { ResultEvent } from '../events/result'
 import type { UsageEvent } from '../events/usage'
 import type { ManifestEvent } from '../events/manifest'
-import type { PipelineBindings } from './types'
+import type { EventQueueBindings, QueuedAnalyticsEvent } from './types'
 
-type ProviderStreamRecord = Parameters<PipelineBindings['PROVIDER_PIPELINE']['send']>[0][number]
-type ResultStreamRecord = Parameters<PipelineBindings['RESULT_PIPELINE']['send']>[0][number]
-type UsageStreamRecord = Parameters<PipelineBindings['USAGE_PIPELINE']['send']>[0][number]
-type ManifestStreamRecord = Parameters<PipelineBindings['MANIFEST_PIPELINE']['send']>[0][number]
+const QUEUE_SEND_TIMEOUT_MS = 2000
+const QUEUE_RETRY_DELAYS_MS = [250, 500]
 
-function nullsToUndefined<T extends Record<string, unknown>>(record: T): T {
-  return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [key, value === null ? undefined : value]),
-  ) as T
+class QueueTimeoutError extends Error {
+  constructor() { super('queue send timed out') }
 }
 
-/**
- * Flatten an event envelope into a single-level object for Iceberg.
- * Merges { domain, timestamp, id, data: { ... } } → { domain, type, timestamp, id, ... }
- *
- * NOTE: `type` is kept for backward compatibility — usage_events and
- * manifest_events streams still require it. V2 streams ignore extra fields.
- */
-function flattenProvider(event: ProviderEvent): ProviderStreamRecord {
-  const { data, ...envelope } = event
-  return nullsToUndefined({ ...envelope, ...data }) as ProviderStreamRecord
-}
-
-function flattenResult(event: ResultEvent): ResultStreamRecord {
-  const { data, ...envelope } = event
-  return nullsToUndefined({ ...envelope, ...data }) as ResultStreamRecord
-}
-
-function flattenUsage(event: UsageEvent): UsageStreamRecord {
-  const { data, ...envelope } = event
-  return nullsToUndefined({ ...envelope, type: event.domain, ...data }) as UsageStreamRecord
-}
-
-function flattenManifest(event: ManifestEvent): ManifestStreamRecord {
-  const { data, ...envelope } = event
-  return nullsToUndefined({ ...envelope, type: event.domain, ...data }) as ManifestStreamRecord
-}
-
-const PIPELINE_SEND_TIMEOUT_MS = 2000
-const PIPELINE_RETRY_DELAYS_MS = [250, 500]
-
-class PipelineTimeoutError extends Error {
-  constructor() { super('pipeline send timed out') }
-}
-
-/** Fire-and-forget send with per-attempt timeout + bounded retry. Errors are absorbed. */
+/** Fire-and-forget enqueue with per-attempt timeout + bounded retry. Errors are absorbed. */
 export async function sendWithRetry(
   send: () => Promise<void>,
   label: string,
 ): Promise<void> {
-  for (let attempt = 0; attempt <= PIPELINE_RETRY_DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; attempt <= QUEUE_RETRY_DELAYS_MS.length; attempt++) {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       await Promise.race([
         send(),
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new PipelineTimeoutError()), PIPELINE_SEND_TIMEOUT_MS)
+          timer = setTimeout(() => reject(new QueueTimeoutError()), QUEUE_SEND_TIMEOUT_MS)
         }),
       ])
       if (timer) clearTimeout(timer)
       return
     } catch (err) {
       if (timer) clearTimeout(timer)
-      // `.send()` has no AbortSignal, so a timed-out send may still succeed
-      // server-side. Retrying would risk duplicate analytics events, so we
-      // log and give up on timeouts and only retry on explicit failures.
-      const isTimeout = err instanceof PipelineTimeoutError
-      const isTerminal = isTimeout || attempt === PIPELINE_RETRY_DELAYS_MS.length
+      const isTimeout = err instanceof QueueTimeoutError
+      const isTerminal = isTimeout || attempt === QUEUE_RETRY_DELAYS_MS.length
       if (isTerminal) {
         console.error(JSON.stringify({
           level: 'error',
-          msg: 'pipeline_send_failed',
-          pipeline: label,
+          msg: 'event_enqueue_failed',
+          queue: label,
           reason: isTimeout ? 'timeout' : 'error',
           error: err instanceof Error ? err.message : String(err),
         }))
         return
       }
-      await new Promise((r) => setTimeout(r, PIPELINE_RETRY_DELAYS_MS[attempt]))
+      await new Promise((resolve) => setTimeout(resolve, QUEUE_RETRY_DELAYS_MS[attempt]))
     }
   }
 }
 
-/**
- * Emit a provider event to the provider pipeline.
- * Call via `ctx.waitUntil(emitProviderEvent(env, event))`.
- */
+function message(body: QueuedAnalyticsEvent): MessageSendRequest<QueuedAnalyticsEvent> {
+  return { body, contentType: 'json' }
+}
+
 export async function emitProviderEvent(
-  env: PipelineBindings,
+  env: EventQueueBindings,
   event: ProviderEvent,
 ): Promise<void> {
-  await sendWithRetry(() => env.PROVIDER_PIPELINE.send([flattenProvider(event)]), 'provider')
+  await sendWithRetry(
+    () => env.EVENT_QUEUE.send({ domain: 'provider', event }, { contentType: 'json' }),
+    'analytics',
+  )
 }
 
-/**
- * Emit a result event to the result pipeline.
- */
 export async function emitResultEvent(
-  env: PipelineBindings,
+  env: EventQueueBindings,
   event: ResultEvent,
 ): Promise<void> {
-  await sendWithRetry(() => env.RESULT_PIPELINE.send([flattenResult(event)]), 'result')
+  await sendWithRetry(
+    () => env.EVENT_QUEUE.send({ domain: 'result', event }, { contentType: 'json' }),
+    'analytics',
+  )
 }
 
-/**
- * Emit a usage event to the usage pipeline.
- */
 export async function emitUsageEvent(
-  env: PipelineBindings,
+  env: EventQueueBindings,
   event: UsageEvent,
 ): Promise<void> {
-  await sendWithRetry(() => env.USAGE_PIPELINE.send([flattenUsage(event)]), 'usage')
+  await sendWithRetry(
+    () => env.EVENT_QUEUE.send({ domain: 'usage', event }, { contentType: 'json' }),
+    'analytics',
+  )
 }
 
-/**
- * Emit a manifest event to the manifest pipeline.
- */
 export async function emitManifestEvent(
-  env: PipelineBindings,
+  env: EventQueueBindings,
   event: ManifestEvent,
 ): Promise<void> {
-  await sendWithRetry(() => env.MANIFEST_PIPELINE.send([flattenManifest(event)]), 'manifest')
+  await sendWithRetry(
+    () => env.EVENT_QUEUE.send({ domain: 'manifest', event }, { contentType: 'json' }),
+    'analytics',
+  )
 }
 
 /**
- * Emit multiple events to their respective pipelines.
- * Convenience for route handlers that need to send to multiple pipelines.
+ * Emit multiple events to the analytics queue.
+ * Convenience for route handlers that need to send multiple domains together.
  */
 export async function emitAll(
-  env: PipelineBindings,
+  env: EventQueueBindings,
   events: {
     provider?: ProviderEvent[]
     result?: ResultEvent[]
@@ -152,12 +110,13 @@ export async function emitAll(
     manifest?: ManifestEvent[]
   },
 ): Promise<void> {
-  const promises: Promise<void>[] = []
+  const messages: MessageSendRequest<QueuedAnalyticsEvent>[] = [
+    ...(events.provider ?? []).map((event) => message({ domain: 'provider', event })),
+    ...(events.result ?? []).map((event) => message({ domain: 'result', event })),
+    ...(events.usage ?? []).map((event) => message({ domain: 'usage', event })),
+    ...(events.manifest ?? []).map((event) => message({ domain: 'manifest', event })),
+  ]
 
-  for (const e of events.provider ?? []) promises.push(emitProviderEvent(env, e))
-  for (const e of events.result ?? []) promises.push(emitResultEvent(env, e))
-  for (const e of events.usage ?? []) promises.push(emitUsageEvent(env, e))
-  for (const e of events.manifest ?? []) promises.push(emitManifestEvent(env, e))
-
-  await Promise.allSettled(promises)
+  if (messages.length === 0) return
+  await sendWithRetry(() => env.EVENT_QUEUE.sendBatch(messages), 'analytics')
 }
