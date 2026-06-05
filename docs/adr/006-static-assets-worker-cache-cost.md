@@ -1,10 +1,13 @@
 # ADR-006: Static Assets, Worker Caching & Cost Architecture
 
-**Status**: Accepted
+**Status**: Accepted; pricing sections superseded by ADR-008
 **Date**: 2026-03-22
 **Authors**: @fforootd
 **Supersedes**: Parts of ADR-002 § "CDN edge at zero Worker cost"
 **Related**: ADR-007 (GTM & billing)
+
+> [!NOTE]
+> The Worker cost correction remains current. ADR-008 supersedes the pricing tables and paid-tier launch assumptions with a free-to-use access model.
 
 ## Context
 

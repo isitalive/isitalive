@@ -28,9 +28,9 @@ describe('tier config', () => {
     }
   })
 
-  it('higher tiers have shorter fresh TTLs', () => {
-    expect(TIERS.enterprise.freshTtl).toBeLessThan(TIERS.pro.freshTtl)
-    expect(TIERS.pro.freshTtl).toBeLessThan(TIERS.free.freshTtl)
+  it('legacy tier aliases use the free access TTLs', () => {
+    expect(TIERS.pro).toEqual(TIERS.free)
+    expect(TIERS.enterprise).toEqual(TIERS.free)
   })
 })
 
@@ -42,7 +42,7 @@ describe('cacheControlHeaders', () => {
       expect(headers['CDN-Cache-Control']).toBe('public, s-maxage=86400')
     })
 
-    it('returns browser Cache-Control with tier TTL', () => {
+    it('returns browser Cache-Control with the free access TTL', () => {
       const headers = cacheControlHeaders('free', false)
       const free = TIERS.free
       const swr = free.staleTtl - free.freshTtl

@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { defineConfig } from 'vitest/config';
+import { readFile } from 'node:fs/promises'
+import { defineConfig, configDefaults } from 'vitest/config'
 
 export default defineConfig({
   plugins: [
@@ -7,17 +7,18 @@ export default defineConfig({
       name: 'markdown-as-text',
       enforce: 'pre',
       async load(id) {
-        if (!id.endsWith('.md')) {
-          return null;
-        }
-
-        const content = await readFile(id, 'utf8');
-        return `export default ${JSON.stringify(content)};`;
+        if (!id.endsWith('.md')) return null
+        const content = await readFile(id, 'utf8')
+        return `export default ${JSON.stringify(content)};`
       },
     },
   ],
   test: {
     setupFiles: ['./src/test-setup.ts'],
-    testTimeout: 30_000, // fuzz job runs FC_NUM_RUNS=10000; default 5s is too tight
+    testTimeout: 30_000,
+    exclude: [
+      ...configDefaults.exclude,
+      '**/.claude/**',
+    ],
   },
-});
+})

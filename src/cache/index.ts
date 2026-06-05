@@ -29,9 +29,11 @@ const CACHE_PREFIX = `isitalive:${METHODOLOGY.version}:`;
 const CACHE_DOMAIN = 'https://cache.isitalive.dev';
 
 // ---------------------------------------------------------------------------
-// Tier definitions
+// Access policy definitions
 // ---------------------------------------------------------------------------
 
+// `pro` and `enterprise` remain accepted only so legacy API-key rows and old
+// tests/utilities do not crash. Runtime auth normalizes all valid keys to free.
 export type Tier = 'free' | 'pro' | 'enterprise';
 
 interface TierConfig {
@@ -43,23 +45,17 @@ interface TierConfig {
   l1Ttl: number;
 }
 
+const FREE_TIER_CONFIG: TierConfig = {
+  freshTtl: 24 * 60 * 60,     // 24h — fresh
+  staleTtl: 48 * 60 * 60,     // 48h — serve stale up to 2 days
+  l1Ttl: 24 * 60 * 60,        // 24h in Cache API
+}
+
 export const TIERS: Record<Tier, TierConfig> = {
-  free: {
-    freshTtl: 24 * 60 * 60,     // 24h — fresh
-    staleTtl: 48 * 60 * 60,     // 48h — serve stale up to 2 days
-    l1Ttl: 24 * 60 * 60,        // 24h in Cache API
-  },
-  pro: {
-    freshTtl: 1 * 60 * 60,      // 1h fresh
-    staleTtl: 6 * 60 * 60,      // 6h stale window
-    l1Ttl: 1 * 60 * 60,         // 1h in Cache API
-  },
-  enterprise: {
-    freshTtl: 15 * 60,           // 15min fresh
-    staleTtl: 1 * 60 * 60,      // 1h stale window
-    l1Ttl: 15 * 60,             // 15min in Cache API
-  },
-};
+  free: FREE_TIER_CONFIG,
+  pro: FREE_TIER_CONFIG,
+  enterprise: FREE_TIER_CONFIG,
+}
 
 /** L2 max TTL — also the hard cap for the degraded-fallback window. */
 const L2_MAX_TTL = 7 * 24 * 60 * 60;
@@ -407,7 +403,7 @@ export class CacheManager {
 // Cache-Control headers for downstream (browser)
 //
 // Two separate concerns:
-//   Cache-Control: browser caching (per-tier TTL)
+//   Cache-Control: browser caching (free access TTL)
 //   CDN-Cache-Control: Cloudflare CDN edge caching
 //
 // NOTE (ADR-006): CDN-Cache-Control does NOT prevent Worker invocations.
@@ -433,7 +429,7 @@ export function cacheControlHeaders(tier: Tier, isAuthenticated: boolean): Cache
     }
   }
 
-  // Anonymous: CDN caches for 24h, browser uses tier TTL
+  // Anonymous: CDN caches for 24h, browser uses the free access TTL
   return {
     'Cache-Control': `public, max-age=${config.l1Ttl}, stale-while-revalidate=${swr}`,
     'CDN-Cache-Control': `public, s-maxage=86400`,

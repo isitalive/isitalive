@@ -284,7 +284,7 @@ describe('agent-ready health API', () => {
   it('keeps manifest audits compact by default but still includes provenance fields', async () => {
     const rawData = makeRawProjectData()
     const staleResult = scoreProject(rawData, 'github')
-    seedRepoCache(cacheKv, staleResult, Date.now() - (30 * 60 * 60 * 1000))
+    seedRepoCache(cacheKv, staleResult, Date.now() - (72 * 60 * 60 * 1000))
     const env = createEnv(cacheKv)
 
     const fetchSpy = vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)

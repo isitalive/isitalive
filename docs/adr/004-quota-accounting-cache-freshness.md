@@ -1,9 +1,12 @@
 # ADR-004: Quota Accounting & Cache Freshness Tiers
 
-**Status**: Accepted
+**Status**: Partially superseded by ADR-008
 **Date**: 2026-03-21
 **Authors**: @fforootd
 **Related**: ADR-002 (billing model), ADR-003 (content-addressed caching), ADR-007 (GTM & billing)
+
+> [!NOTE]
+> ADR-008 supersedes the launch-time quota and freshness-tier decisions. During free-to-use access, cached and fresh scoring are tracked for analytics, not billing; all authenticated access uses the same 24h fresh / 48h stale cache policy.
 
 ## Context
 
@@ -78,102 +81,59 @@ However, individual dependency scores are cached independently (via `/api/check`
 
 This two-level caching (per-manifest hash + per-dependency) minimizes quota consumption naturally.
 
-### 4. OIDC Quota (GitHub Action — Public Repos)
+### 4. OIDC Quota (Superseded for Free Access)
 
-Public repos using GitHub Actions OIDC get a separate, fixed free quota:
+ADR-008 removes monthly GitHub Actions OIDC quota enforcement. Public repositories using OIDC authenticate as free traffic and share the authenticated infrastructure limit:
 
-| Scope | Quota | Reset |
+| Scope | Limit | Reset |
 | --- | --- | --- |
-| Per public repository | 500 deps scored/month | Monthly |
-| Per organization | 5,000 deps scored/month (aggregate) | Monthly |
+| Authenticated API key or GitHub Actions OIDC | 50 requests/min | Per minute |
 
-Tracked via KV: `oidc:quota:{repository}` → `{ used: 142, limit: 500, period: "2026-03" }`
+Private repository OIDC remains rejected. Private CI should use an authenticated API key.
 
-When quota is exceeded, the POST returns 429 with:
+### 5. Quota Enforcement Mechanism (Superseded for Free Access)
 
-```json
-{
-  "error": "OIDC quota exceeded",
-  "used": 500,
-  "limit": 500,
-  "hint": "Add an ISITALIVE_API_KEY secret for higher limits"
-}
-```
-
-### 5. Quota Enforcement Mechanism
-
-Consistent with ADR-002's approach — enforcement does not need to be real-time. The rate limiter protects infra; quota enforcement can lag by ~10 minutes.
+During free-to-use access, quota counters are not used to reject requests. The rate limiter protects infrastructure in real time:
 
 ```text
-Layer 3 scoring happens
-    │
-    ▼
-Usage event emitted to USAGE_PIPELINE (includes dep count)
-    │
-    ▼
-Cron (every 10 min): aggregate per-key usage from Iceberg
-    │
-    ▼
-KV: quota:{api_key} → { used: 4821, limit: 10000, period: "2026-03" }
-    │
-    ▼
-On each authenticated POST: read KV counter
-    → if used >= limit → 429 "Quota exceeded"
+Request arrives
+    |
+    v
+Auth resolves anonymous, API key, or public OIDC identity
+    |
+    v
+Rate limiter enforces 5/min anonymous or 50/min authenticated
+    |
+    v
+Cache-first scoring records events for analytics and history
 ```
 
-For OIDC, the same flow applies with `oidc:quota:{repository}` as the key.
+Scoring, usage, provider, manifest, first-seen, trending, and history data collection remains active. Those datasets are analytics inputs, not billing enforcement inputs, until a future ADR reintroduces quotas.
 
-> [!NOTE]
-> The ~10 minute lag means a customer could slightly exceed their quota. This is acceptable — the rate limiter (1,000 req/min) prevents extreme overshoot, and the small overage acts as a natural grace period.
+### 6. CI Behavior During Free Access
 
-### 6. Fail-Open CI Behavior
+GitHub Actions audits for public repositories authenticate through OIDC and run under the 50 requests/min infrastructure limit. If the service returns a 429 because that limit is exceeded, the action can retry or warn according to its own policy, but the API response is no longer a monthly quota or paid-upgrade message.
 
-When a GitHub Action audit exhausts the scored-dep budget, the CI pipeline **must not break**. The action prints a warning and continues with exit code 0:
+### 7. Interaction Between Manifest Cache and Freshness
 
-```
-⚠️ IsItAlive quota exceeded (10,000/10,000 scored deps this month).
-   Dependency audit skipped — build continues.
-   Upgrade: https://isitalive.dev/pricing
-```
+All runtime access uses the free access cache policy:
 
-This "Fail Open" design serves three purposes:
+| Fresh | Stale | L1 |
+| ---: | ---: | ---: |
+| 24h | 48h | 24h |
 
-1. **Never break a customer's CI** — builds stay green even under quota exhaustion
-2. **Natural upsell** — the warning creates a conversation without friction
-3. **Abuse protection** — a rogue script can't consume infinite compute; it hits the budget and gets warned
-
-> [!NOTE]
-> The 429 API response for quota exhaustion includes AI-friendly messaging so LLM agents can relay the upsell to their users.
-
-### 7. Interaction Between GET Cache and Freshness
-
-A subtle scenario: a Pro customer who wants 1h-fresh data for a manifest that the 7-day GET cache already has.
-
-**Resolution**: The Action/client should POST when freshness matters, not GET. The GET endpoint is optimized for cost ($0), not freshness. The Action can be configured per tier:
-
-```yaml
-- uses: isitalive/audit-action@v1
-  with:
-    # 'cache-first' = try GET, then POST (default, cheapest)
-    # 'fresh' = always POST, skip GET (uses quota but gets tier-fresh data)
-    strategy: cache-first
-```
-
-Most users should use `cache-first`. Only Pro/Enterprise customers with strict freshness requirements would use `fresh`.
+Legacy `pro` or `enterprise` key records are accepted for compatibility, but request handling normalizes them to the runtime `free` tier.
 
 ## Consequences
 
 ### Positive
 
-- **Fair billing** — only pay for actual compute, not cache hits
-- **Clear value prop** — "you only pay for new scores"
-- **Freshness incentive** — paying more gets fresher data, creating a natural upgrade path
+- **Simple free access** — users and CI can try authenticated manifest audits without pricing friction
+- **Infrastructure protection remains explicit** — abuse control is handled by per-minute limits
 - **Crowdsource benefit** — identical manifests scored once, all users benefit
-- **Simple enforcement** — KV counters, ~10 min lag, rate limiter as safety net
+- **Analytics preserved** — usage and score history still accumulate for future product decisions
 
 ### Negative
 
-- **Per-dep counting complexity** — need to track individual dep scores within manifest audits
-- **Freshness gap for GET cache** — 7-day CDN cache may serve stale results to GET users
-- **Quota lag** — ~10 min window allows slight quota overshoot
-- **OIDC quota tracking** — additional KV writes per public repo per month
+- **No billing enforcement** — unusually heavy but compliant users are limited only by rate limits and cache behavior
+- **Less freshness differentiation** — all users receive the same 24h/48h cache policy

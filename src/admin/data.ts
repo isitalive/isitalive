@@ -24,8 +24,8 @@ export interface AdminOverview {
   warmRepoCount: number
   coldRepoCount: number
   trendingCount: number
-  /** Rate limit tier config — code-defined, PR-reviewable */
-  tierLimits: { tier: string; limit: number; period: number }[]
+  /** Rate limit config — code-defined, PR-reviewable */
+  rateLimits: { access: string; limit: number; period: number }[]
 }
 
 export async function getAdminOverview(env: Env): Promise<AdminOverview> {
@@ -50,10 +50,10 @@ export async function getAdminOverview(env: Env): Promise<AdminOverview> {
     warmRepoCount: warm,
     coldRepoCount: cold,
     trendingCount: trending.length,
-    tierLimits: [
-      { tier: 'free', limit: 60, period: 60 },
-      { tier: 'pro', limit: 120, period: 60 },
-      { tier: 'enterprise', limit: 600, period: 60 },
+    rateLimits: [
+      { access: 'anonymous', limit: 5, period: 60 },
+      { access: 'authenticated', limit: 50, period: 60 },
+      { access: 'admin-login', limit: 10, period: 60 },
     ],
   }
 }
@@ -69,7 +69,7 @@ export interface KeyEntry extends ApiKeyEntry {
 
 export interface KeyStore {
   list(): Promise<KeyEntry[]>
-  create(name: string, tier: ApiKeyEntry['tier']): Promise<{ key: string; entry: KeyEntry }>
+  create(name: string): Promise<{ key: string; entry: KeyEntry }>
   revoke(keyId: string): Promise<boolean>
 }
 
@@ -84,8 +84,8 @@ export class D1KeyStore implements KeyStore {
     return listApiKeys(this.env)
   }
 
-  async create(name: string, tier: ApiKeyEntry['tier']): Promise<{ key: string; entry: KeyEntry }> {
-    return createApiKey(this.env, name, tier)
+  async create(name: string): Promise<{ key: string; entry: KeyEntry }> {
+    return createApiKey(this.env, name)
   }
 
   async revoke(keyId: string): Promise<boolean> {
@@ -120,11 +120,11 @@ export class KVKeyStore implements KeyStore {
     return keys
   }
 
-  async create(name: string, tier: ApiKeyEntry['tier']): Promise<{ key: string; entry: KeyEntry }> {
+  async create(name: string): Promise<{ key: string; entry: KeyEntry }> {
     const key = `sk_${crypto.randomUUID().replace(/-/g, '')}`
     const entry: ApiKeyEntry = {
       name,
-      tier,
+      tier: 'free',
       active: true,
       created: new Date().toISOString(),
     }

@@ -82,7 +82,6 @@ import { apiDocsPage } from '../src/ui/api-docs.js';
 import { openApiSpec } from '../src/routes/openapi.js';
 import { llmsTxt, llmsFullTxt } from '../src/routes/llms.js';
 import { aiPluginManifest } from '../src/routes/aiPlugin.js';
-import { pricingPage } from '../src/ui/pricing.js';
 
 // ── Render and write ───────────────────────────────────────────────────
 
@@ -95,6 +94,9 @@ function write(relPath: string, content: string) {
 
 console.log('🔨 Building static assets to public/...\n');
 
+// Remove legacy generated pages that are no longer part of the public surface.
+rmSync(resolve(OUT, 'pricing'), { recursive: true, force: true });
+
 // HTML pages
 write('index.html', landingPage(TURNSTILE_SITE_KEY, CF_ANALYTICS_TOKEN));
 write('methodology/index.html', methodologyPage(CF_ANALYTICS_TOKEN));
@@ -102,7 +104,6 @@ write('terms/index.html', termsPage(CF_ANALYTICS_TOKEN));
 write('changelog/index.html', changelogPage(CF_ANALYTICS_TOKEN));
 write('trending/index.html', trendingPage(CF_ANALYTICS_TOKEN));
 write('api/index.html', apiDocsPage(CF_ANALYTICS_TOKEN));
-write('pricing/index.html', pricingPage(TURNSTILE_SITE_KEY, CF_ANALYTICS_TOKEN));
 
 // JSON / text files
 write('openapi.json', JSON.stringify(openApiSpec, null, 2));

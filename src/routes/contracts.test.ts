@@ -4,7 +4,6 @@ import { llmsTxt } from './llms'
 import { apiDocsPage } from '../ui/api-docs'
 import { landingPage } from '../ui/landing'
 import { methodologyPage } from '../ui/methodology'
-import { pricingPage } from '../ui/pricing'
 import { aiPluginManifest } from './aiPlugin'
 import { CACHE_STATUS_DEFINITIONS, METHODOLOGY, SIGNAL_DEFINITIONS } from '../scoring/methodology'
 
@@ -37,7 +36,7 @@ describe('agent contract alignment', () => {
       expect(html).toContain(signal.label)
       expect(html).toContain(`${signal.weight * 100}%`)
     }
-    expect(html).toContain('6 hours')
+    expect(html).toContain('2 days')
     expect(html).toContain('maintenance-health')
   })
 
@@ -48,22 +47,35 @@ describe('agent contract alignment', () => {
     expect(apiDocs).toContain('not a security, license, or compliance verdict')
     expect(apiDocs).toContain('"lastCommit"')
     expect(apiDocs).toContain('l2-hit')
+    expect(apiDocs).toContain('free to use')
     expect(apiDocs).toContain('5 req/min')
+    expect(apiDocs).toContain('50 req/min')
     expect(apiDocs).not.toContain('"last_commit"')
-    expect(apiDocs).not.toContain('60 req/min')
+    expect(apiDocs).not.toContain('free beta')
+    expect(apiDocs).not.toContain('1,000 req/min')
+    expect(apiDocs).not.toContain('/pricing')
+    expect(apiDocs).not.toContain('Pro API key')
+    expect(apiDocs).not.toContain('Enterprise API key')
 
     const landing = landingPage()
     expect(landing).toContain('maintenance-health')
+    expect(landing).toContain('Free to use today')
+    expect(landing).toContain('IsItAlive is free to use for public maintenance-health checks')
     expect(landing).toContain("Don't let your agent install dead dependencies")
+    expect(landing).not.toContain('free beta')
     expect(landing).not.toContain('safe to depend on')
     expect(landing).not.toContain('Does this project look maintained')
 
-    const pricing = pricingPage()
-    expect(pricing).toContain('Maintenance-health scores for any public repo')
-    expect(pricing).not.toContain('security scans')
-
     expect(openApiSpec.info.description).toContain('before humans or AI agents choose a dependency')
+    expect(openApiSpec.info.description).toContain('free to use for public maintenance-health checks')
     expect(openApiSpec.info.description).toContain('not a security, license, or compliance verdict')
+    expect(JSON.stringify(openApiSpec)).not.toContain('free beta')
+    expect(JSON.stringify(openApiSpec)).not.toContain('/pricing')
+    expect(JSON.stringify(openApiSpec)).not.toContain('"pro"')
+    expect(JSON.stringify(openApiSpec)).not.toContain('"enterprise"')
+    expect(llmsTxt).not.toContain('/pricing')
+    expect(llmsTxt).not.toContain('free beta')
+    expect(llmsTxt).not.toContain('Tier-based')
     expect(aiPluginManifest.description_for_model).toContain('before recommending, adding, or auditing')
     expect(aiPluginManifest.description_for_model).toContain('not a security, license, or compliance verdict')
   })

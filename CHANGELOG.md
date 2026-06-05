@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- Public access is now free to use with infrastructure limits only: anonymous requests are limited to 5/min and authenticated API key or GitHub Actions OIDC requests are limited to 50/min.
+- API keys now use the same free cache policy as anonymous requests; legacy key records with old tier names still authenticate as free access.
 - Analytics emission now uses Cloudflare Queues (`EVENT_QUEUE`) instead of Cloudflare Pipelines, preserving existing `emitAll()` call sites.
 - Admin analytics and trending/tracked/sitemap/history reads now query D1 rollups instead of R2 SQL/Iceberg.
 - Replica-safe D1 reads now use `withSession('first-unconstrained')`, while latest-sensitive reads use `withSession('first-primary')`; writes continue through the base D1 binding.
@@ -26,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Removed
 
+- Public pricing page, paid-tier cards, pricing navigation links, waitlist signup flow, and the GitHub Actions OIDC monthly dependency quota.
 - Runtime Pipeline bindings, KV namespace bindings, and R2 SQL Worker secrets from `wrangler.toml`.
 
 ### Fixed

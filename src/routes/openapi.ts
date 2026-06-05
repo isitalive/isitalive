@@ -9,7 +9,7 @@ export const openApiSpec = {
   info: {
     title: 'Is It Alive? API',
     version: '0.7.2',
-    description: 'Check the maintenance-health of open-source GitHub projects before humans or AI agents choose a dependency. Returns a weighted 0-100 score, verdict, methodology metadata, and agent-readable evidence. This is not a security, license, or compliance verdict.',
+    description: 'Check the maintenance-health of open-source GitHub projects before humans or AI agents choose a dependency. IsItAlive is free to use for public maintenance-health checks; infrastructure limits apply. Returns a weighted 0-100 score, verdict, methodology metadata, and agent-readable evidence. This is not a security, license, or compliance verdict.',
     license: {
       name: 'AGPL-3.0',
       url: 'https://www.gnu.org/licenses/agpl-3.0.html',
@@ -29,7 +29,7 @@ export const openApiSpec = {
       get: {
         operationId: 'checkProject',
         summary: 'Check project maintenance',
-        description: 'Returns a maintenance-health score, verdict, signal breakdown, and cache metadata for the specified open-source project. Use before recommending, adding, or auditing a dependency. Results are cached with tiered TTLs based on your API key tier.',
+        description: 'Returns a maintenance-health score, verdict, signal breakdown, and cache metadata for the specified open-source project. Use before recommending, adding, or auditing a dependency. Free-to-use results share a 24h fresh / 48h stale cache policy.',
         parameters: [
           {
             name: 'provider',
@@ -70,14 +70,14 @@ export const openApiSpec = {
                 schema: { type: 'string', enum: ['L1-HIT', 'L2-HIT', 'L2-STALE', 'L2-STALE-DEGRADED', 'L3-MISS'] },
               },
               'X-RateLimit-Limit': {
-                description: 'Maximum requests allowed per minute for your tier',
+                description: 'Maximum requests allowed per minute for your access level',
                 schema: { type: 'integer' },
               },
               // Note: X-RateLimit-Remaining is intentionally omitted —
               // native Cloudflare Rate Limiting doesn't expose a remaining count.
               'X-RateLimit-Tier': {
-                description: 'Your current rate limit tier',
-                schema: { type: 'string', enum: ['free', 'pro', 'enterprise'] },
+                description: 'Current access policy. Free-to-use access currently returns `free`.',
+                schema: { type: 'string', enum: ['free'] },
               },
             },
             content: {
@@ -222,18 +222,13 @@ export const openApiSpec = {
                   properties: {
                     error: { type: 'string' },
                     limit: { type: 'integer' },
-                    tier: { type: 'string', enum: ['free', 'pro', 'enterprise'] },
+                    tier: { type: 'string', enum: ['free'] },
                     authenticated: { type: 'boolean' },
                     retryAfterSeconds: { type: 'integer' },
                     message: { type: 'string' },
                     hint: {
                       type: 'string',
                       description: 'Only present for anonymous requests. Human-readable guidance agents can surface to users.',
-                    },
-                    upgrade_url: {
-                      type: 'string',
-                      format: 'uri',
-                      description: 'Only present for anonymous requests. Pricing/upgrade page for getting an API key.',
                     },
                   },
                 },
@@ -406,7 +401,7 @@ export const openApiSpec = {
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
-        description: 'API key or GitHub Actions OIDC token. Pass as `Authorization: Bearer sk_your_key` or `Authorization: Bearer <oidc_jwt>`. Without auth: 5 req/min (IP-based). With any API key: 1,000 req/min (key-based).',
+        description: 'API key or GitHub Actions OIDC token. Pass as `Authorization: Bearer sk_your_key` or `Authorization: Bearer <oidc_jwt>`. Without auth: 5 req/min (IP-based). With an API key or OIDC token: 50 req/min (identity-based).',
       },
     },
     schemas: {
@@ -548,8 +543,8 @@ export const openApiSpec = {
           },
           tier: {
             type: 'string',
-            enum: ['free', 'pro', 'enterprise'],
-            description: 'Your API key tier (determines cache TTLs)',
+            enum: ['free'],
+            description: 'Current free-to-use cache policy',
           },
           ageSeconds: {
             type: 'integer',
@@ -629,7 +624,7 @@ export const openApiSpec = {
           },
           freshlyScored: {
             type: 'integer',
-            description: 'Number of dependencies freshly scored this request (consumed quota). Cache hits are 0 quota.',
+            description: 'Number of dependencies freshly scored this request. Cache hits are 0 fresh scores.',
           },
           methodology: {
             $ref: '#/components/schemas/Methodology',

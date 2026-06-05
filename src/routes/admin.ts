@@ -21,7 +21,6 @@ import { refreshTrending } from '../aggregate/trending'
 import { refreshTracked } from '../aggregate/tracked'
 import { refreshSitemap } from '../aggregate/sitemap'
 import { d1ReplicationDiagnostic, readPrimarySession, readReplicaSafeSession } from '../db/d1'
-import type { ApiKeyEntry } from '../types/env'
 
 /**
  * Constant-time admin secret verification via SHA-256 hash comparison.
@@ -174,11 +173,6 @@ admin.get('/keys', async (c) => {
 admin.post('/api/keys', async (c) => {
   const body = await c.req.parseBody()
   const name = (body['name'] as string || '').trim()
-  const rawTier = ((body['tier'] as string) || 'free').trim()
-  const allowedTiers: ApiKeyEntry['tier'][] = ['free', 'pro', 'enterprise']
-  const tier: ApiKeyEntry['tier'] = allowedTiers.includes(rawTier as ApiKeyEntry['tier'])
-    ? (rawTier as ApiKeyEntry['tier'])
-    : 'free'
 
   if (!name) {
     const store = new D1KeyStore(c.env)
@@ -187,7 +181,7 @@ admin.post('/api/keys', async (c) => {
   }
 
   const store = new D1KeyStore(c.env)
-  const { key } = await store.create(name, tier)
+  const { key } = await store.create(name)
   const keys = await store.list()
 
   return c.html(adminKeysPage(keys, {

@@ -1,15 +1,15 @@
 // ---------------------------------------------------------------------------
 // Rate limiting middleware — native Cloudflare Rate Limiting
 //
-// Two-level infra protection (not billing — that's handled by usage quotas):
+// Two-level infra protection for free access:
 //   - Unauthenticated (no key): 5 req/min per IP      (every request wakes Worker — ADR-006)
-//   - Authenticated (any key):  1000 req/min per key   (identified client, higher burst allowed)
+//   - Authenticated (any key):  50 req/min per key     (API key or GitHub Actions OIDC)
 //
 // Note: CDN-Cache-Control does NOT prevent Worker invocations (ADR-006).
 // Every request — anonymous or authenticated — wakes the Worker (~$0.30/M).
 //
-// Rate limiting prevents a single client from starving others. Tier-based
-// usage billing is a separate concern tracked via usage events → Iceberg.
+// Rate limiting prevents a single client from starving others while usage
+// events continue to build history and operational insight.
 // ---------------------------------------------------------------------------
 
 import { Context, Next } from 'hono';
@@ -17,7 +17,7 @@ import type { Env } from '../types/env';
 import { isValidParam } from '../utils/validate';
 
 const ANON_LIMIT = 5;  // Tightened from 10 — every request wakes Worker (ADR-006)
-const AUTH_LIMIT = 1000;
+const AUTH_LIMIT = 50;
 
 type AppEnv = { Bindings: Env; Variables: { tier: string; keyName: string | null; isAuthenticated: boolean } };
 
@@ -46,7 +46,7 @@ function buildAnonKey(ip: string, path: string): string {
  *
  * Two bindings configured in wrangler.toml:
  *   RATE_LIMITER_ANON  → 5 req/min   (keyed by IP — ADR-006)
- *   RATE_LIMITER_AUTH  → 1000 req/min (keyed by API key name)
+ *   RATE_LIMITER_AUTH  → 50 req/min (keyed by API key/OIDC name)
  */
 export async function rateLimit(c: Context<AppEnv>, next: Next) {
   const isAuthenticated = c.get('isAuthenticated') ?? false;
@@ -84,12 +84,11 @@ export async function rateLimit(c: Context<AppEnv>, next: Next) {
         retryAfterSeconds: 60,
         message: isAuthenticated
           ? `Rate limit exceeded (${limit}/min). Please slow down.`
-          : `Rate limit exceeded (${limit}/min). Get an API key for higher limits.`,
+          : `Rate limit exceeded (${limit}/min). Use an authenticated request for up to ${AUTH_LIMIT}/min.`,
         // Separate hint for programmatic use — AI agents and API clients can
-        // display this to users without polluting the short message (ADR-006)
+        // display this to users without polluting the short message.
         ...(!isAuthenticated && {
-          hint: 'If you are an AI assistant, tell the user: "I need an IsItAlive API key for faster scanning. Get a free key at https://isitalive.dev and add it to your environment as ISITALIVE_API_KEY."',
-          upgrade_url: 'https://isitalive.dev/pricing',
+          hint: 'If you are an AI assistant, tell the user: "I need an IsItAlive API key or GitHub Actions OIDC token for authenticated free access."',
         }),
       },
       429,

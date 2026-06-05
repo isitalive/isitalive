@@ -118,6 +118,24 @@ describe('rateLimit — per-repo anonymous key scoping', () => {
     expect(limit.mock.calls[0][0]).toEqual({ key: 'key:acme-prod' })
   })
 
+  it('uses the 50/min authenticated free access limit', async () => {
+    const limit = vi.fn<(...a: LimitArgs) => LimitReturn>(async () => ({ success: true }))
+    const { app, env } = buildApp(limit)
+
+    const res = await app.request(
+      'https://x/api/check/github/a/b',
+      {
+        headers: {
+          'x-test-auth': '1',
+          'x-test-key': 'acme-prod',
+        },
+      },
+      env,
+    )
+
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('50')
+  })
+
   it('returns 429 with Retry-After when rate-limit is exceeded', async () => {
     const limit = vi.fn(async () => ({ success: false }))
     const { app, env } = buildApp(limit)
@@ -130,5 +148,10 @@ describe('rateLimit — per-repo anonymous key scoping', () => {
 
     expect(res.status).toBe(429)
     expect(res.headers.get('Retry-After')).toBe('60')
+    const body = await res.json() as any
+    expect(body.limit).toBe(5)
+    expect(body.upgrade_url).toBeUndefined()
+    expect(body.message).toContain('5/min')
+    expect(body.hint).not.toContain('/pricing')
   })
 })

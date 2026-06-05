@@ -2,7 +2,7 @@ import type { Env, ApiKeyEntry } from '../types/env'
 import type { RecentQuery } from '../cache/recentQueries'
 import { readPrimarySession, readReplicaSafeSession } from './d1'
 
-type LegacyKvEnv = { CACHE_KV?: KVNamespace; KEYS_KV?: KVNamespace; WAITLIST_KV?: KVNamespace }
+type LegacyKvEnv = { CACHE_KV?: KVNamespace; KEYS_KV?: KVNamespace }
 export type StateStore = Env | D1Database | KVNamespace | LegacyKvEnv
 
 interface SystemCacheRow {
@@ -52,10 +52,6 @@ function asKv(store: StateStore): KVNamespace | null {
 
 function asKeysKv(store: StateStore): KVNamespace | null {
   return (store as LegacyKvEnv).KEYS_KV ?? asKv(store)
-}
-
-function asWaitlistKv(store: StateStore): KVNamespace | null {
-  return (store as LegacyKvEnv).WAITLIST_KV ?? asKv(store)
 }
 
 function ttlToExpiresAt(ttlSeconds?: number): number | null {
@@ -403,17 +399,16 @@ export async function listApiKeys(store: StateStore): Promise<KeyEntry[]> {
 export async function createApiKey(
   store: StateStore,
   name: string,
-  tier: ApiKeyEntry['tier'],
 ): Promise<{ key: string; entry: KeyEntry }> {
   const key = `sk_${crypto.randomUUID().replace(/-/g, '')}`
   const created = new Date().toISOString()
-  const entry: ApiKeyEntry = { name, tier, active: true, created }
+  const entry: ApiKeyEntry = { name, tier: 'free', active: true, created }
   const db = asDb(store)
 
   if (db) {
     await db
       .prepare('INSERT INTO api_keys (key_id, tier, name, active, created) VALUES (?, ?, ?, 1, ?)')
-      .bind(key, tier, name, created)
+      .bind(key, entry.tier, name, created)
       .run()
   } else {
     const kv = asKeysKv(store)
@@ -439,36 +434,6 @@ export async function revokeApiKey(store: StateStore, keyId: string): Promise<bo
   existing.active = false
   await kv.put(keyId, JSON.stringify(existing))
   return true
-}
-
-export async function upsertWaitlistSignup(
-  store: StateStore,
-  emailHash: string,
-  email: string,
-  tier: string,
-): Promise<void> {
-  const db = asDb(store)
-  const now = new Date().toISOString()
-
-  if (db) {
-    await db
-      .prepare(`
-        INSERT INTO waitlist_signups (email_hash, email, tier, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(email_hash) DO UPDATE SET
-          email = excluded.email,
-          tier = excluded.tier,
-          updated_at = excluded.updated_at
-      `)
-      .bind(emailHash, email, tier, now, now)
-      .run()
-    return
-  }
-
-  const kv = asWaitlistKv(store)
-  if (kv) {
-    await kv.put(`waitlist:${emailHash}`, JSON.stringify({ email, tier, timestamp: now }))
-  }
 }
 
 export async function getOidcQuota(

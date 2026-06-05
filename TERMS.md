@@ -11,7 +11,7 @@ Is It Alive? is an infrastructure tool that evaluates the maintenance health of 
 - A free web-based health checker at **isitalive.dev**
 - A public REST API and edge-cached data endpoints
 - Embeddable SVG health badges for README files
-- Paid/Sponsored integrations, including API Keys and a GitHub App for CI/CD auditing
+- Authenticated API access and GitHub Actions support for CI dependency auditing
 
 ## 2\. Acceptable Use & Machine Access
 
@@ -22,13 +22,12 @@ We welcome developers and AI Agents to use the Service. However, you agree not t
 - Scrape the Service at scale to train machine learning models, build a competing dataset, or replicate our scoring engine.
 - Introduce malicious payloads, attempt injection attacks, or probe for vulnerabilities outside of responsible disclosure.
 
-**Commercial Scraping & Resale:** You may not redistribute our API responses or health scores as part of a standalone commercial SaaS product, or white-label the Service as your own. If you intend to embed our API into a closed-source, proprietary commercial product or paid AI Agent, you must obtain a Commercial License. AI agents consuming our free tier must respect the guidelines in our `/llms.txt` file.
+**Commercial Scraping & Resale:** You may not redistribute our API responses or health scores as part of a standalone commercial SaaS product, or white-label the Service as your own. If you intend to embed our API into a closed-source, proprietary commercial product, you must obtain written permission. AI agents consuming the Service must respect the guidelines in our `/llms.txt` file.
 
-## 3\. API Limits, Tokens, & Paid Tiers
+## 3\. API Limits, Tokens, & Free Access
 
-Access to the free API is subject to rate limits to ensure infrastructure stability. **Current limits are published in our API documentation and may be dynamically adjusted at any time.** Higher limits are available via Paid API keys, Sponsorships, or by providing your own GitHub token.
+IsItAlive is free to use for public maintenance-health checks. Infrastructure limits apply: anonymous requests are limited to 5 requests/minute, and authenticated API key or public GitHub Actions OIDC requests are limited to 50 requests/minute. **Current limits are published in our API documentation and may be dynamically adjusted at any time.**
 
-- **Paid Tiers:** Because API usage involves the immediate consumption of serverless compute and third-party AI/API costs, payments and sponsorships are non-refundable.
 - **Revocation:** We reserve the right to throttle, suspend, or revoke access to any API key or IP address that engages in abusive usage patterns, with or without notice.
 
 ## 4\. Disclaimer of Warranties (Read Carefully)
@@ -73,7 +72,7 @@ We are not responsible for the availability, accuracy, or policies of these thir
 
 ## 9\. Service Availability
 
-We strive to keep the Service available, but we do not guarantee uptime SLAs unless explicitly stated in a separate Enterprise contract. The Service may be interrupted for maintenance, updates, or due to circumstances beyond our control.
+We strive to keep the Service available, but we do not guarantee uptime SLAs unless explicitly stated in a separate written agreement. The Service may be interrupted for maintenance, updates, or due to circumstances beyond our control.
 
 ## 10\. Changes to These Terms
 
@@ -81,4 +80,4 @@ We may update these terms from time to time. Material changes will be noted with
 
 ## 11\. Contact
 
-Questions about these terms, Commercial Licensing, or responsible disclosure? Email us at **hi@isitalive.dev** or open an issue on [GitHub](https://github.com/isitalive/isitalive/issues).
+Questions about these terms, licensing, or responsible disclosure? Email us at **hi@isitalive.dev** or open an issue on [GitHub](https://github.com/isitalive/isitalive/issues).
