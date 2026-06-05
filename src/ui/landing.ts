@@ -274,57 +274,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       flex-shrink: 0;
     }
 
-    /* ── Free Access Strip ─────────────────── */
-    .free-section {
-      padding: 30px 0 10px;
-    }
-
-    .free-section-header {
-      max-width: 680px;
-      margin: 0 auto 18px;
-      text-align: center;
-    }
-
-    .free-section-kicker {
-      color: var(--text-muted);
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 1.6px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    .free-section h2 {
-      color: var(--text-primary);
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .free-section p {
-      color: var(--text-secondary);
-      font-size: 0.86rem;
-      line-height: 1.6;
-    }
-
-    .free-feature-list {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      list-style: none;
-      margin: 0 auto;
-      max-width: 780px;
-    }
-
-    .free-feature-list li {
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-secondary);
-      font-size: 0.78rem;
-      line-height: 1.45;
-      padding: 12px 14px;
-    }
-
     /* ── Adoption Section ──────────────────── */
     .adopt-section {
       padding: 64px 0 48px;
@@ -516,7 +465,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     /* ── Responsive ─────────────────────────── */
     @media (max-width: 768px) {
       .adopt-grid { grid-template-columns: 1fr; }
-      .free-feature-list { grid-template-columns: 1fr; }
       .adopt-block:last-child { grid-column: auto; }
     }
 
@@ -686,24 +634,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       </div>
     </div>
 
-    <section class="free-section" aria-labelledby="freeHeading">
-      <div class="free-section-header">
-        <div class="free-section-kicker">Free to use today</div>
-        <h2 id="freeHeading">IsItAlive is free to use for public maintenance-health checks.</h2>
-        <p>Infrastructure limits apply: 5 req/min anonymously and 50 req/min with an API key or public GitHub Actions OIDC.</p>
-      </div>
-      <ul class="free-feature-list">
-        <li>Public GitHub repository maintenance-health checks</li>
-        <li>JSON score, verdict, signals, and drivers via /api/check</li>
-        <li>Package-first resolve and check endpoints for npm packages and Go modules</li>
-        <li>SVG README badges</li>
-        <li>Manifest and lockfile audits with API key or public GitHub Actions OIDC</li>
-        <li>Local CLI for agent workflows: isitalive scan</li>
-        <li>OpenAPI, llms.txt, and AI plugin manifest for agents</li>
-        <li>Methodology, trending, recent queries, and score history where data is available</li>
-      </ul>
-    </section>
-
     <section class="adopt-section">
       <div class="section-label"><span>Use it where dependencies enter your workflow</span></div>
       <div class="adopt-grid">
@@ -737,13 +667,12 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
             <h3>Give agents a liveness API</h3>
           </div>
           <p>Let LLMs and MCP servers sanity-check dependencies before recommending or adding them.</p>
-          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/\\
-  github/vercel/next.js
+          <div class="adopt-code"><span class="ac">$</span> curl 'https://isitalive.dev/api/check/package/npm?name=react'
 
 { <span class="gr">"score"</span>: 92,
   <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
   <span class="gr">"signals"</span>: [...] }</div>
-          <span class="adopt-tag"><a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
+          <span class="adopt-tag">Package-first resolve and check endpoints · CLI: isitalive scan · <a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
         </div>
       </div>
     </section>
