@@ -69,9 +69,7 @@ export function methodologyPage(analyticsToken?: string): string {
   `).join('')
 
   const cacheRows = [
-    ['Free', TIERS.free.freshTtl, TIERS.free.staleTtl],
-    ['Pro', TIERS.pro.freshTtl, TIERS.pro.staleTtl],
-    ['Enterprise', TIERS.enterprise.freshTtl, TIERS.enterprise.staleTtl],
+    ['Free to use', TIERS.free.freshTtl, TIERS.free.staleTtl],
   ].map(([label, freshTtl, staleTtl]) => `
       <tr><td>${label}</td><td>${formatSeconds(freshTtl as number)}</td><td>${formatSeconds(staleTtl as number)}</td></tr>
   `).join('')
@@ -377,9 +375,9 @@ export function methodologyPage(analyticsToken?: string): string {
     </div>
 
     <h2>Caching</h2>
-    <p style="color: var(--text-secondary); font-size: 0.85rem;">Results are cached to avoid excessive API calls and to keep responses fast. Cache TTLs depend on your API tier:</p>
+    <p style="color: var(--text-secondary); font-size: 0.85rem;">Results are cached to avoid excessive API calls and to keep responses fast. Free-to-use requests share one cache policy:</p>
     <table class="scoring-table" style="margin-top: 12px; margin-bottom: 40px;">
-      <tr><th>Tier</th><th>Fresh TTL</th><th>Stale TTL</th></tr>
+      <tr><th>Access</th><th>Fresh TTL</th><th>Stale TTL</th></tr>
       ${cacheRows}
     </table>
 

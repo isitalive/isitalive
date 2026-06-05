@@ -164,7 +164,7 @@ describe('apiKeyAuth middleware', () => {
         headers: { Authorization: 'Bearer sk_test123' },
       }, env)
       const body = await res.json() as any
-      expect(body.tier).toBe('pro')
+      expect(body.tier).toBe('free')
       expect(body.keyName).toBe('TestCo')
       expect(body.isAuthenticated).toBe(true)
       expect(body.oidcClaims).toBeNull()
@@ -227,7 +227,7 @@ describe('apiKeyAuth middleware', () => {
       }, env)
       expect(res.status).toBe(401)
       const body = await res.json() as any
-      expect(body.error).toContain('free for open-source')
+      expect(body.error).toContain('public repositories only')
     })
 
     it('returns 401 for invalid OIDC token', async () => {

@@ -1,9 +1,12 @@
 # ADR-007: Go-to-Market & Billing
 
-**Status**: Accepted
+**Status**: Paused by ADR-008
 **Date**: 2026-03-23
 **Authors**: @fforootd
 **Related**: ADR-002 (tier table), ADR-004 (quota accounting), ADR-006 (cost model)
+
+> [!NOTE]
+> ADR-008 pauses public pricing and billing implementation. Keep this ADR as historical GTM research, not current launch behavior.
 
 ## Context
 

@@ -231,9 +231,9 @@ describe('CacheManager fuzz', () => {
   )
 
   test.prop([scoringResultArb], CACHE_FUZZ_RUNS)(
-    'higher tiers expire faster than lower tiers',
+    'legacy tier aliases use the same free access freshness policy',
     async (result) => {
-      // 2 hours ago — fresh for free, stale for pro, miss for enterprise
+      // 2 hours ago — fresh for every legacy tier alias.
       const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000)
       const cm = new CacheManager(env, ctx)
 
@@ -249,12 +249,9 @@ describe('CacheManager fuzz', () => {
       mockCache._store.clear()
       const ent = await cm.get('github', 'ent', 'test', 'enterprise')
 
-      // Free: 2h < 24h freshTtl → hit
       expect(free.status).toBe('l2-hit')
-      // Pro: 2h > 1h freshTtl, < 6h staleTtl → stale
-      expect(pro.status).toBe('l2-stale')
-      // Enterprise: 2h > 1h staleTtl → miss
-      expect(ent.status).toBe('l3-miss')
+      expect(pro.status).toBe('l2-hit')
+      expect(ent.status).toBe('l2-hit')
     },
   )
 

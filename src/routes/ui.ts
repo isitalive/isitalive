@@ -27,7 +27,6 @@ import changelogMd from '../../CHANGELOG.md'
 import { getScoreHistory, computeTrend } from '../aggregate/history'
 import { apiDocsPage } from '../ui/api-docs'
 import { auditResultPage } from '../ui/audit-result'
-import { pricingPage } from '../ui/pricing'
 import { buildPageViewUsageEvent, buildUsageEvent, type UsageContext } from '../events/usage'
 import { buildResultEvent } from '../events/result'
 import { buildProviderEvent } from '../events/provider'
@@ -45,14 +44,12 @@ import {
   cacheDelete,
   cacheGetText,
   cachePutText,
-  upsertWaitlistSignup,
 } from '../db/state'
 
 // Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
 
 const ui = new Hono<{ Bindings: Env }>()
-const MAX_WAITLIST_BODY_BYTES = 16 * 1024
 
 /** Suppress Turnstile + CF Web Analytics on local dev */
 function isLocalDev(c: any): boolean {
@@ -127,7 +124,6 @@ ui.get('/sitemap.xml', async (c) => {
   const staticPages = [
     '',
     '/trending',
-    '/pricing',
     '/api',
     '/methodology',
     '/changelog',
@@ -281,70 +277,6 @@ ui.get('/_data/history/:provider/:owner/:repo', async (c) => {
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   c.header('CDN-Cache-Control', 'public, s-maxage=3600')
   return c.json({ history })
-})
-
-// Pricing page
-ui.get('/pricing', (c) => {
-  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
-  c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-  const local = isLocalDev(c)
-  return c.html(pricingPage(
-    local ? undefined : c.env.TURNSTILE_SITE_KEY,
-    local ? undefined : c.env.CF_ANALYTICS_TOKEN,
-  ))
-})
-
-// Waitlist email collection — Turnstile-protected, KV-backed
-// Security invariant: always returns identical 200 regardless of duplicate
-ui.post('/_data/waitlist', async (c) => {
-  let body = {} as { email?: string; tier?: string; 'cf-turnstile-response'?: string }
-  try {
-    const rawBody = await readBodyWithByteLimit(c.req.raw, MAX_WAITLIST_BODY_BYTES)
-    body = JSON.parse(rawBody || '{}') as { email?: string; tier?: string; 'cf-turnstile-response'?: string }
-  } catch (err) {
-    if (err instanceof RequestBodyTooLargeError) {
-      return c.json({ ok: false, error: 'payload_too_large' }, 413)
-    }
-  }
-  const email = (body.email ?? '').trim().toLowerCase()
-  const tier = body.tier ?? ''
-  const turnstileToken = body['cf-turnstile-response'] ?? ''
-
-  // Constant response — never reveal validation details
-  const ok = { ok: true, message: "Thanks! We'll notify you when this tier is available." }
-
-  // Basic validation — reject silently with same response
-  if (!email || !email.includes('@') || !['starter', 'pro', 'business'].includes(tier)) {
-    return c.json(ok)
-  }
-
-  // Verify Turnstile token (skip in local dev when no secret configured)
-  const secretKey = c.env.TURNSTILE_SECRET_KEY
-  if (secretKey) {
-    // Token required when Turnstile is configured — silent reject if missing
-    if (!turnstileToken) return c.json(ok)
-    const verify = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        secret: secretKey,
-        response: turnstileToken,
-        remoteip: c.req.header('cf-connecting-ip') ?? '',
-      }),
-    })
-    const outcome = await verify.json() as { success: boolean }
-    if (!outcome.success) return c.json(ok) // Silent rejection
-  }
-
-  // Hash email for KV key — no enumeration of raw emails
-  const encoder = new TextEncoder()
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(email))
-  const hashHex = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('')
-
-  // Always upsert — no timing difference between new and existing
-  await upsertWaitlistSignup(c.env, hashHex, email, tier)
-
-  return c.json(ok)
 })
 
 // Dependency health data — JSON for client-side hydration on result pages

@@ -23,6 +23,17 @@ export const llmsTxt = `# Is It Alive?
 
 Base URL: https://isitalive.dev
 
+## Free to use
+
+IsItAlive is free to use for public maintenance-health checks. Infrastructure limits apply.
+
+- Public GitHub repository maintenance-health checks
+- JSON score, verdict, signals, and drivers via \`/api/check\`
+- SVG README badges
+- \`go.mod\` and \`package.json\` manifest audits with API key or public GitHub Actions OIDC
+- OpenAPI, \`llms.txt\`, and AI plugin manifest for agents
+- Methodology, trending, recent queries, and score history where data is available
+
 ### Check Project Health
 \`GET /api/check/{provider}/{owner}/{repo}\`
 
@@ -48,7 +59,7 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 ### Audit Dependency Manifest
 \`POST /api/manifest\`
 
-**Requires authentication** (API key). Upload a go.mod or package.json and get a scored maintenance-health report for every dependency. Synchronous, idempotent, cache-first.
+**Requires authentication** (API key or GitHub Actions OIDC for public repositories). Upload a go.mod or package.json and get a scored maintenance-health report for every dependency. Synchronous, idempotent, cache-first.
 
 **Optional query params:**
 - \`include=drivers\`: include per-dependency top drivers
@@ -93,14 +104,14 @@ Returns an SVG badge for README embedding.
 
 ## Authentication
 
-Optional for project checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` for higher rate limits and access to all endpoints.
+Optional for project checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` or a GitHub Actions OIDC token for authenticated free access.
 
-Rate limiting is infrastructure protection (not billing). Usage quotas are tracked separately.
+Rate limiting is infrastructure protection. Free access is limited by authentication state.
 
 | Level | Rate Limit | Cache TTL |
 |-------|-----------|-----------|
 | No key | 5/min | 24h fresh / 48h stale |
-| With key | 1,000/min | Tier-based |
+| API key or GitHub OIDC | 50/min | 24h fresh / 48h stale |
 
 ## Scoring Signals
 

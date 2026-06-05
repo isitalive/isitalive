@@ -23,15 +23,15 @@ Common terms used throughout the IsItAlive codebase, documentation, and API.
 | **Badge** | `GET /api/badge/{provider}/{owner}/{repo}` — returns an SVG health badge for README embedding. |
 | **Trending** | A ranked list of the most-checked projects in the last 24 hours, ordered by check frequency. |
 
-## Tiers & Access
+## Access & Limits
 
 | Term | Definition |
 | --- | --- |
-| **Tier** | The access level associated with an API key: `free`, `pro`, or `enterprise`. Determines rate limits and cache TTLs. |
-| **Anonymous** | A request without an API key. Served from CDN edge cache (24h TTL) at zero Worker cost. No usage events emitted. |
-| **Authenticated** | A request with a valid API key. Always hits the Worker for metering. Full usage events emitted. |
-| **Rate Limit** | Per-key (or per-IP for anonymous) request throttle for infra protection. Anonymous: 5/min, Authenticated: 1,000/min. Separate from billing quotas. |
-| **Quota** | Prepaid pool of health checks consumed per billing period. Distinct from rate limits (which protect infrastructure). |
+| **Free To Use** | Current access model. Public checks, badges, API-key requests, and public GitHub Actions OIDC audits use the same free cache policy. |
+| **Anonymous** | A request without an API key or OIDC token. Rate-limited per IP, with `/api/check` and dependency-data requests scoped by repo to avoid one popular repo starving all others. |
+| **Authenticated** | A request with a valid API key or public GitHub Actions OIDC token. Rate-limited by key/OIDC identity. |
+| **Rate Limit** | Request throttle for infrastructure protection. Anonymous: 5/min. Authenticated API key or GitHub Actions OIDC: 50/min. Admin login: 10/min. |
+| **Fresh Score** | A dependency or repository score computed from an upstream GitHub fetch rather than served from cache. Used for operational analytics, not billing enforcement. |
 
 ## Caching
 
@@ -40,14 +40,14 @@ Common terms used throughout the IsItAlive codebase, documentation, and API.
 | **L1 Cache** | In-Worker memory cache (Cloudflare Cache API). Fastest, shortest TTL. |
 | **KV Cache** | Cloudflare KV-backed cache. Second layer, longer TTL. Supports stale-while-revalidate. |
 | **SWR** | Stale-While-Revalidate — serves stale data immediately while refreshing in the background. |
-| **Edge Cache** | Cloudflare CDN cache, controlled by `CDN-Cache-Control`. Anonymous requests are edge-cached for 24 hours. |
+| **Edge Cache** | Cloudflare Cache API response cache used from inside the Worker. It keeps cached responses fast, but every request still invokes the Worker. |
 | **Cache Miss** | No cached result exists — triggers a fresh GitHub API call and scoring. |
 
 ## Events & Analytics
 
 | Term | Definition |
 | --- | --- |
-| **Usage Event** | Records who checked what, when, and how. Only emitted for authenticated requests. Used for billing/metering. |
+| **Usage Event** | Records who checked what, when, and how. Used for product analytics, trending, tracked repos, and operational insight. |
 | **Result Event** | Records the score and verdict for a health check. Emitted on every cache miss (both anonymous and authenticated). Powers trending. |
 | **Provider Event** | Archives the raw API response from the provider (GitHub). Emitted on cache miss. |
 | **Manifest Event** | Records a manifest audit submission — what was scanned and the results. |

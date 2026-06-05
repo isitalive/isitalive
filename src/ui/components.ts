@@ -937,7 +937,6 @@ export const navbarHtml = `
       <button class="nav-hamburger" id="navHamburger" aria-label="Toggle menu">☰</button>
       <div class="site-nav-links-left">
         <a href="/trending" class="site-nav-link">Trending</a>
-        <a href="/pricing" class="site-nav-link">Pricing</a>
         <a href="/methodology" class="site-nav-link">Methodology</a>
       </div>
       <div class="site-nav-links-right">
@@ -966,7 +965,6 @@ export const footerHtml = `
           <div class="footer-col-title">Product</div>
           <a href="/">Home</a>
           <a href="/trending">Trending</a>
-          <a href="/pricing">Pricing</a>
           <a href="/api">API Docs</a>
         </div>
         <div class="footer-col">

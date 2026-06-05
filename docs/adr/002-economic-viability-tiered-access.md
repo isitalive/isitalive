@@ -1,10 +1,13 @@
 # ADR-002: Economic Viability — Tiered Access & Cost-Optimized Architecture
 
-**Status**: Accepted  
+**Status**: Partially superseded by ADR-008  
 **Date**: 2026-03-21  
 **Authors**: @fforootd  
 **Supersedes**: Partially updates ADR-001 (usage event collection strategy)
 **Related**: ADR-006 (cost model correction), ADR-007 (GTM & billing)
+
+> [!NOTE]
+> ADR-008 pauses the pricing, paid-tier, and billing-enforcement parts of this ADR for the free-to-use launch. The current launch policy is anonymous 5 req/min, authenticated 50 req/min, one free cache policy, and no monthly OIDC quota.
 
 ## Context
 

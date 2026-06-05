@@ -41,9 +41,7 @@ export function apiDocsPage(analyticsToken?: string): string {
 
   const freshnessRows = [
     { label: 'Anonymous', rateLimit: '5 req/min', tier: TIERS.free },
-    { label: 'Free API key or GitHub OIDC', rateLimit: '1,000 req/min', tier: TIERS.free },
-    { label: 'Pro API key', rateLimit: '1,000 req/min', tier: TIERS.pro },
-    { label: 'Enterprise API key', rateLimit: '1,000 req/min', tier: TIERS.enterprise },
+    { label: 'API key or GitHub OIDC', rateLimit: '50 req/min', tier: TIERS.free },
   ]
     .map((row) => `<tr><td>${row.label}</td><td>${row.rateLimit}</td><td>${formatDuration(row.tier.freshTtl)}</td><td>${formatDuration(row.tier.staleTtl)}</td><td>${formatDuration(row.tier.l1Ttl)}</td></tr>`)
     .join('\n');
@@ -488,7 +486,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="code-block"><span class="comment"># Markdown</span><br>[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)<br><br><span class="comment"># HTML</span><br>&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;<br>&nbsp;&nbsp;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;<br>&lt;/a&gt;</div>
 
     <h2>Rate Limits</h2>
-    <p>Rate limiting is infrastructure protection only. Freshness and stale windows vary by tier; request limits vary only by authentication state.</p>
+    <p>IsItAlive is free to use for public maintenance-health checks. Infrastructure limits apply. Freshness is the same for anonymous and authenticated requests; request limits vary by authentication state.</p>
     <table class="tier-table">
       <tr><th>Access</th><th>Rate Limit</th><th>Fresh Window</th><th>Stale Window</th><th>L1 Cache TTL</th></tr>
       ${freshnessRows}
@@ -496,7 +494,7 @@ export function apiDocsPage(analyticsToken?: string): string {
 
     <div class="note-box">
       Rate limit headers are included with every response:<br>
-      <span class="inline-code">X-RateLimit-Limit</span>, <span class="inline-code">X-RateLimit-Tier</span>
+      <span class="inline-code">X-RateLimit-Limit</span>, <span class="inline-code">X-RateLimit-Tier</span> (<span class="inline-code">free</span>)
     </div>
 
     <h3>Cache Statuses</h3>

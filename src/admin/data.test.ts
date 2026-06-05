@@ -46,16 +46,16 @@ describe('KVKeyStore', () => {
 
   describe('create', () => {
     it('should create a key with sk_ prefix', async () => {
-      const result = await keyStore.create('Test Key', 'pro')
+      const result = await keyStore.create('Test Key')
       expect(result.key).toMatch(/^sk_[a-f0-9]{32}$/)
       expect(result.entry.name).toBe('Test Key')
-      expect(result.entry.tier).toBe('pro')
+      expect(result.entry.tier).toBe('free')
       expect(result.entry.active).toBe(true)
       expect(result.entry.id).toBe(result.key)
     })
 
     it('should store the key in KV', async () => {
-      const result = await keyStore.create('Test', 'free')
+      const result = await keyStore.create('Test')
       expect(kv.put).toHaveBeenCalledWith(result.key, expect.any(String))
       const stored = JSON.parse(store[result.key])
       expect(stored.name).toBe('Test')
@@ -65,7 +65,7 @@ describe('KVKeyStore', () => {
     it('should generate unique keys', async () => {
       const keys = new Set<string>()
       for (let i = 0; i < 20; i++) {
-        const result = await keyStore.create(`Key ${i}`, 'free')
+        const result = await keyStore.create(`Key ${i}`)
         keys.add(result.key)
       }
       expect(keys.size).toBe(20)
@@ -73,7 +73,7 @@ describe('KVKeyStore', () => {
 
     it('should set created timestamp', async () => {
       const before = new Date().toISOString()
-      const result = await keyStore.create('Test', 'free')
+      const result = await keyStore.create('Test')
       const after = new Date().toISOString()
       expect(result.entry.created).toBeDefined()
       expect(result.entry.created! >= before).toBe(true)
@@ -88,16 +88,16 @@ describe('KVKeyStore', () => {
     })
 
     it('should return created keys', async () => {
-      await keyStore.create('Key A', 'free')
-      await keyStore.create('Key B', 'pro')
+      await keyStore.create('Key A')
+      await keyStore.create('Key B')
       const keys = await keyStore.list()
       expect(keys.length).toBe(2)
       expect(keys.map(k => k.name).sort()).toEqual(['Key A', 'Key B'])
     })
 
     it('should include both active and revoked keys', async () => {
-      const { key } = await keyStore.create('Active', 'free')
-      await keyStore.create('Also Active', 'free')
+      const { key } = await keyStore.create('Active')
+      await keyStore.create('Also Active')
       await keyStore.revoke(key)
 
       const keys = await keyStore.list()
@@ -109,7 +109,7 @@ describe('KVKeyStore', () => {
 
   describe('revoke', () => {
     it('should soft-delete by setting active to false', async () => {
-      const { key } = await keyStore.create('To Revoke', 'free')
+      const { key } = await keyStore.create('To Revoke')
       const success = await keyStore.revoke(key)
       expect(success).toBe(true)
 
@@ -124,7 +124,7 @@ describe('KVKeyStore', () => {
     })
 
     it('should be idempotent', async () => {
-      const { key } = await keyStore.create('Test', 'free')
+      const { key } = await keyStore.create('Test')
       await keyStore.revoke(key)
       const success = await keyStore.revoke(key)
       expect(success).toBe(true) // Still succeeds, already revoked
@@ -162,7 +162,11 @@ describe('getAdminOverview', () => {
     expect(overview.warmRepoCount).toBe(1)
     expect(overview.coldRepoCount).toBe(1)
     expect(overview.trendingCount).toBe(2)
-    expect(overview.tierLimits.length).toBe(3)
+    expect(overview.rateLimits).toEqual([
+      { access: 'anonymous', limit: 5, period: 60 },
+      { access: 'authenticated', limit: 50, period: 60 },
+      { access: 'admin-login', limit: 10, period: 60 },
+    ])
   })
 
   it('should handle empty KV gracefully', async () => {

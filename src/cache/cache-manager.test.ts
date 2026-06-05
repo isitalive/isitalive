@@ -240,9 +240,9 @@ describe('CacheManager', () => {
       expect(cached.staleUntil).toBeNull()
     })
 
-    it('applies tier-specific TTLs — same entry is fresh for free but stale for pro', async () => {
+    it('treats legacy tier aliases as the free access cache policy', async () => {
       const result = makeScoringResult()
-      // 2 hours ago: within 24h free freshTtl, but beyond 1h pro freshTtl
+      // 2 hours ago: within the 24h free access fresh window.
       const storedAt = Date.now() - (2 * 60 * 60 * 1000)
 
       seedKV('github', 'vercel', 'next.js', result, storedAt)
@@ -256,7 +256,7 @@ describe('CacheManager', () => {
       mockCache._store.clear()
 
       const proCached = await cm.get('github', 'vercel', 'next.js', 'pro')
-      expect(proCached.status).toBe('l2-stale')
+      expect(proCached.status).toBe('l2-hit')
     })
 
     it('normalizes owner/repo to lowercase for key lookup', async () => {
@@ -388,7 +388,7 @@ describe('CacheManager', () => {
   describe('getAny()', () => {
     it('returns a cached entry past the stale window but within 7 days', async () => {
       const result = makeScoringResult()
-      const fiftyHoursAgo = Date.now() - 50 * 60 * 60 * 1000 // past free/pro stale caps
+      const fiftyHoursAgo = Date.now() - 50 * 60 * 60 * 1000 // past the free access stale cap
       mockKV._store.set(`isitalive:${METHODOLOGY.version}:github/vercel/next.js`, {
         value: JSON.stringify({ result, storedAt: fiftyHoursAgo }),
       })

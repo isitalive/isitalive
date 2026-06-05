@@ -25,7 +25,7 @@ import { emitAll } from '../pipeline/emit';
 import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
 import { includeKey, parseIncludeFlags, shapeAuditResult, type IncludeFlags } from '../utils/healthResponse';
 import { METHODOLOGY } from '../scoring/methodology';
-import { auditCacheDelete, auditCacheGetText, getOidcQuota } from '../db/state';
+import { auditCacheDelete, auditCacheGetText } from '../db/state';
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
@@ -33,7 +33,6 @@ const audit = new Hono<AppEnv>();
 const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
 const MAX_REQUEST_BODY_BYTES = 576 * 1024; // ~576 KB total JSON payload
-const OIDC_FREE_QUOTA_LIMIT = 500; // deps scored/month per public repo (ADR-004)
 
 function buildCachedAuditResponse(
   cachedJson: string,
@@ -86,25 +85,10 @@ audit.post('/', async (c) => {
   if (!isAuthenticated) {
     return c.json({
       error: 'Authentication required',
-      hint: 'Get an API key at https://isitalive.dev or use the website to audit manifests for free.',
+      hint: 'Manifest audits require authenticated free access: use an IsItAlive API key or GitHub Actions OIDC for public repositories.',
     }, 401)
   }
-
-  // ── OIDC quota enforcement — read D1 aggregate counter ─────────────
   const oidcClaims = c.get('oidcClaims') ?? null
-  if (oidcClaims) {
-    const quotaEntry = await getOidcQuota(c.env, oidcClaims.repository, OIDC_FREE_QUOTA_LIMIT)
-    const limit = quotaEntry?.limit ?? OIDC_FREE_QUOTA_LIMIT
-    if (quotaEntry && quotaEntry.used >= limit) {
-      return c.json({
-        error: 'OIDC quota exceeded',
-        used: quotaEntry.used,
-        limit,
-        period: quotaEntry.period,
-        hint: 'Add an ISITALIVE_API_KEY secret for higher limits. See https://isitalive.dev/docs/api-keys',
-      }, 429)
-    }
-  }
 
   // ── FAST PATH: X-Manifest-Hash header check BEFORE parsing body (ADR-006)
   // If the client sends a hash, we can check L1/L2 cache without the cost of
@@ -204,8 +188,8 @@ audit.post('/', async (c) => {
 
       // Emit usage events in background — parse cached JSON AFTER response
       // is sent so it doesn't affect latency.
-      // NOTE: these events have cacheStatus='l2-hit' so quota aggregation
-      // cron must exclude them (ADR-004: only Layer 3 misses consume quota).
+      // NOTE: these events have cacheStatus='l2-hit' so analytics can
+      // distinguish cached audits from fresh dependency scoring work.
       c.executionCtx.waitUntil(emitUsageFromCached(d1Cached, c));
       return response;
     }

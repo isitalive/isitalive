@@ -34,7 +34,7 @@ simple = { limit = 5, period = 60 }  # Tightened from 10 — ADR-006
 name = "RATE_LIMITER_AUTH"
 type = "ratelimit"
 namespace_id = "1002"
-simple = { limit = 1000, period = 60 }
+simple = { limit = 50, period = 60 }
 
 # Admin login brute-force protection — per-IP
 [[unsafe.bindings]]

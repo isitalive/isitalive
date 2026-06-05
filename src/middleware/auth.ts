@@ -4,14 +4,14 @@
 // Two auth strategies (in priority order):
 //   1. API key:  Authorization: Bearer sk_abc123   → D1 lookup in api_keys
 //   2. OIDC JWT: Authorization: Bearer eyJ...      → GitHub Actions OIDC verification
-//   3. No auth:                                    → free tier, unauthenticated
+//   3. No auth:                                    → free access, unauthenticated
 //
 // Keys are stored in D1 and managed by the admin UI:
 //   Key:   sk_abc123
-//   Value: { "tier": "pro", "name": "ACME Corp", "active": true, "created": "2026-03-19" }
+//   Value: { "tier": "free", "name": "ACME Corp", "active": true, "created": "2026-03-19" }
 //
 // OIDC tokens are verified against GitHub's JWKS (see ../github/oidc.ts).
-// Public repos get free OIDC quota; private repos get 401.
+// Public repos get free OIDC auth; private repo OIDC tokens get 401.
 //
 // OSS-safe: actual API key values only exist in KV, never in code.
 // ---------------------------------------------------------------------------
@@ -58,12 +58,12 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
       try {
         const claims = await verifyOidcToken(token, c.env);
 
-        // Only public repos get free OIDC quota — private repos upsell (ADR-006)
+        // Only public repositories can use GitHub Actions OIDC directly.
         if (claims.repository_visibility !== 'public') {
           return c.json({
-            error: 'IsItAlive OIDC auth is free for open-source only.',
+            error: 'IsItAlive OIDC auth is available for public repositories only.',
             repository_visibility: claims.repository_visibility,
-            hint: 'To secure private corporate repositories, get a Pro API key at https://isitalive.dev/pricing and add it as an ISITALIVE_API_KEY GitHub Secret.',
+            hint: 'For private repository CI, use an authenticated IsItAlive API key as an ISITALIVE_API_KEY GitHub Secret.',
           }, 401);
         }
 
@@ -88,7 +88,7 @@ export const apiKeyAuth = createMiddleware<AppEnv>(async (c, next) => {
     const entry = await getApiKey(c.env, token);
 
     if (entry && entry.active !== false) {
-      c.set('tier', (entry.tier || 'free') as Tier);
+      c.set('tier', 'free');
       c.set('keyName', entry.name || 'unnamed');
       c.set('isAuthenticated', true);
     }

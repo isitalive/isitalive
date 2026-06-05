@@ -12,7 +12,7 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
     content: `
     <div class="admin-header">
       <h1>API Keys</h1>
-      <p>Manage API keys for authenticated access. Keys are stored in D1.</p>
+      <p>Manage free access API keys for authenticated requests. Keys are stored in D1.</p>
     </div>
 
     ${flash ? `
@@ -29,14 +29,6 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
         <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0">
           <label class="form-label" for="keyName">Name</label>
           <input class="form-input" type="text" id="keyName" name="name" placeholder="e.g. ACME Corp" required>
-        </div>
-        <div class="form-group" style="min-width:140px; margin-bottom:0">
-          <label class="form-label" for="keyTier">Tier</label>
-          <select class="form-select" id="keyTier" name="tier">
-            <option value="free">Free</option>
-            <option value="pro">Pro</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
         </div>
         <button type="submit" class="btn btn-primary" style="height:42px">Create Key</button>
       </form>
@@ -56,7 +48,6 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
               <tr>
                 <th>Name</th>
                 <th>Key ID</th>
-                <th>Tier</th>
                 <th>Created</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -67,7 +58,6 @@ export function adminKeysPage(keys: KeyEntry[], flash?: { type: 'success' | 'err
                 <tr>
                   <td style="color:var(--text-primary); font-weight:500">${escapeHtml(k.name)}</td>
                   <td><code style="font-size:0.75rem; color:var(--text-muted)">${k.id.slice(0, 12)}…</code></td>
-                  <td><span class="badge ${k.tier === 'enterprise' ? 'badge-green' : k.tier === 'pro' ? 'badge-yellow' : 'badge-gray'}">${k.tier}</span></td>
                   <td>${k.created ? new Date(k.created).toLocaleDateString() : '—'}</td>
                   <td>${k.active !== false
                     ? '<span class="badge badge-green">Active</span>'
