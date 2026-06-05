@@ -349,4 +349,91 @@ describe('agent-ready health API', () => {
 
     await Promise.all(ctx.pending)
   })
+
+  it('resolves Go modules without scoring them', async () => {
+    const env = createEnv(cacheKv)
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/go?name=github.com/owner/repo&version=v1.2.3'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json).toEqual({
+      ecosystem: 'go',
+      name: 'github.com/owner/repo',
+      version: 'v1.2.3',
+      resolution: {
+        resolved: true,
+        github: 'owner/repo',
+        resolvedFrom: 'direct',
+      },
+    })
+    expect((env as any).RATE_LIMITER_ANON.limit).toHaveBeenCalled()
+  })
+
+  it('returns 400 for unsupported package ecosystems and invalid names', async () => {
+    const env = createEnv(cacheKv)
+    const unsupported = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/python?name=flask'),
+      env,
+      makeExecutionCtx(),
+    )
+    const invalid = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/npm?name=../leftpad'),
+      env,
+      makeExecutionCtx(),
+    )
+
+    expect(unsupported.status).toBe(400)
+    await expect(unsupported.json()).resolves.toMatchObject({ error_code: 'unsupported_ecosystem' })
+    expect(invalid.status).toBe(400)
+    await expect(invalid.json()).resolves.toMatchObject({ error_code: 'invalid_package_name' })
+  })
+
+  it('returns unresolved package check results as 200 with null result', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({}, { status: 404 })))
+    const env = createEnv(cacheKv)
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/package/npm?name=missing-pkg'),
+      env,
+      makeExecutionCtx(),
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.resolution.resolved).toBe(false)
+    expect(json.resolution.unresolvedReason).toBe('package_not_found')
+    expect(json.result).toBeNull()
+  })
+
+  it('checks package health with metrics after direct Go resolution', async () => {
+    const rawData = makeRawProjectData()
+    const env = createEnv(cacheKv)
+    vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/package/go?name=github.com/owner/repo&include=metrics', {
+        headers: { Authorization: 'Bearer sk_pro' },
+      }),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.resolution).toMatchObject({
+      resolved: true,
+      github: 'owner/repo',
+      resolvedFrom: 'direct',
+    })
+    expect(json.result.methodology.version).toBe(METHODOLOGY.version)
+    expect(json.result.metrics.ciDataSource).toBe('actions-runs')
+    expect((env as any).RATE_LIMITER_AUTH.limit).toHaveBeenCalled()
+
+    await drainExecutionCtx(ctx)
+  })
 })

@@ -238,6 +238,107 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/resolve/{ecosystem}': {
+      get: {
+        operationId: 'resolvePackage',
+        summary: 'Resolve package to GitHub repository',
+        description: 'Resolve an npm package or Go module name to the canonical GitHub owner/repo without scoring it. Use this when an agent knows a package name but wants to inspect resolution before calling a health check.',
+        security: [{ bearerAuth: [] }, {}],
+        parameters: [
+          {
+            name: 'ecosystem',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['npm', 'go'] },
+          },
+          {
+            name: 'name',
+            in: 'query',
+            required: true,
+            description: 'Package or module name, for example `react`, `@scope/pkg`, or `github.com/zitadel/zitadel`.',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'version',
+            in: 'query',
+            required: false,
+            description: 'Optional package version or range. Resolution currently uses the package name and echoes this value for provenance.',
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Package resolution result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PackageResolveResult' },
+              },
+            },
+          },
+          '400': {
+            description: 'Unsupported ecosystem or invalid package input',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/check/package/{ecosystem}': {
+      get: {
+        operationId: 'checkPackage',
+        summary: 'Check package maintenance',
+        description: 'Resolve an npm package or Go module name to GitHub and return the same maintenance-health result shape used by project checks. Unresolved packages return `200` with `resolution.resolved: false` and `result: null`.',
+        security: [{ bearerAuth: [] }, {}],
+        parameters: [
+          {
+            name: 'ecosystem',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['npm', 'go'] },
+          },
+          {
+            name: 'name',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' },
+          },
+          {
+            name: 'version',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+          },
+          {
+            name: 'include',
+            in: 'query',
+            required: false,
+            description: 'Use include=metrics to include normalized raw measurements and sampling metadata in the nested result.',
+            schema: { type: 'string', enum: ['metrics'] },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Package maintenance-health result or unresolved package result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PackageCheckResult' },
+              },
+            },
+          },
+          '400': {
+            description: 'Unsupported ecosystem or invalid package input',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
     '/api/badge/{provider}/{owner}/{repo}': {
       get: {
         operationId: 'getBadge',
@@ -279,7 +380,7 @@ export const openApiSpec = {
       post: {
         operationId: 'auditManifest',
         summary: 'Audit dependency manifest',
-        description: 'Upload a go.mod or package.json file and receive a scored maintenance-health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
+        description: 'Upload a supported manifest or lockfile and receive a scored maintenance-health report for every dependency. Supported formats: go.mod, go.sum, package.json, package-lock.json, pnpm-lock.yaml, yarn.lock. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -287,6 +388,20 @@ export const openApiSpec = {
             in: 'query',
             required: false,
             description: 'Optional extra per-dependency sections to include. Combine with commas, for example include=drivers,metrics.',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'X-Manifest-Hash',
+            in: 'header',
+            required: false,
+            description: 'Optional SHA-256 hash of the manifest content. When present, the Worker checks audit cache before parsing the request body.',
+            schema: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+          },
+          {
+            name: 'If-None-Match',
+            in: 'header',
+            required: false,
+            description: 'Optional ETag from a previous complete audit response. Returns 304 when the manifest hash is unchanged.',
             schema: { type: 'string' },
           },
         ],
@@ -405,6 +520,54 @@ export const openApiSpec = {
       },
     },
     schemas: {
+      ErrorResponse: {
+        type: 'object',
+        properties: {
+          error: { type: 'string' },
+          error_code: { type: 'string' },
+          hint: { type: 'string' },
+          supported: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+      PackageResolution: {
+        type: 'object',
+        required: ['resolved', 'github', 'resolvedFrom'],
+        properties: {
+          resolved: { type: 'boolean' },
+          github: { type: 'string', nullable: true, description: 'Resolved GitHub owner/repo, for example `vercel/next.js`.' },
+          resolvedFrom: { type: 'string', nullable: true, enum: ['direct', 'vanity', 'registry', 'cache', null] },
+          unresolvedReason: { type: 'string' },
+        },
+      },
+      PackageResolveResult: {
+        type: 'object',
+        required: ['ecosystem', 'name', 'version', 'resolution'],
+        properties: {
+          ecosystem: { type: 'string', enum: ['npm', 'go'] },
+          name: { type: 'string' },
+          version: { type: 'string' },
+          resolution: { $ref: '#/components/schemas/PackageResolution' },
+        },
+      },
+      PackageCheckResult: {
+        type: 'object',
+        required: ['ecosystem', 'name', 'version', 'resolution', 'result'],
+        properties: {
+          ecosystem: { type: 'string', enum: ['npm', 'go'] },
+          name: { type: 'string' },
+          version: { type: 'string' },
+          resolution: { $ref: '#/components/schemas/PackageResolution' },
+          result: {
+            anyOf: [
+              { $ref: '#/components/schemas/HealthCheckResult' },
+              { type: 'null' },
+            ],
+          },
+        },
+      },
       HealthCheckResult: {
         type: 'object',
         required: ['project', 'provider', 'score', 'verdict', 'checkedAt', 'cached', 'methodology', 'signals', 'drivers'],
@@ -577,7 +740,7 @@ export const openApiSpec = {
         properties: {
           format: {
             type: 'string',
-            enum: ['go.mod', 'package.json'],
+            enum: ['go.mod', 'go.sum', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'],
             description: 'Manifest file format',
           },
           content: {

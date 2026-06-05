@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { parseGoMod, parsePackageJson, parseManifest } from './parsers'
+import {
+  parseGoMod,
+  parseGoSum,
+  parseManifest,
+  parsePackageJson,
+  parsePackageLock,
+  parsePnpmLock,
+  parseYarnLock,
+} from './parsers'
 
 // ── parseGoMod ─────────────────────────────────────────────────────────
 describe('parseGoMod', () => {
@@ -204,6 +212,115 @@ describe('parsePackageJson', () => {
     })
     const deps = parsePackageJson(content)
     expect(deps[0].name).toBe('@scope/package')
+  })
+})
+
+// ── lockfile parsers ──────────────────────────────────────────────────
+describe('lockfile parsers', () => {
+  it('parses package-lock.json packages and prefers production duplicates', () => {
+    const content = JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        '': {},
+        'node_modules/react': { version: '18.2.0', dev: true },
+        'node_modules/app/node_modules/react': { version: '18.2.0' },
+        'node_modules/@scope/pkg': { version: '1.0.0', dev: false },
+      },
+    })
+
+    const deps = parsePackageLock(content)
+    expect(deps).toEqual([
+      { name: 'react', version: '18.2.0', dev: false, ecosystem: 'npm' },
+      { name: '@scope/pkg', version: '1.0.0', dev: false, ecosystem: 'npm' },
+    ])
+  })
+
+  it('parses package-lock v1 dependency trees', () => {
+    const content = JSON.stringify({
+      lockfileVersion: 1,
+      dependencies: {
+        leftpad: {
+          version: '1.0.0',
+          dependencies: {
+            transitive: { version: '2.0.0', dev: true },
+          },
+        },
+      },
+    })
+
+    const deps = parsePackageLock(content)
+    expect(deps).toContainEqual({ name: 'leftpad', version: '1.0.0', dev: false, ecosystem: 'npm' })
+    expect(deps).toContainEqual({ name: 'transitive', version: '2.0.0', dev: true, ecosystem: 'npm' })
+  })
+
+  it('parses pnpm-lock.yaml importers and packages', () => {
+    const content = `
+lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      react:
+        specifier: ^18.2.0
+        version: 18.2.0
+    devDependencies:
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.8
+packages:
+  /react@18.2.0:
+    resolution: {}
+  /@scope/pkg@1.2.3:
+    resolution: {}
+    dev: true
+`
+
+    const deps = parsePnpmLock(content)
+    expect(deps).toContainEqual({ name: 'react', version: '18.2.0', dev: false, ecosystem: 'npm' })
+    expect(deps).toContainEqual({ name: 'vitest', version: '4.1.8', dev: true, ecosystem: 'npm' })
+    expect(deps).toContainEqual({ name: '@scope/pkg', version: '1.2.3', dev: true, ecosystem: 'npm' })
+  })
+
+  it('parses modern yarn.lock with YAML structure', () => {
+    const content = `
+__metadata:
+  version: 8
+"react@npm:^18.2.0":
+  version: 18.2.0
+"@scope/pkg@npm:^1.0.0":
+  version: 1.0.1
+`
+
+    const deps = parseYarnLock(content)
+    expect(deps).toContainEqual({ name: 'react', version: '18.2.0', dev: false, ecosystem: 'npm' })
+    expect(deps).toContainEqual({ name: '@scope/pkg', version: '1.0.1', dev: false, ecosystem: 'npm' })
+  })
+
+  it('parses yarn v1 lockfiles', () => {
+    const content = `
+"leftpad@^1.0.0", "leftpad@~1.0.1":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/leftpad/-/leftpad-1.0.2.tgz"
+"@scope/pkg@^2.0.0":
+  version "2.1.0"
+`
+
+    const deps = parseYarnLock(content)
+    expect(deps).toContainEqual({ name: 'leftpad', version: '1.0.2', dev: false, ecosystem: 'npm' })
+    expect(deps).toContainEqual({ name: '@scope/pkg', version: '2.1.0', dev: false, ecosystem: 'npm' })
+  })
+
+  it('parses go.sum and skips go.mod checksum rows', () => {
+    const content = `
+github.com/zitadel/zitadel v2.45.0 h1:abc
+github.com/zitadel/zitadel v2.45.0/go.mod h1:def
+golang.org/x/text v0.14.0 h1:ghi
+`
+
+    const deps = parseGoSum(content)
+    expect(deps).toEqual([
+      { name: 'github.com/zitadel/zitadel', version: 'v2.45.0', dev: true, ecosystem: 'go' },
+      { name: 'golang.org/x/text', version: 'v0.14.0', dev: true, ecosystem: 'go' },
+    ])
   })
 })
 

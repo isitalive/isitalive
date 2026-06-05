@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Manifest discovery — find package.json / go.mod at a repo's root
+// Manifest discovery — find supported manifests at a repo's root
 //
 // Uses the GitHub Contents API to list root-level files and filter for
 // known manifest filenames. Results are cached in KV for 6 hours.
@@ -20,7 +20,11 @@ export interface DiscoveredManifest {
 
 const MANIFEST_FILENAMES: Record<string, ManifestFormat> = {
   'package.json': 'package.json',
+  'package-lock.json': 'package-lock.json',
+  'pnpm-lock.yaml': 'pnpm-lock.yaml',
+  'yarn.lock': 'yarn.lock',
   'go.mod': 'go.mod',
+  'go.sum': 'go.sum',
 }
 
 const DISCOVERY_CACHE_PREFIX = 'discover:'
@@ -31,7 +35,7 @@ const DISCOVERY_ERROR_TTL = 5 * 60       // 5 min on error
  * Discover manifest files at the root of a GitHub repository.
  *
  * Makes a single GitHub REST API call to list root directory contents,
- * then filters for known manifest filenames (package.json, go.mod).
+ * then filters for known manifest filenames.
  *
  * Results are cached in D1 to avoid repeated API calls.
  */

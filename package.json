@@ -4,6 +4,9 @@
   "license": "AGPL-3.0-only",
   "description": "Maintenance-risk signals for open-source dependencies and AI agents",
   "type": "module",
+  "bin": {
+    "isitalive": "src/cli/index.js"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "build": "npx tsx --import ./scripts/register-md.mjs scripts/build-static.ts",
@@ -16,7 +19,8 @@
     "test:fuzz": "FC_NUM_RUNS=10000 vitest run"
   },
   "dependencies": {
-    "hono": "^4.12.23"
+    "hono": "^4.12.23",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.4.1",

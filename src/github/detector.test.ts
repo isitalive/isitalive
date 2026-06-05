@@ -19,6 +19,22 @@ describe('detectManifests', () => {
     expect(result).toEqual([{ path: 'go.mod', format: 'go.mod' }]);
   });
 
+  it('detects supported lockfiles', () => {
+    const files = [
+      makeFile('package-lock.json'),
+      makeFile('pnpm-lock.yaml'),
+      makeFile('yarn.lock'),
+      makeFile('go.sum'),
+    ];
+    const result = detectManifests(files);
+    expect(result).toEqual([
+      { path: 'package-lock.json', format: 'package-lock.json' },
+      { path: 'pnpm-lock.yaml', format: 'pnpm-lock.yaml' },
+      { path: 'yarn.lock', format: 'yarn.lock' },
+      { path: 'go.sum', format: 'go.sum' },
+    ]);
+  });
+
   it('detects a nested package.json (not in excluded dirs)', () => {
     const files = [makeFile('apps/web/package.json')];
     const result = detectManifests(files);

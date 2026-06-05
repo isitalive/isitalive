@@ -635,18 +635,22 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
 
 const MANIFEST_FORMATS: Record<string, ManifestFormat> = {
   'package.json': 'package.json',
+  'package-lock.json': 'package-lock.json',
+  'pnpm-lock.yaml': 'pnpm-lock.yaml',
+  'yarn.lock': 'yarn.lock',
   'go.mod': 'go.mod',
+  'go.sum': 'go.sum',
 }
 
-/** Matches GitHub blob URLs ending in package.json or go.mod (supports slashed branch names) */
-const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|go\.mod)$/i
+/** Matches GitHub blob URLs ending in a supported manifest or lockfile (supports slashed branch names) */
+const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.mod|go\.sum)$/i
 
 async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Promise<Response> {
   // Determine format from filename
   const filename = filePath.split('/').pop() || ''
   const format = MANIFEST_FORMATS[filename]
   if (!format) {
-    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json and go.mod.`), 400)
+    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, and go.sum.`), 400)
   }
 
   // Fetch raw content from GitHub

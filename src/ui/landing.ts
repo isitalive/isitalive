@@ -695,8 +695,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       <ul class="free-feature-list">
         <li>Public GitHub repository maintenance-health checks</li>
         <li>JSON score, verdict, signals, and drivers via /api/check</li>
+        <li>Package-first resolve and check endpoints for npm packages and Go modules</li>
         <li>SVG README badges</li>
-        <li>go.mod and package.json manifest audits with API key or public GitHub Actions OIDC</li>
+        <li>Manifest and lockfile audits with API key or public GitHub Actions OIDC</li>
+        <li>Local CLI for agent workflows: isitalive scan</li>
         <li>OpenAPI, llms.txt, and AI plugin manifest for agents</li>
         <li>Methodology, trending, recent queries, and score history where data is available</li>
       </ul>
@@ -812,8 +814,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       // No Turnstile (local dev) — do client-side redirect
       e.preventDefault();
 
-      // Detect manifest URL: github.com/.../package.json or go.mod (only these filenames)
-      var manifestRx = /(?:https?:\\/\\/)?(?:www\\.)?github\\.com\\/.+\\/blob\\/.+\\/(package\\.json|go\\.mod)$/i;
+      // Detect manifest URL: github.com/.../supported manifest or lockfile
+      var manifestRx = /(?:https?:\\/\\/)?(?:www\\.)?github\\.com\\/.+\\/blob\\/.+\\/(package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|go\\.mod|go\\.sum)$/i;
       if (manifestRx.test(input)) {
         // Submit as audit — POST to /_audit with url field
         var form = document.createElement('form');

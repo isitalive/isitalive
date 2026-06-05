@@ -417,16 +417,31 @@ export function apiDocsPage(analyticsToken?: string): string {
       This is a <strong>maintenance-health</strong> score only. It helps humans and AI agents judge maintainer activity and project durability before choosing dependencies. It is not a security, license, or compliance verdict.
     </div>
 
+    <h3>Resolve Or Check A Package</h3>
+    <div class="endpoint">
+      <span class="endpoint-method method-get">GET</span>
+      <span class="endpoint-path">/api/resolve/{ecosystem}?name=...</span>
+      <p class="endpoint-desc">Resolve an npm package or Go module to its canonical GitHub repository without scoring it. Supported ecosystems: <span class="inline-code">npm</span>, <span class="inline-code">go</span>.</p>
+    </div>
+    <div class="endpoint">
+      <span class="endpoint-method method-get">GET</span>
+      <span class="endpoint-path">/api/check/package/{ecosystem}?name=...</span>
+      <p class="endpoint-desc">Resolve a package name and return a nested maintenance-health result in one call. Unresolved packages return <span class="inline-code">200</span> with <span class="inline-code">resolution.resolved: false</span> and <span class="inline-code">result: null</span>.</p>
+    </div>
+
+    <h3>Package Examples</h3>
+    <div class="code-block"><span class="comment"># Resolve an npm package</span><br>curl 'https://isitalive.dev/api/resolve/npm?name=react'<br><br><span class="comment"># Check a Go module with metrics</span><br>curl 'https://isitalive.dev/api/check/package/go?name=github.com/zitadel/zitadel&amp;include=metrics'</div>
+
     <h3>Audit Dependency Manifest</h3>
     <div class="endpoint">
       <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
       <span class="endpoint-path">/api/manifest</span>
-      <p class="endpoint-desc">Upload a <span class="inline-code">go.mod</span> or <span class="inline-code">package.json</span> and get a scored maintenance-health report for every dependency. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
+      <p class="endpoint-desc">Upload a supported manifest or lockfile and get a scored maintenance-health report for every dependency. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
     </div>
 
     <h3>Request Body</h3>
     <div class="field-list">
-      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"go.mod"</span> or <span class="inline-code">"package.json"</span></span></div>
+      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"go.mod"</span>, <span class="inline-code">"go.sum"</span>, <span class="inline-code">"package.json"</span>, <span class="inline-code">"package-lock.json"</span>, <span class="inline-code">"pnpm-lock.yaml"</span>, or <span class="inline-code">"yarn.lock"</span></span></div>
       <div class="field-item"><span class="field-name">content</span><span class="field-desc">Raw manifest file content (max 512KB)</span></div>
     </div>
 
@@ -436,7 +451,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Example Request</h3>
-    <div class="code-block"><span class="comment"># Audit a go.mod file with rich agent output</span><br>curl -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
+    <div class="code-block"><span class="comment"># Audit a go.mod file with rich agent output</span><br>curl -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"X-Manifest-Hash: &lt;sha256&gt;"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
 
     <h3>Example Response</h3>
     <div class="code-block">{<br>
@@ -475,6 +490,10 @@ export function apiDocsPage(analyticsToken?: string): string {
       <strong>Retry logic:</strong> If <span class="inline-code">complete</span> is <span class="inline-code">false</span>, call the same endpoint again after <span class="inline-code">retryAfterMs</span>. The cache fills progressively — each call is faster.<br><br>
       <strong>Unresolved deps:</strong> Dependencies not on GitHub get <span class="inline-code">verdict: "unresolved"</span> with a reason (e.g. <span class="inline-code">gitlab_not_supported_yet</span>, <span class="inline-code">no_github_repo</span>).
     </div>
+
+    <h3>CLI For Agents</h3>
+    <div class="code-block">ISITALIVE_API_KEY=sk_your_api_key isitalive scan . --json --include drivers,metrics,signals</div>
+    <p>The CLI auto-detects supported manifest and lock files, sends <span class="inline-code">X-Manifest-Hash</span>, follows <span class="inline-code">retryAfterMs</span> for partial audits, and prints JSON for local agent workflows.</p>
 
     <h3>Get SVG Badge</h3>
     <div class="endpoint">

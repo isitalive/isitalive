@@ -2,7 +2,7 @@
 // GitHub App — manifest file detector
 //
 // Given a list of changed files in a PR, identify supported dependency
-// manifests (package.json, go.mod). Returns the detected manifests with
+// manifests and lockfiles. Returns the detected manifests with
 // their format and path.
 // ---------------------------------------------------------------------------
 
@@ -23,7 +23,11 @@ export interface DetectedManifest {
  */
 const MANIFEST_PATTERNS: Array<{ basename: string; format: ManifestFormat }> = [
   { basename: 'package.json', format: 'package.json' },
+  { basename: 'package-lock.json', format: 'package-lock.json' },
+  { basename: 'pnpm-lock.yaml', format: 'pnpm-lock.yaml' },
+  { basename: 'yarn.lock', format: 'yarn.lock' },
   { basename: 'go.mod', format: 'go.mod' },
+  { basename: 'go.sum', format: 'go.sum' },
 ];
 
 /** Directories that should be excluded from manifest detection */
@@ -43,7 +47,7 @@ const EXCLUDED_DIRS = [
  *
  * Rules:
  * - Only files that were added or modified (not deleted)
- * - Only known manifest basenames (package.json, go.mod)
+ * - Only known manifest basenames
  * - Exclude files nested inside ignored directories
  */
 export function detectManifests(files: PullRequestFile[]): DetectedManifest[] {

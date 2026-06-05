@@ -44,7 +44,7 @@ export async function resolveAll(
 ): Promise<ResolvedDep[]> {
   const settled = await runWithConcurrency(
     deps,
-    (dep) => resolveSingle(dep, env, ctx),
+    (dep) => resolveDependency(dep, env, ctx),
     { limit: 20 },
   )
 
@@ -61,7 +61,7 @@ export async function resolveAll(
   })
 }
 
-async function resolveSingle(
+export async function resolveDependency(
   dep: ParsedDep,
   env: Env,
   ctx?: ExecutionContext,

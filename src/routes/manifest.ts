@@ -30,7 +30,7 @@ import { auditCacheDelete, auditCacheGetText } from '../db/state';
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
 
-const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
+const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'go.sum', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
 const MAX_REQUEST_BODY_BYTES = 576 * 1024; // ~576 KB total JSON payload
 

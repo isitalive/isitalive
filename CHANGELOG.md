@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Package-first agent endpoints: `GET /api/resolve/{ecosystem}` and `GET /api/check/package/{ecosystem}` for npm packages and Go modules.
+- Local `isitalive scan` CLI with manifest auto-detection, `X-Manifest-Hash`, partial-audit retry handling, and JSON output for agent workflows.
+- Manifest audit support for `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, and `go.sum` in addition to `package.json` and `go.mod`.
 - D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
 - R2 JSONL archive for analytics events under partitioned `events/raw/type=.../dt=.../hour=...` keys, with `archive_batches` coverage tracking and Queue/DLQ retry handling.
 - D1 `discovered_repos` registry for repositories found through external feeds such as GitHub Trending.
@@ -25,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Refresh workflows now keep externally discovered repositories fresh on a tiered cadence, separate from user/request-tracked repositories.
 - `/health` now probes D1 in production.
 - Public, README, and agent-facing copy now positions Is It Alive as a maintenance-risk signal for humans and AI agents choosing open-source dependencies, not as a security scanner.
+- OpenAPI, API docs, `llms.txt`, `llms-full.txt`, and `ai-plugin.json` now document package-first checks, lockfile formats, CLI usage, manifest hash headers, and current free-to-use infrastructure limits.
 
 ### Removed
 

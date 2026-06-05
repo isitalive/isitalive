@@ -50,8 +50,9 @@ src/
 ├── github/      # GitHub App (auth, API client, handlers, report, OIDC)
 ├── middleware/   # auth (API key + OIDC), rate limiting
 ├── pipeline/    # event emission to Cloudflare Pipelines
-├── routes/      # Hono route handlers (check, badge, UI, manifest)
+├── routes/      # Hono route handlers (check, resolve, badge, UI, manifest)
 ├── scoring/     # health score engine and signal definitions
+├── cli/         # local agent CLI
 └── ui/          # HTML page templates (landing, result, changelog, etc.)
 ```
 
@@ -109,6 +110,17 @@ Use `?include=metrics` when an agent needs normalized raw measurements and sampl
 | critical | 20–39 | Significant maintenance concerns |
 | unmaintained | 0–19 | Likely abandoned or archived |
 
+## Package Resolve And Check
+
+```
+GET https://isitalive.dev/api/resolve/npm?name=react
+GET https://isitalive.dev/api/check/package/go?name=github.com/zitadel/zitadel&include=metrics
+```
+
+Use package-first endpoints when an agent knows the package or module name but not the canonical GitHub repository. Supported ecosystems: `npm`, `go`.
+
+Unresolved packages return `200` with `resolution.resolved: false` and `result: null`; malformed package names or unsupported ecosystems return `400`.
+
 ## Manifest Audit
 
 ```
@@ -117,7 +129,7 @@ Authorization: Bearer sk_your_api_key
 Content-Type: application/json
 
 {
-  "content": "<raw package.json or go.mod content>",
+  "content": "<raw package.json, lockfile, go.mod, or go.sum content>",
   "format": "package.json"
 }
 ```
@@ -125,7 +137,7 @@ Content-Type: application/json
 Audits all dependencies in a manifest file and returns per-dependency maintenance-health scores.
 Requires authentication (API key or GitHub Actions OIDC token). The old `/api/audit` path redirects here.
 
-Supported formats: `package.json`, `go.mod`.
+Supported formats: `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`.
 
 Optional query params:
 
@@ -146,7 +158,15 @@ Two authentication methods are supported:
 1. **API key** (all repos): `Authorization: Bearer sk_your_api_key`
 2. **GitHub Actions OIDC** (public repos only): `Authorization: Bearer <oidc_jwt>`
 
-OIDC tokens are obtained automatically by the [`isitalive/audit-action`](https://github.com/isitalive/audit-action). Public repos get 500 deps scored/month free.
+OIDC tokens are obtained automatically by the [`isitalive/audit-action`](https://github.com/isitalive/audit-action). Public repositories using OIDC share the same authenticated infrastructure limit as API keys. There is no monthly public OIDC dependency quota during the current free-to-use access model.
+
+## CLI
+
+```bash
+ISITALIVE_API_KEY=sk_your_api_key npx isitalive scan . --json --include drivers,metrics,signals
+```
+
+The CLI auto-detects supported manifest and lock files, sends `X-Manifest-Hash`, retries partial audits using `retryAfterMs`, and prints JSON for agent workflows.
 
 ## Badge
 
@@ -179,17 +199,18 @@ GET https://isitalive.dev/.well-known/ai-plugin.json
 Rate limiting is purely infrastructure protection (not billing):
 
 - **Anonymous**: 5 requests/minute
-- **With API key**: 1,000 requests/minute
+- **With API key or public GitHub Actions OIDC**: 50 requests/minute
 
 ## Tips for Agents
 
 1. **Treat this as maintenance-health** — the score is useful for maintainer activity and project durability, not security posture
-2. **Cache results** — repo scores are freshness-tiered (`free`: 24h fresh / 48h stale, `pro`: 1h / 6h, `enterprise`: 15m / 1h)
-3. **Use `GET /api/check/...` first** for individual dependencies — it now returns `methodology`, `signals`, and `drivers` by default
-4. **Use `?include=metrics`** on `GET /api/check/...` when you need normalized raw measurements and sampling metadata
-5. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
-6. **Use `include=drivers,metrics,signals` on `/api/manifest`** when an agent needs richer per-dependency evidence without rescoring
-7. **Check the `verdict` field** for a quick human-readable assessment
-8. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
-9. **Archived repos** are instantly scored 0 — no need to inspect signals
-10. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI
+2. **Cache results** — public repo scores use the free cache policy: 24h fresh / 48h stale
+3. **Use `GET /api/check/...` first** when you already know the GitHub repo — it returns `methodology`, `signals`, and `drivers` by default
+4. **Use `GET /api/resolve/{ecosystem}` or `GET /api/check/package/{ecosystem}`** when you only know an npm package or Go module name
+5. **Use `?include=metrics`** on check endpoints when you need normalized raw measurements and sampling metadata
+6. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
+7. **Use `include=drivers,metrics,signals` on `/api/manifest`** when an agent needs richer per-dependency evidence without rescoring
+8. **Check the `verdict` field** for a quick human-readable assessment
+9. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
+10. **Archived repos** are instantly scored 0 — no need to inspect signals
+11. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI

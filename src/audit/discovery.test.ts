@@ -43,7 +43,7 @@ describe('discoverManifests', () => {
     expect(kv.put).toHaveBeenCalledOnce()
   })
 
-  it('discovers go.mod at repo root', async () => {
+  it('discovers Go manifests at repo root', async () => {
     const kv = createMockKV()
     const mockResponse = [
       { name: 'go.mod', type: 'file', download_url: 'https://raw.githubusercontent.com/owner/repo/main/go.mod' },
@@ -56,9 +56,11 @@ describe('discoverManifests', () => {
 
     const result = await discoverManifests('owner', 'repo', 'test-token', kv as any)
 
-    expect(result).toHaveLength(1)
+    expect(result).toHaveLength(2)
     expect(result[0].filename).toBe('go.mod')
     expect(result[0].format).toBe('go.mod')
+    expect(result[1].filename).toBe('go.sum')
+    expect(result[1].format).toBe('go.sum')
   })
 
   it('discovers both package.json and go.mod', async () => {

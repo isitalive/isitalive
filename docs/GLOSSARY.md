@@ -19,7 +19,8 @@ Common terms used throughout the IsItAlive codebase, documentation, and API.
 | Term | Definition |
 | --- | --- |
 | **Check** | `GET /api/check/{provider}/{owner}/{repo}` — returns a health score for a single repository. |
-| **Manifest Audit** | `POST /api/manifest` — accepts a `package.json` or `go.mod`, resolves all dependencies to GitHub repos, and scores each one. Requires authentication. |
+| **Manifest Audit** | `POST /api/manifest` — accepts supported manifest and lockfile formats (`package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`), resolves dependencies to GitHub repos, and scores each one. Requires authentication. |
+| **Package Resolve** | `GET /api/resolve/{ecosystem}?name=...` — resolves an npm package or Go module to a GitHub repo without scoring it. |
 | **Badge** | `GET /api/badge/{provider}/{owner}/{repo}` — returns an SVG health badge for README embedding. |
 | **Trending** | A ranked list of the most-checked projects in the last 24 hours, ordered by check frequency. |
 
@@ -30,7 +31,7 @@ Common terms used throughout the IsItAlive codebase, documentation, and API.
 | **Free To Use** | Current access model. Public checks, badges, API-key requests, and public GitHub Actions OIDC audits use the same free cache policy. |
 | **Anonymous** | A request without an API key or OIDC token. Rate-limited per IP, with `/api/check` and dependency-data requests scoped by repo to avoid one popular repo starving all others. |
 | **Authenticated** | A request with a valid API key or public GitHub Actions OIDC token. Rate-limited by key/OIDC identity. |
-| **Rate Limit** | Request throttle for infrastructure protection. Anonymous: 5/min. Authenticated API key or GitHub Actions OIDC: 50/min. Admin login: 10/min. |
+| **Rate Limit** | Request throttle for infrastructure protection. Anonymous: 5/min. Authenticated API key or public GitHub Actions OIDC: 50/min. Admin login: 10/min. |
 | **Fresh Score** | A dependency or repository score computed from an upstream GitHub fetch rather than served from cache. Used for operational analytics, not billing enforcement. |
 
 ## Caching

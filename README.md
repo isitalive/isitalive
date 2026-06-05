@@ -15,6 +15,10 @@ This is a maintenance-risk signal, not a security, license, or compliance verdic
 curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
 ```
 
+```bash
+ISITALIVE_API_KEY=sk_your_api_key npx isitalive scan . --json --include drivers,metrics,signals
+```
+
 ## Links
 
 - **Website**: [isitalive.dev](https://isitalive.dev)
