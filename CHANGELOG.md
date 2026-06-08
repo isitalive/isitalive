@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Package-first lookup for humans and agents: npm packages and Go modules can now be resolved via `/api/resolve/{ecosystem}/{packageName}` and checked via `/api/check/package/{ecosystem}/{packageName}` before falling back to GitHub repo-level maintenance-health scoring.
 - D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
 - R2 JSONL archive for analytics events under partitioned `events/raw/type=.../dt=.../hour=...` keys, with `archive_batches` coverage tracking and Queue/DLQ retry handling.
 - D1 `discovered_repos` registry for repositories found through external feeds such as GitHub Trending.

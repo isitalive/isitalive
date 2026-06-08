@@ -130,6 +130,16 @@ function seedResponseCache(cacheApi: ReturnType<typeof createMockCacheApi>, path
   )
 }
 
+function stubNpmRegistry(body: unknown, status = 200) {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.startsWith('https://registry.npmjs.org/')) {
+      return Response.json(body, { status })
+    }
+    return new Response('unexpected fetch', { status: 500 })
+  }))
+}
+
 function queuedDomainBatches(env: Env): string[][] {
   const sendBatch = vi.mocked((env as any).EVENT_QUEUE.sendBatch)
   return sendBatch.mock.calls.map((call: [Iterable<{ body: { domain: string } }>]) =>
@@ -279,6 +289,142 @@ describe('agent-ready health API', () => {
     expect(response.status).toBe(200)
     await drainExecutionCtx(ctx)
     expect(queuedDomainBatches(env)).toContainEqual(['provider', 'result', 'usage'])
+  })
+
+  it('resolves npm packages through /api/resolve and applies API rate-limit headers', async () => {
+    const env = createEnv(cacheKv)
+    stubNpmRegistry({ repository: { url: 'https://github.com/facebook/react.git' } })
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/npm/react'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('X-RateLimit-Limit')).toBe('5')
+    expect(json).toEqual({
+      package: { ecosystem: 'npm', name: 'react', version: '' },
+      github: 'facebook/react',
+      resolvedFrom: 'registry',
+    })
+
+    await Promise.all(ctx.pending)
+  })
+
+  it('checks npm packages through /api/check/package with metrics', async () => {
+    const rawData = makeRawProjectData({ owner: 'facebook', name: 'react' })
+    const env = createEnv(cacheKv)
+    stubNpmRegistry({ repository: { url: 'https://github.com/facebook/react.git' } })
+    vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/package/npm/react?include=metrics'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('X-RateLimit-Limit')).toBe('5')
+    expect(json.package).toEqual({ ecosystem: 'npm', name: 'react', version: '' })
+    expect(json.github).toBe('facebook/react')
+    expect(json.resolvedFrom).toBe('registry')
+    expect(json.project).toBe('github/facebook/react')
+    expect(json.metrics.issueSampleSize).toBe(4)
+
+    await drainExecutionCtx(ctx)
+  })
+
+  it('supports scoped npm packages through query fallback', async () => {
+    const env = createEnv(cacheKv)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/npm?name=@types/node'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.package).toEqual({ ecosystem: 'npm', name: '@types/node', version: '' })
+    expect(json.github).toBe('definitelytyped/definitelytyped')
+    expect(json.resolvedFrom).toBe('direct')
+  })
+
+  it('supports Go module package paths', async () => {
+    const env = createEnv(cacheKv)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/go/golang.org/x/crypto'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.package).toEqual({ ecosystem: 'go', name: 'golang.org/x/crypto', version: '' })
+    expect(json.github).toBe('golang/crypto')
+    expect(json.resolvedFrom).toBe('vanity')
+  })
+
+  it('returns stable package route errors', async () => {
+    const env = createEnv(cacheKv)
+
+    const unsupported = await app.fetch(new Request('https://isitalive.dev/api/resolve/pypi/django'), env, makeExecutionCtx())
+    expect(unsupported.status).toBe(400)
+    await expect(unsupported.json()).resolves.toMatchObject({ error_code: 'unsupported_ecosystem' })
+
+    const missingName = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm'), env, makeExecutionCtx())
+    expect(missingName.status).toBe(400)
+    await expect(missingName.json()).resolves.toMatchObject({ error_code: 'invalid_param' })
+
+    stubNpmRegistry({}, 404)
+    const notFound = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm/missing-package'), env, makeExecutionCtx())
+    expect(notFound.status).toBe(404)
+    await expect(notFound.json()).resolves.toMatchObject({ error_code: 'package_not_found' })
+
+    stubNpmRegistry({})
+    const noGithub = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm/no-github'), env, makeExecutionCtx())
+    expect(noGithub.status).toBe(404)
+    await expect(noGithub.json()).resolves.toMatchObject({ error_code: 'no_github_repo' })
+
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('registry down')
+    }))
+    const registryTimeout = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm/timeout'), env, makeExecutionCtx())
+    expect(registryTimeout.status).toBe(502)
+    await expect(registryTimeout.json()).resolves.toMatchObject({ error_code: 'registry_timeout' })
+  })
+
+  it('routes human search inputs for packages and repos', async () => {
+    const env = createEnv(cacheKv)
+    const cases = [
+      ['react', '/package/npm/react'],
+      ['@types/node', '/package/npm/%40types/node'],
+      ['https://www.npmjs.com/package/react', '/package/npm/react'],
+      ['go:golang.org/x/crypto', '/package/go/golang.org/x/crypto'],
+      ['facebook/react', '/github/facebook/react'],
+    ]
+
+    for (const [repo, location] of cases) {
+      const response = await app.fetch(
+        new Request('https://isitalive.dev/_check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ repo }),
+        }),
+        env,
+        makeExecutionCtx(),
+      )
+      expect(response.status).toBe(302)
+      expect(response.headers.get('Location')).toBe(location)
+    }
   })
 
   it('keeps manifest audits compact by default but still includes provenance fields', async () => {

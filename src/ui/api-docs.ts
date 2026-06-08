@@ -314,6 +314,42 @@ export function apiDocsPage(analyticsToken?: string): string {
 
     <h2>Endpoints</h2>
 
+    <h3>Check Package Maintenance</h3>
+    <div class="endpoint">
+      <span class="endpoint-method method-get">GET</span>
+      <span class="endpoint-path">/api/check/package/{ecosystem}/{packageName}</span>
+      <p class="endpoint-desc">Resolve an npm package or Go module to GitHub, then return the normal maintenance-health score with package context attached. Use this when an agent or human starts from a dependency name such as <span class="inline-code">react</span>, <span class="inline-code">@types/node</span>, or <span class="inline-code">golang.org/x/crypto</span>. Query fallback: <span class="inline-code">/api/check/package/{ecosystem}?name=...</span>.</p>
+
+      <table class="params-table">
+        <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+        <tr>
+          <td><span class="param-name">ecosystem</span><span class="param-required">required</span></td>
+          <td><span class="param-type">string</span></td>
+          <td><span class="inline-code">npm</span> or <span class="inline-code">go</span></td>
+        </tr>
+        <tr>
+          <td><span class="param-name">packageName</span><span class="param-required">required</span></td>
+          <td><span class="param-type">string</span></td>
+          <td>Package name or Go module path. Use URL encoding when needed.</td>
+        </tr>
+        <tr>
+          <td><span class="param-name">include</span></td>
+          <td><span class="param-type">string</span></td>
+          <td>Optional. Use <span class="inline-code">metrics</span> to include normalized raw measurements and sampling metadata.</td>
+        </tr>
+      </table>
+    </div>
+
+    <h3>Example Request</h3>
+    <div class="code-block"><span class="comment"># Check an npm package's underlying GitHub repo</span><br>curl https://isitalive.dev/api/check/package/npm/react?include=metrics</div>
+
+    <h3>Resolve Package Only</h3>
+    <div class="endpoint">
+      <span class="endpoint-method method-get">GET</span>
+      <span class="endpoint-path">/api/resolve/{ecosystem}/{packageName}</span>
+      <p class="endpoint-desc">Return only the package-to-GitHub mapping, including <span class="inline-code">package</span>, <span class="inline-code">github</span>, and <span class="inline-code">resolvedFrom</span>. Query fallback: <span class="inline-code">/api/resolve/{ecosystem}?name=...</span>.</p>
+    </div>
+
     <h3>Check Project Maintenance</h3>
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>

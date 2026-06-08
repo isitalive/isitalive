@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Env } from '../types/env'
+import { resolvePackageDependency } from './packages'
 import { extractGitHub, resolveGopkgIn, resolveGoogleGolang } from './resolver'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 // ── extractGitHub ──────────────────────────────────────────────────────
 describe('extractGitHub', () => {
@@ -117,5 +123,77 @@ describe('resolveGoogleGolang', () => {
 
   it('returns null for non-google.golang.org paths', () => {
     expect(resolveGoogleGolang('golang.org/x/text')).toBeNull()
+  })
+})
+
+describe('resolvePackageDependency', () => {
+  it('resolves npm packages from registry repository metadata', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      repository: { url: 'git+https://github.com/facebook/react.git' },
+    })))
+
+    const result = await resolvePackageDependency('npm', 'react', {} as Env)
+
+    expect(result.package).toEqual({ ecosystem: 'npm', name: 'react', version: '' })
+    expect(result.resolved.github).toEqual({ owner: 'facebook', repo: 'react' })
+    expect(result.resolved.resolvedFrom).toBe('registry')
+  })
+
+  it('continues resolving when resolver cache reads and writes fail', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      repository: { url: 'https://github.com/facebook/react.git' },
+    })))
+    const env = {
+      CACHE_KV: {
+        get: vi.fn(async () => {
+          throw new Error('cache unavailable')
+        }),
+        put: vi.fn(async () => {
+          throw new Error('cache unavailable')
+        }),
+      },
+    } as unknown as Env
+
+    const result = await resolvePackageDependency('npm', 'react', env)
+
+    expect(result.resolved.github).toEqual({ owner: 'facebook', repo: 'react' })
+    expect(result.resolved.resolvedFrom).toBe('registry')
+  })
+
+  it('resolves @types packages directly to DefinitelyTyped', async () => {
+    const result = await resolvePackageDependency('npm', '@types/node', {} as Env)
+
+    expect(result.resolved.github).toEqual({ owner: 'DefinitelyTyped', repo: 'DefinitelyTyped' })
+    expect(result.resolved.resolvedFrom).toBe('direct')
+  })
+
+  it('resolves direct GitHub Go module paths', async () => {
+    const result = await resolvePackageDependency('go', 'github.com/zitadel/zitadel', {} as Env)
+
+    expect(result.resolved.github).toEqual({ owner: 'zitadel', repo: 'zitadel' })
+    expect(result.resolved.resolvedFrom).toBe('direct')
+  })
+
+  it('resolves golang.org/x Go modules through known vanity mapping', async () => {
+    const result = await resolvePackageDependency('go', 'golang.org/x/crypto', {} as Env)
+
+    expect(result.resolved.github).toEqual({ owner: 'golang', repo: 'crypto' })
+    expect(result.resolved.resolvedFrom).toBe('vanity')
+  })
+
+  it('resolves google.golang.org modules through known vanity mapping', async () => {
+    const result = await resolvePackageDependency('go', 'google.golang.org/grpc/codes', {} as Env)
+
+    expect(result.resolved.github).toEqual({ owner: 'grpc', repo: 'grpc-go' })
+    expect(result.resolved.resolvedFrom).toBe('vanity')
+  })
+
+  it('marks unresolved packages with stable reasons', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })))
+
+    const result = await resolvePackageDependency('npm', 'missing-package', {} as Env)
+
+    expect(result.resolved.github).toBeNull()
+    expect(result.resolved.unresolvedReason).toBe('package_not_found')
   })
 })

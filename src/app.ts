@@ -7,6 +7,7 @@ import { version } from '../package.json';
 import { apiKeyAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
 import { check } from './routes/check';
+import { packageCheck, packageResolve } from './routes/package';
 import { badge } from './routes/badge';
 import { audit } from './routes/manifest';
 import { githubWebhook } from './github/webhook';
@@ -55,6 +56,8 @@ app.use('/api/*', cors({
 // Auth + rate limiting — skip badge (CDN-cached, embedded as <img> tags)
 app.use('/api/check/*', apiKeyAuth);
 app.use('/api/check/*', rateLimit);
+app.use('/api/resolve/*', apiKeyAuth);
+app.use('/api/resolve/*', rateLimit);
 app.use('/api/manifest', apiKeyAuth);
 app.use('/api/manifest', rateLimit);
 app.use('/_data/deps/*', apiKeyAuth);
@@ -62,6 +65,8 @@ app.use('/_data/deps/*', rateLimit);
 app.use('/_view', apiKeyAuth);
 app.use('/_view', rateLimit);
 
+app.route('/api/resolve', packageResolve);
+app.route('/api/check/package', packageCheck);
 app.route('/api/check', check);
 app.route('/api/badge', badge);
 app.route('/api/manifest', audit);

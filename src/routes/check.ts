@@ -2,7 +2,7 @@
 // /api/check/:provider/:owner/:repo — main health check endpoint
 // ---------------------------------------------------------------------------
 
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import type { Env } from '../types/env'
 import { providers, fetchAndScoreProject, scheduleRevalidation } from '../providers/index'
 import { classifyError, type ProviderErrorCode } from '../providers/errors'
@@ -15,6 +15,10 @@ import { emitAll } from '../pipeline/emit'
 import { parseIncludeFlags, shapeScoringResult } from '../utils/healthResponse'
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean } }
+type CheckContext = Context<AppEnv>
+type ProjectCheckOptions = {
+  extraResponseFields?: Record<string, unknown>
+}
 const check = new Hono<AppEnv>()
 
 
@@ -46,10 +50,16 @@ function cacheMeta(
 
 
 
-check.get('/:provider/:owner/:repo', async (c) => {
+export async function handleProjectCheck(
+  c: CheckContext,
+  provider: string,
+  rawOwner: string,
+  rawRepo: string,
+  options: ProjectCheckOptions = {},
+) {
   const startTime = Date.now()
   const includeFlags = parseIncludeFlags(c.req.url)
-  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
+  const extraResponseFields = options.extraResponseFields ?? {}
 
   // Validate path params — blocks XSS / path-traversal payloads
   if (!isValidParam(rawOwner) || !isValidParam(rawRepo)) {
@@ -85,7 +95,10 @@ check.get('/:provider/:owner/:repo', async (c) => {
   // Validate provider
   if (!Object.hasOwn(providers, provider)) {
     return c.json(
-      { error: `Unsupported provider: ${provider}. Supported: ${Object.keys(providers).join(', ')}` },
+      {
+        error: `Unsupported provider: ${provider}. Supported: ${Object.keys(providers).join(', ')}`,
+        error_code: 'unsupported_provider',
+      },
       400,
     )
   }
@@ -116,6 +129,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     )
 
     const response = c.json({
+      ...extraResponseFields,
       ...shapeScoringResult(cached.result, includeFlags),
       ...cacheMeta(cached.status, tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
@@ -143,6 +157,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     c.executionCtx.waitUntil(Promise.all(bgTasks))
 
     const response = c.json({
+      ...extraResponseFields,
       ...shapeScoringResult(cached.result, includeFlags),
       ...cacheMeta('l2-stale', tier, cached.ageSeconds, cached.storedAt, cached.freshUntil, cached.staleUntil),
     })
@@ -182,6 +197,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
     const now = new Date().toISOString()
     
     const response = c.json({
+      ...extraResponseFields,
       ...shapeScoringResult(result, includeFlags),
       ...cacheMeta('l3-miss', tier, 0, now, now, now),
     })
@@ -201,6 +217,7 @@ check.get('/:provider/:owner/:repo', async (c) => {
       const stale = await cacheManager.getAny(provider, owner, repo)
       if (stale) {
         const response = c.json({
+          ...extraResponseFields,
           ...shapeScoringResult(stale.result, includeFlags),
           ...cacheMeta('l2-stale-degraded', tier, stale.ageSeconds, stale.storedAt, null, null),
           degraded: true,
@@ -229,6 +246,11 @@ check.get('/:provider/:owner/:repo', async (c) => {
     }
     return c.json({ error: messageMap[errorCode], error_code: errorCode }, statusMap[errorCode])
   }
+}
+
+check.get('/:provider/:owner/:repo', async (c) => {
+  const { provider, owner: rawOwner, repo: rawRepo } = c.req.param()
+  return handleProjectCheck(c, provider, rawOwner, rawRepo)
 })
 
 export { check }

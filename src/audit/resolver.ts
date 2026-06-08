@@ -68,14 +68,19 @@ async function resolveSingle(
 ): Promise<ResolvedDep> {
   // Check cache first
   const cacheKey = `${RESOLVE_CACHE_PREFIX}${dep.ecosystem}:${dep.name}`;
-  const cached = await cacheGetText(env, cacheKey);
-  if (cached) {
-    const parsed = JSON.parse(cached);
-    if (parsed.github) {
-      return { ...dep, github: parsed.github, resolvedFrom: 'cache' };
+  try {
+    const cached = await cacheGetText(env, cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed.github) {
+        return { ...dep, github: parsed.github, resolvedFrom: 'cache' };
+      }
+      // Cached as unresolvable
+      return { ...dep, github: null, resolvedFrom: null, unresolvedReason: parsed.reason };
     }
-    // Cached as unresolvable
-    return { ...dep, github: null, resolvedFrom: null, unresolvedReason: parsed.reason };
+  } catch {
+    // Cache availability must not block dependency resolution. This keeps local
+    // dev and degraded cache states from turning package lookups into failures.
   }
 
   // Resolve fresh
@@ -89,7 +94,7 @@ async function resolveSingle(
     : { github: null, reason: result.unresolvedReason };
   const putPromise = cachePutText(env, cacheKey, JSON.stringify(cacheValue), {
     expirationTtl: RESOLVE_CACHE_TTL,
-  });
+  }).catch(() => {});
   if (ctx) {
     ctx.waitUntil(putPromise);
   } else {

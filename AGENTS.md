@@ -65,6 +65,28 @@ src/
 
 ## Quick Check API
 
+For package-first dependency checks:
+
+```
+GET https://isitalive.dev/api/check/package/{ecosystem}/{packageName}
+GET https://isitalive.dev/api/resolve/{ecosystem}/{packageName}
+```
+
+Supported ecosystems: `npm`, `go`.
+Use the query fallback when path encoding is awkward: `/api/check/package/npm?name=@types/node`.
+
+Examples:
+
+```bash
+curl -s https://isitalive.dev/api/check/package/npm/react | jq
+curl -s 'https://isitalive.dev/api/check/package/npm?name=@types/node' | jq
+curl -s https://isitalive.dev/api/check/package/go/golang.org/x/crypto | jq
+```
+
+Package checks resolve to GitHub and score the underlying repository. They are still maintenance-health checks, not package security, license, provenance, or registry-health verdicts.
+
+For repo-first checks:
+
 ```
 GET https://isitalive.dev/api/check/github/{owner}/{repo}
 ```
@@ -179,17 +201,18 @@ GET https://isitalive.dev/.well-known/ai-plugin.json
 Rate limiting is purely infrastructure protection (not billing):
 
 - **Anonymous**: 5 requests/minute
-- **With API key**: 1,000 requests/minute
+- **With API key or GitHub OIDC**: 50 requests/minute
 
 ## Tips for Agents
 
 1. **Treat this as maintenance-health** — the score is useful for maintainer activity and project durability, not security posture
-2. **Cache results** — repo scores are freshness-tiered (`free`: 24h fresh / 48h stale, `pro`: 1h / 6h, `enterprise`: 15m / 1h)
-3. **Use `GET /api/check/...` first** for individual dependencies — it now returns `methodology`, `signals`, and `drivers` by default
-4. **Use `?include=metrics`** on `GET /api/check/...` when you need normalized raw measurements and sampling metadata
-5. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
-6. **Use `include=drivers,metrics,signals` on `/api/manifest`** when an agent needs richer per-dependency evidence without rescoring
-7. **Check the `verdict` field** for a quick human-readable assessment
-8. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
-9. **Archived repos** are instantly scored 0 — no need to inspect signals
-10. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI
+2. **Use package-first endpoints** when you have an npm package or Go module name; use repo checks when you already know the GitHub repository
+3. **Cache results** — free access uses 24h fresh / 48h stale repo-score freshness for anonymous and authenticated requests
+4. **Use `GET /api/check/...` first** for individual dependencies — it returns `methodology`, `signals`, and `drivers` by default
+5. **Use `?include=metrics`** on `GET /api/check/...` when you need normalized raw measurements and sampling metadata
+6. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
+7. **Use `include=drivers,metrics,signals` on `/api/manifest`** when an agent needs richer per-dependency evidence without rescoring
+8. **Check the `verdict` field** for a quick human-readable assessment
+9. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
+10. **Archived repos** are instantly scored 0 — no need to inspect signals
+11. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI

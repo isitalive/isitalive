@@ -600,7 +600,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <div class="container">    <header>
 
       <h1>Don't let your agent install dead dependencies.</h1>
-      <p class="subtitle">Check maintenance-health for any GitHub project with one score, inspectable evidence, and agent-readable signals.</p>
+      <p class="subtitle">Check maintenance-health for any package or GitHub project with one score, inspectable evidence, and agent-readable signals.</p>
 
       <div class="search-container">
         <form action="/_check" method="POST" id="searchForm">
@@ -609,7 +609,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
               type="text"
               name="repo"
               id="searchInput"
-              placeholder="${['vercel/next.js', 'facebook/react', 'golang/go', 'zitadel/zitadel', 'tailwindlabs/tailwindcss'][Math.floor(Math.random() * 5)]}"
+              placeholder="${['react', '@types/node', 'go:golang.org/x/crypto', 'facebook/react', 'vercel/next.js'][Math.floor(Math.random() * 5)]}"
               required
               autofocus
             />
@@ -620,7 +620,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           </div>
           ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="auto" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
         </form>
-        <p class="search-hint">Paste any GitHub repo before you adopt, recommend, or automate it</p>
+        <p class="search-hint">Paste an npm package, Go module, or GitHub repo before you adopt, recommend, or automate it</p>
       </div>
     </header>
 
@@ -667,10 +667,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
             <h3>Give agents a liveness API</h3>
           </div>
           <p>Let LLMs and MCP servers sanity-check dependencies before recommending or adding them.</p>
-          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/\\
-  github/vercel/next.js
+          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/package/npm/react
 
-{ <span class="gr">"score"</span>: 92,
+{ <span class="gr">"package"</span>: { <span class="gr">"name"</span>: <span class="gr">"react"</span> },
+  <span class="gr">"score"</span>: 96,
   <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
   <span class="gr">"signals"</span>: [...] }</div>
           <span class="adopt-tag"><a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
@@ -696,6 +696,44 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     var turnstileReady = ${hasTurnstile ? 'false' : 'true'};
     function onTurnstileSuccess() { turnstileReady = true; }
     function onTurnstileExpired() { turnstileReady = false; if (typeof turnstile !== 'undefined') turnstile.reset(); }
+
+    function packageRoute(ecosystem, name) {
+      return '/package/' + ecosystem + '/' + name.replace(/\\/+$/, '').split('/').map(encodeURIComponent).join('/');
+    }
+
+    function routeForSearchInput(raw) {
+      var input = raw.trim();
+      var explicit = input.match(/^(npm|go):(.+)$/i);
+      if (explicit) return packageRoute(explicit[1].toLowerCase(), explicit[2].trim());
+
+      var npmUrl = input.match(/^(?:https?:\\/\\/)?(?:www\\.)?npmjs\\.com\\/package\\/([^?#]+)(?:[?#].*)?$/i);
+      if (npmUrl) {
+        try { return packageRoute('npm', decodeURIComponent(npmUrl[1])); }
+        catch (_) { return packageRoute('npm', npmUrl[1]); }
+      }
+
+      var isGithubUrl = /^(?:https?:\\/\\/)?(?:www\\.)?github\\.com\\//i.test(input);
+      var path = input
+        .replace(/^https?:\\/\\//, '')
+        .replace(/^(www\\.)?github\\.com\\//, '')
+        .replace(/\\.git$/, '')
+        .replace(/\\/+$/, '');
+      var parts = path.split('/');
+
+      if (isGithubUrl && parts.length >= 2) return '/github/' + parts[0].toLowerCase() + '/' + parts[1].toLowerCase();
+      if (input.charAt(0) === '@' || input.indexOf('/') === -1) return packageRoute('npm', input);
+      if (parts.length === 2 && parts[0].indexOf('.') === -1 && parts[0].charAt(0) !== '@') {
+        return '/github/' + parts[0].toLowerCase() + '/' + parts[1].toLowerCase();
+      }
+      return null;
+    }
+
+    function resetSearchState() {
+      document.getElementById('searchBtn').classList.remove('loading');
+      document.getElementById('searchBox').classList.remove('loading');
+      document.getElementById('loadingBar').classList.remove('active');
+      document.getElementById('searchInput').readOnly = false;
+    }
 
     document.getElementById('searchForm').addEventListener('submit', function(e) {
       const input = document.getElementById('searchInput').value.trim();
@@ -724,16 +762,12 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
             if (turnstileReady) { form.submit(); }
             else {
               // Turnstile failed (e.g. preview domain) — fallback to client-side redirect
-              var path = formInput
-                .replace(/^https?:\\/\\//, '')
-                .replace(/^(www\\.)?github\\.com\\//, '')
-                .replace(/\\.git$/, '').replace(/\\/+$/, '');
-              var parts = path.split('/');
-              if (parts.length >= 2) {
+              var target = routeForSearchInput(formInput);
+              if (target) {
                 document.body.classList.add('navigating');
-                window.location.href = '/github/' + parts[0] + '/' + parts[1];
+                window.location.href = target;
               } else {
-                btn.classList.remove('loading'); box.classList.remove('loading'); bar.classList.remove('active'); document.getElementById('searchInput').readOnly = false;
+                resetSearchState();
               }
             }
           }
@@ -762,17 +796,14 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         return;
       }
 
-      let path = input
-        .replace(/^https?:\\\\/\\\\//, '')
-        .replace(/^(www\\\\.)?github\\\\.com\\\\//, '')
-        .replace(/\\\\.git$/, '').replace(/\\\\/+$/, '');
-
-      const parts = path.split('/');
-      if (parts.length >= 2) {
+      var target = routeForSearchInput(input);
+      if (target) {
         document.body.classList.add('navigating');
         setTimeout(function() {
-          window.location.href = '/github/' + parts[0] + '/' + parts[1];
+          window.location.href = target;
         }, 300);
+      } else {
+        resetSearchState();
       }`}
     });
 

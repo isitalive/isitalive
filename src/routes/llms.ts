@@ -29,10 +29,33 @@ IsItAlive is free to use for public maintenance-health checks. Infrastructure li
 
 - Public GitHub repository maintenance-health checks
 - JSON score, verdict, signals, and drivers via \`/api/check\`
+- Package-first checks via \`/api/check/package\` and package-to-GitHub resolution via \`/api/resolve\`
 - SVG README badges
 - \`go.mod\` and \`package.json\` manifest audits with API key or public GitHub Actions OIDC
 - OpenAPI, \`llms.txt\`, and AI plugin manifest for agents
 - Methodology, trending, recent queries, and score history where data is available
+
+### Check Package Health
+\`GET /api/check/package/{ecosystem}/{packageName}\`
+
+Resolves an npm package or Go module to GitHub, then returns the normal maintenance-health response for that repository with package context attached. Supported ecosystems: \`npm\`, \`go\`.
+
+**Examples:**
+\`\`\`
+curl https://isitalive.dev/api/check/package/npm/react
+curl 'https://isitalive.dev/api/check/package/npm?name=@types/node'
+curl https://isitalive.dev/api/check/package/go/golang.org/x/crypto
+\`\`\`
+
+**Resolve only:**
+\`\`\`
+curl https://isitalive.dev/api/resolve/npm/react
+\`\`\`
+
+**Package response fields:**
+- \`package\`: ecosystem, name, and optional version context
+- \`github\`: resolved GitHub owner/repo
+- \`resolvedFrom\`: direct | vanity | registry | cache
 
 ### Check Project Health
 \`GET /api/check/{provider}/{owner}/{repo}\`
@@ -104,7 +127,7 @@ Returns an SVG badge for README embedding.
 
 ## Authentication
 
-Optional for project checks and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` or a GitHub Actions OIDC token for authenticated free access.
+Optional for package checks, project checks, package resolution, and badges. **Required for manifest audit.** Add \`Authorization: Bearer <key>\` or a GitHub Actions OIDC token for authenticated free access.
 
 Rate limiting is infrastructure protection. Free access is limited by authentication state.
 
