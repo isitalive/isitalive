@@ -593,7 +593,7 @@ export const openApiSpec = {
           name: { type: 'string' },
           version: {
             type: 'string',
-            description: 'Optional package version provided by the caller. Scoring remains repo-level.',
+            description: 'Always present. Contains the optional package version provided by the caller, or an empty string when omitted. Scoring remains repo-level.',
           },
         },
       },

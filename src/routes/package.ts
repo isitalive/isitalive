@@ -4,6 +4,7 @@ import type { Tier } from '../cache/index'
 import { handleProjectCheck } from './check'
 import {
   normalizePackageName,
+  normalizePackageVersion,
   packageResolutionProblem,
   parsePackageEcosystem,
   resolvePackageDependency,
@@ -53,7 +54,18 @@ async function resolveForRequest(c: AppContext, rawEcosystem: string, rawName: s
     }
   }
 
-  const version = versionFromRequest(c)
+  const version = normalizePackageVersion(versionFromRequest(c))
+  if (version === null) {
+    return {
+      ok: false as const,
+      response: c.json({
+        error: 'Invalid package version',
+        error_code: 'invalid_param',
+        hint: 'Package version context must be 128 characters or fewer and cannot contain control characters.',
+      }, 400),
+    }
+  }
+
   const result = await resolvePackageDependency(ecosystem, name, c.env, c.executionCtx, version)
   const github = resolvedGithubSlug(result.resolved)
   if (!github) {

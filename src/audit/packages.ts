@@ -22,6 +22,10 @@ export type PackageResolutionProblem = {
 }
 
 const MAX_PACKAGE_NAME_LENGTH = 255
+const MAX_PACKAGE_VERSION_LENGTH = 128
+const CONTROL_CHARS_RE = /[\0-\x1F\x7F]/
+const NPM_UNSCOPED_RE = /^[a-z0-9][a-z0-9._~-]*$/
+const NPM_SCOPED_RE = /^@[a-z0-9][a-z0-9._~-]*\/[a-z0-9][a-z0-9._~-]*$/
 
 export function parsePackageEcosystem(value: string): PackageEcosystem | null {
   return SUPPORTED_PACKAGE_ECOSYSTEMS.includes(value as PackageEcosystem)
@@ -30,12 +34,22 @@ export function parsePackageEcosystem(value: string): PackageEcosystem | null {
 }
 
 export function normalizePackageName(ecosystem: PackageEcosystem, value: string): string | null {
-  const name = value.trim().replace(/\/+$/, '')
+  const rawName = value.trim().replace(/\/+$/, '')
+  const name = ecosystem === 'npm' ? rawName.toLowerCase() : rawName
   if (!name || name.length > MAX_PACKAGE_NAME_LENGTH) return null
-  if (/[\0\r\n\t]/.test(name)) return null
-  if (ecosystem === 'npm' && /\s/.test(name)) return null
+  if (CONTROL_CHARS_RE.test(name)) return null
+  if (ecosystem === 'npm') {
+    return NPM_UNSCOPED_RE.test(name) || NPM_SCOPED_RE.test(name) ? name : null
+  }
   if (ecosystem === 'go' && (/\s/.test(name) || !name.includes('.'))) return null
   return name
+}
+
+export function normalizePackageVersion(value: string): string | null {
+  const version = value.trim()
+  if (version.length > MAX_PACKAGE_VERSION_LENGTH) return null
+  if (CONTROL_CHARS_RE.test(version)) return null
+  return version
 }
 
 export function makePackageDep(

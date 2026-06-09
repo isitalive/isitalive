@@ -314,6 +314,29 @@ describe('agent-ready health API', () => {
     await Promise.all(ctx.pending)
   })
 
+  it('normalizes npm package names before registry resolution', async () => {
+    const env = createEnv(cacheKv)
+    const fetchMock = vi.fn(async () => Response.json({
+      repository: { url: 'https://github.com/facebook/react.git' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/resolve/npm/React'),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.package.name).toBe('react')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://registry.npmjs.org/react',
+      expect.any(Object),
+    )
+  })
+
   it('checks npm packages through /api/check/package with metrics', async () => {
     const rawData = makeRawProjectData({ owner: 'facebook', name: 'react' })
     const env = createEnv(cacheKv)
@@ -383,6 +406,22 @@ describe('agent-ready health API', () => {
     const missingName = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm'), env, makeExecutionCtx())
     expect(missingName.status).toBe(400)
     await expect(missingName.json()).resolves.toMatchObject({ error_code: 'invalid_param' })
+
+    const malformedScoped = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm/@scope/a/b'), env, makeExecutionCtx())
+    expect(malformedScoped.status).toBe(400)
+    await expect(malformedScoped.json()).resolves.toMatchObject({ error_code: 'invalid_param' })
+
+    const versionInName = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm?name=react@18.2.0'), env, makeExecutionCtx())
+    expect(versionInName.status).toBe(400)
+    await expect(versionInName.json()).resolves.toMatchObject({ error_code: 'invalid_param' })
+
+    const controlVersion = await app.fetch(new Request(`https://isitalive.dev/api/resolve/npm/react?version=${encodeURIComponent('1.0.0\nnext')}`), env, makeExecutionCtx())
+    expect(controlVersion.status).toBe(400)
+    await expect(controlVersion.json()).resolves.toMatchObject({ error_code: 'invalid_param' })
+
+    const oversizedVersion = await app.fetch(new Request(`https://isitalive.dev/api/resolve/npm/react?version=${'x'.repeat(129)}`), env, makeExecutionCtx())
+    expect(oversizedVersion.status).toBe(400)
+    await expect(oversizedVersion.json()).resolves.toMatchObject({ error_code: 'invalid_param' })
 
     stubNpmRegistry({}, 404)
     const notFound = await app.fetch(new Request('https://isitalive.dev/api/resolve/npm/missing-package'), env, makeExecutionCtx())

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Env } from '../types/env'
-import { resolvePackageDependency } from './packages'
+import { normalizePackageName, normalizePackageVersion, resolvePackageDependency } from './packages'
 import { extractGitHub, resolveGopkgIn, resolveGoogleGolang } from './resolver'
 
 afterEach(() => {
@@ -127,6 +127,22 @@ describe('resolveGoogleGolang', () => {
 })
 
 describe('resolvePackageDependency', () => {
+  it('normalizes and validates package names', () => {
+    expect(normalizePackageName('npm', 'React')).toBe('react')
+    expect(normalizePackageName('npm', '@Types/Node')).toBe('@types/node')
+    expect(normalizePackageName('npm', '@scope/a/b')).toBeNull()
+    expect(normalizePackageName('npm', 'react@18.2.0')).toBeNull()
+    expect(normalizePackageName('npm', 'owner/repo')).toBeNull()
+    expect(normalizePackageName('go', 'golang.org/x/crypto')).toBe('golang.org/x/crypto')
+  })
+
+  it('validates optional package version context', () => {
+    expect(normalizePackageVersion(' ^18.2.0 ')).toBe('^18.2.0')
+    expect(normalizePackageVersion('')).toBe('')
+    expect(normalizePackageVersion('1.0.0\nnext')).toBeNull()
+    expect(normalizePackageVersion('x'.repeat(129))).toBeNull()
+  })
+
   it('resolves npm packages from registry repository metadata', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       repository: { url: 'git+https://github.com/facebook/react.git' },

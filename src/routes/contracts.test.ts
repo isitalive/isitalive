@@ -75,6 +75,8 @@ describe('agent contract alignment', () => {
     expect(openApiSpec.info.description).toContain('before humans or AI agents choose a dependency')
     expect(openApiSpec.paths).toHaveProperty('/api/check/package/{ecosystem}/{packageName}')
     expect(openApiSpec.paths).toHaveProperty('/api/resolve/{ecosystem}/{packageName}')
+    expect(openApiSpec.components.schemas.PackageDescriptor.required).toContain('version')
+    expect(openApiSpec.components.schemas.PackageDescriptor.properties.version.description).toContain('Always present')
     expect(openApiSpec.info.description).toContain('free to use for public maintenance-health checks')
     expect(openApiSpec.info.description).toContain('not a security, license, or compliance verdict')
     expect(JSON.stringify(openApiSpec)).not.toContain('free beta')
