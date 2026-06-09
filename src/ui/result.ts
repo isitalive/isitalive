@@ -124,6 +124,24 @@ function renderMetadataCard(meta: ProjectMetadata | undefined, owner: string, re
     </section>`;
 }
 
+type PackageContext = {
+  ecosystem: string;
+  name: string;
+  version: string;
+  github: string;
+  resolvedFrom: string | null;
+}
+
+function renderPackageContext(context?: PackageContext): string {
+  if (!context) return '';
+  const label = `${context.ecosystem}:${context.name}${context.version ? `@${context.version}` : ''}`;
+  const resolvedFrom = context.resolvedFrom ? ` via ${context.resolvedFrom}` : '';
+  return `
+      <div class="package-context">
+        Package <code>${escapeHtml(label)}</code> resolves to <strong>${escapeHtml(context.github)}</strong>${escapeHtml(resolvedFrom)}.
+      </div>`;
+}
+
 /** Build the Install Action CTA URL */
 function installActionUrl(owner: string, repo: string): string {
   const yaml = `name: Dependency Health Audit
@@ -144,7 +162,7 @@ jobs:
   return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/new/main?filename=.github/workflows/isitalive.yml&value=${encodeURIComponent(yaml)}`;
 }
 
-export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null): string {
+export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: string, analyticsToken?: string, firstIndexed?: string | null, trend?: Trend | null, packageContext?: PackageContext): string {
   const owner = escapeHtml(rawOwner);
   const repo = escapeHtml(rawRepo);
   const verdict = normalizeVerdict(result.verdict);
@@ -245,6 +263,29 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     }
 
     .project-name a:hover { color: var(--accent); }
+
+    .package-context {
+      display: inline-block;
+      margin: 4px auto 8px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+
+    .package-context code {
+      color: var(--text-secondary);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+    }
+
+    .package-context strong {
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
 
     .gauge-container {
       position: relative;
@@ -591,6 +632,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
       <div class="project-name">
         <a href="${githubUrl}" target="_blank" rel="noopener">${owner}/${repo}</a>
       </div>
+      ${renderPackageContext(packageContext)}
 
       <div class="gauge-container">
         <svg viewBox="0 0 100 100">

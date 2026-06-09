@@ -33,6 +33,14 @@ import { buildProviderEvent } from '../events/provider'
 import { emitAll } from '../pipeline/emit'
 import { parseManifest, type ManifestFormat } from '../audit/parsers'
 import { resolveAll } from '../audit/resolver'
+import {
+  normalizePackageName,
+  packageResolutionProblem,
+  parsePackageEcosystem,
+  resolvePackageDependency,
+  resolvedGithubSlug,
+  type PackageEcosystem,
+} from '../audit/packages'
 import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
@@ -50,6 +58,14 @@ import {
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
 
 const ui = new Hono<{ Bindings: Env }>()
+
+type PackagePageContext = {
+  ecosystem: PackageEcosystem
+  name: string
+  version: string
+  github: string
+  resolvedFrom: string | null
+}
 
 /** Suppress Turnstile + CF Web Analytics on local dev */
 function isLocalDev(c: any): boolean {
@@ -439,16 +455,14 @@ ui.post('/_check', verifyTurnstile, async (c) => {
     return handleAuditFromUrl(c, rawUrl, filename)
   }
 
-  // Parse input: "owner/repo", "github.com/owner/repo", or full URL
-  let path = input
-    .replace(/^https?:\/\//, '')
-    .replace(/^(www\.)?github\.com\//, '')
-    .replace(/\.git$/, '')
-    .replace(/\/+$/, '')
+  const repoInput = parseRepoInput(input)
+  if (repoInput) {
+    return c.redirect(`/github/${repoInput.owner}/${repoInput.repo}`)
+  }
 
-  const parts = path.split('/')
-  if (parts.length >= 2) {
-    return c.redirect(`/github/${parts[0].toLowerCase()}/${parts[1].toLowerCase()}`)
+  const packageInput = parsePackageInput(input)
+  if (packageInput) {
+    return c.redirect(packagePath(packageInput.ecosystem, packageInput.name))
   }
 
   return c.redirect('/')
@@ -522,8 +536,71 @@ ui.get('/_data/audit/:hash', async (c) => {
   }
 })
 
+function packagePath(ecosystem: PackageEcosystem, name: string): string {
+  return `/package/${ecosystem}/${name.split('/').map(encodeURIComponent).join('/')}`
+}
+
+function parseNpmPackageUrl(input: string): string | null {
+  const match = input.match(/^(?:https?:\/\/)?(?:www\.)?npmjs\.com\/package\/([^?#]+)(?:[?#].*)?$/i)
+  if (!match) return null
+  try {
+    return decodeURIComponent(match[1]).replace(/\/+$/, '')
+  } catch {
+    return match[1].replace(/\/+$/, '')
+  }
+}
+
+function parsePackageInput(input: string): { ecosystem: PackageEcosystem; name: string } | null {
+  const explicit = input.match(/^(npm|go):(.+)$/i)
+  if (explicit) {
+    const ecosystem = parsePackageEcosystem(explicit[1].toLowerCase())
+    if (!ecosystem) return null
+    const name = normalizePackageName(ecosystem, explicit[2])
+    return name ? { ecosystem, name } : null
+  }
+
+  const npmUrlName = parseNpmPackageUrl(input)
+  if (npmUrlName) {
+    const name = normalizePackageName('npm', npmUrlName)
+    return name ? { ecosystem: 'npm', name } : null
+  }
+
+  if (input.startsWith('@') || !input.includes('/')) {
+    const name = normalizePackageName('npm', input)
+    return name ? { ecosystem: 'npm', name } : null
+  }
+
+  return null
+}
+
+function parseRepoInput(input: string): { owner: string; repo: string } | null {
+  const isGithubUrl = /^(?:https?:\/\/)?(?:www\.)?github\.com\//i.test(input)
+  const path = input
+    .replace(/^https?:\/\//, '')
+    .replace(/^(www\.)?github\.com\//, '')
+    .replace(/\.git$/, '')
+    .replace(/\/+$/, '')
+
+  const parts = path.split('/')
+  if (isGithubUrl && parts.length >= 2) {
+    return { owner: parts[0].toLowerCase(), repo: parts[1].toLowerCase() }
+  }
+
+  if (parts.length === 2 && !parts[0].includes('.') && !parts[0].startsWith('@')) {
+    return { owner: parts[0].toLowerCase(), repo: parts[1].toLowerCase() }
+  }
+
+  return null
+}
+
 // Shared handler for fetching + rendering a result page
-async function handleCheck(c: any, provider: string, owner: string, repo: string) {
+async function handleCheck(
+  c: any,
+  provider: string,
+  owner: string,
+  repo: string,
+  packageContext?: PackagePageContext,
+) {
   const startTime = Date.now()
 
   // ─── 1. EDGE CACHE (L1) ──────────────────────────────────────────────────
@@ -577,7 +654,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
       const trend = computeTrend(history)
       c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
       c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-      const response = c.html(resultPage(cached, owner, repo, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
+      const response = c.html(resultPage(cached, owner, repo, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend, packageContext))
       c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
       return response
     }
@@ -611,7 +688,7 @@ async function handleCheck(c: any, provider: string, owner: string, repo: string
     
     c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600')
     c.header('CDN-Cache-Control', 'public, s-maxage=3600')
-    const response = c.html(resultPage(result, owner, repo, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend))
+    const response = c.html(resultPage(result, owner, repo, isLocalDev(c) ? undefined : c.env.CF_ANALYTICS_TOKEN, firstIndexed, trend, packageContext))
     c.executionCtx.waitUntil(cacheManager.putResponse(cacheKey, response))
 
     return response
@@ -705,6 +782,36 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
 
   return c.redirect(`/audit/${contentHash}`)
 }
+
+// Package result: /package/npm/react or /package/go/golang.org/x/crypto
+ui.get('/package/:ecosystem/:name{.+}', async (c) => {
+  const { ecosystem: rawEcosystem, name: rawName } = c.req.param()
+  const ecosystem = parsePackageEcosystem(rawEcosystem)
+  if (!ecosystem) {
+    return c.html(errorPage(`Unsupported package ecosystem: ${rawEcosystem}`), 400)
+  }
+
+  const name = normalizePackageName(ecosystem, rawName)
+  if (!name) {
+    return c.html(errorPage('Invalid package name.'), 400)
+  }
+
+  const resolved = await resolvePackageDependency(ecosystem, name, c.env, c.executionCtx)
+  const github = resolvedGithubSlug(resolved.resolved)
+  if (!github) {
+    const problem = packageResolutionProblem(resolved.resolved.unresolvedReason)
+    return c.html(errorPage(`${problem.error}. ${problem.hint}`), problem.status)
+  }
+
+  const [owner, repo] = github.split('/')
+  return handleCheck(c, 'github', owner, repo, {
+    ecosystem,
+    name,
+    version: resolved.package.version,
+    github,
+    resolvedFrom: resolved.resolved.resolvedFrom,
+  })
+})
 
 // Shortcut: /owner/repo → redirect to canonical /github/owner/repo (always lowercase)
 ui.get('/:owner/:repo', async (c) => {

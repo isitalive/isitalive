@@ -238,6 +238,186 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/resolve/{ecosystem}/{packageName}': {
+      get: {
+        operationId: 'resolvePackage',
+        summary: 'Resolve package to GitHub repository',
+        description: 'Resolve an npm package or Go module to the GitHub repository IsItAlive will score. Use this when an agent starts from a dependency name instead of a repo slug.',
+        parameters: [
+          {
+            name: 'ecosystem',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['npm', 'go'] },
+          },
+          {
+            name: 'packageName',
+            in: 'path',
+            required: true,
+            description: 'Package name or module path, for example react, @types/node, or golang.org/x/crypto.',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'version',
+            in: 'query',
+            required: false,
+            description: 'Optional version string echoed in the package context. Scoring remains repo-level.',
+            schema: { type: 'string' },
+          },
+        ],
+        security: [{ bearerAuth: [] }, {}],
+        responses: {
+          '200': {
+            description: 'Package resolution result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PackageResolution' },
+              },
+            },
+          },
+          '400': { description: 'Invalid package name or unsupported ecosystem' },
+          '404': { description: 'Package could not be resolved to a GitHub repository' },
+          '502': { description: 'Package registry or resolver failed' },
+        },
+      },
+    },
+    '/api/resolve/{ecosystem}': {
+      get: {
+        operationId: 'resolvePackageByQuery',
+        summary: 'Resolve package to GitHub repository by query',
+        description: 'Query-parameter form of resolvePackage. Useful for package names that clients prefer not to place in the path.',
+        parameters: [
+          {
+            name: 'ecosystem',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['npm', 'go'] },
+          },
+          {
+            name: 'name',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' },
+          },
+          {
+            name: 'version',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+          },
+        ],
+        security: [{ bearerAuth: [] }, {}],
+        responses: {
+          '200': {
+            description: 'Package resolution result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PackageResolution' },
+              },
+            },
+          },
+          '400': { description: 'Invalid package name or unsupported ecosystem' },
+          '404': { description: 'Package could not be resolved to a GitHub repository' },
+          '502': { description: 'Package registry or resolver failed' },
+        },
+      },
+    },
+    '/api/check/package/{ecosystem}/{packageName}': {
+      get: {
+        operationId: 'checkPackage',
+        summary: 'Check package maintenance',
+        description: 'Resolve an npm package or Go module to GitHub, then return the normal maintenance-health score for that repository with package context attached.',
+        parameters: [
+          {
+            name: 'ecosystem',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['npm', 'go'] },
+          },
+          {
+            name: 'packageName',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+          {
+            name: 'include',
+            in: 'query',
+            required: false,
+            description: 'Optional extra sections to include. Use include=metrics to include normalized raw measurements and sampling metadata.',
+            schema: { type: 'string', enum: ['metrics'] },
+          },
+          {
+            name: 'version',
+            in: 'query',
+            required: false,
+            description: 'Optional version string echoed in the package context. Scoring remains repo-level.',
+            schema: { type: 'string' },
+          },
+        ],
+        security: [{ bearerAuth: [] }, {}],
+        responses: {
+          '200': {
+            description: 'Package maintenance-health check result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PackageHealthCheckResult' },
+              },
+            },
+          },
+          '400': { description: 'Invalid package name or unsupported ecosystem' },
+          '404': { description: 'Package or resolved GitHub repository not found' },
+          '502': { description: 'Package registry, resolver, or upstream provider failed' },
+        },
+      },
+    },
+    '/api/check/package/{ecosystem}': {
+      get: {
+        operationId: 'checkPackageByQuery',
+        summary: 'Check package maintenance by query',
+        description: 'Query-parameter form of checkPackage. Useful for package names that clients prefer not to place in the path.',
+        parameters: [
+          {
+            name: 'ecosystem',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', enum: ['npm', 'go'] },
+          },
+          {
+            name: 'name',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' },
+          },
+          {
+            name: 'include',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['metrics'] },
+          },
+          {
+            name: 'version',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+          },
+        ],
+        security: [{ bearerAuth: [] }, {}],
+        responses: {
+          '200': {
+            description: 'Package maintenance-health check result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PackageHealthCheckResult' },
+              },
+            },
+          },
+          '400': { description: 'Invalid package name or unsupported ecosystem' },
+          '404': { description: 'Package or resolved GitHub repository not found' },
+          '502': { description: 'Package registry, resolver, or upstream provider failed' },
+        },
+      },
+    },
     '/api/badge/{provider}/{owner}/{repo}': {
       get: {
         operationId: 'getBadge',
@@ -405,6 +585,55 @@ export const openApiSpec = {
       },
     },
     schemas: {
+      PackageDescriptor: {
+        type: 'object',
+        required: ['ecosystem', 'name', 'version'],
+        properties: {
+          ecosystem: { type: 'string', enum: ['npm', 'go'] },
+          name: { type: 'string' },
+          version: {
+            type: 'string',
+            description: 'Always present. Contains the optional package version provided by the caller, or an empty string when omitted. Scoring remains repo-level.',
+          },
+        },
+      },
+      PackageResolution: {
+        type: 'object',
+        required: ['package', 'github', 'resolvedFrom'],
+        properties: {
+          package: { $ref: '#/components/schemas/PackageDescriptor' },
+          github: {
+            type: 'string',
+            description: 'Resolved GitHub owner/repo, normalized for IsItAlive checks.',
+          },
+          resolvedFrom: {
+            type: 'string',
+            nullable: true,
+            enum: ['direct', 'vanity', 'registry', 'cache', null],
+          },
+        },
+      },
+      PackageHealthCheckResult: {
+        allOf: [
+          { $ref: '#/components/schemas/HealthCheckResult' },
+          {
+            type: 'object',
+            required: ['package', 'github', 'resolvedFrom'],
+            properties: {
+              package: { $ref: '#/components/schemas/PackageDescriptor' },
+              github: {
+                type: 'string',
+                description: 'Resolved GitHub owner/repo, normalized for IsItAlive checks.',
+              },
+              resolvedFrom: {
+                type: 'string',
+                nullable: true,
+                enum: ['direct', 'vanity', 'registry', 'cache', null],
+              },
+            },
+          },
+        ],
+      },
       HealthCheckResult: {
         type: 'object',
         required: ['project', 'provider', 'score', 'verdict', 'checkedAt', 'cached', 'methodology', 'signals', 'drivers'],

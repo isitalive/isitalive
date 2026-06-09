@@ -6,6 +6,7 @@ import { landingPage } from '../ui/landing'
 import { methodologyPage } from '../ui/methodology'
 import { aiPluginManifest } from './aiPlugin'
 import { CACHE_STATUS_DEFINITIONS, METHODOLOGY, SIGNAL_DEFINITIONS } from '../scoring/methodology'
+import agentsMd from '../../AGENTS.md'
 
 describe('agent contract alignment', () => {
   it('keeps OpenAPI signal enums aligned with methodology definitions', () => {
@@ -44,6 +45,8 @@ describe('agent contract alignment', () => {
     const apiDocs = apiDocsPage()
     expect(apiDocs).toContain('maintenance-health')
     expect(apiDocs).toContain('before recommending, adding, or automating a dependency')
+    expect(apiDocs).toContain('/api/check/package/{ecosystem}/{packageName}')
+    expect(apiDocs).toContain('/api/resolve/{ecosystem}/{packageName}')
     expect(apiDocs).toContain('not a security, license, or compliance verdict')
     expect(apiDocs).toContain('"lastCommit"')
     expect(apiDocs).toContain('l2-hit')
@@ -70,6 +73,10 @@ describe('agent contract alignment', () => {
     expect(landing).not.toContain('Does this project look maintained')
 
     expect(openApiSpec.info.description).toContain('before humans or AI agents choose a dependency')
+    expect(openApiSpec.paths).toHaveProperty('/api/check/package/{ecosystem}/{packageName}')
+    expect(openApiSpec.paths).toHaveProperty('/api/resolve/{ecosystem}/{packageName}')
+    expect(openApiSpec.components.schemas.PackageDescriptor.required).toContain('version')
+    expect(openApiSpec.components.schemas.PackageDescriptor.properties.version.description).toContain('Always present')
     expect(openApiSpec.info.description).toContain('free to use for public maintenance-health checks')
     expect(openApiSpec.info.description).toContain('not a security, license, or compliance verdict')
     expect(JSON.stringify(openApiSpec)).not.toContain('free beta')
@@ -79,7 +86,14 @@ describe('agent contract alignment', () => {
     expect(llmsTxt).not.toContain('/pricing')
     expect(llmsTxt).not.toContain('free beta')
     expect(llmsTxt).not.toContain('Tier-based')
+    expect(llmsTxt).toContain('/api/check/package')
+    expect(llmsTxt).toContain('/api/resolve')
     expect(aiPluginManifest.description_for_model).toContain('before recommending, adding, or auditing')
+    expect(aiPluginManifest.description_for_model).toContain('checkPackage')
     expect(aiPluginManifest.description_for_model).toContain('not a security, license, or compliance verdict')
+
+    expect(agentsMd).toContain('/api/check/package')
+    expect(agentsMd).toContain('50 requests/minute')
+    expect(agentsMd).not.toContain('1,000 requests/minute')
   })
 })
