@@ -23,6 +23,11 @@ export const llmsTxt = `# Is It Alive?
 
 Base URL: https://isitalive.dev
 
+Optional client attribution header for aggregate product analytics:
+\`X-IsItAlive-Client: <tool>/<version> (<url-or-contact>)\`
+
+Examples: \`X-IsItAlive-Client: codex/1.0\`, \`X-IsItAlive-Client: my-agent/0.3 (https://example.com)\`. This header is not authentication and should not contain secrets.
+
 ## Free to use
 
 IsItAlive is free to use for public maintenance-health checks. Infrastructure limits apply.
@@ -34,6 +39,29 @@ IsItAlive is free to use for public maintenance-health checks. Infrastructure li
 - \`go.mod\` and \`package.json\` manifest audits with API key or public GitHub Actions OIDC
 - OpenAPI, \`llms.txt\`, and AI plugin manifest for agents
 - Methodology, trending, recent queries, and score history where data is available
+
+## Agent Quick Start
+
+Start with package-first checks when you have a dependency name:
+\`\`\`
+curl -s https://isitalive.dev/api/check/package/npm/react \\
+  -H "X-IsItAlive-Client: codex/1.0" | jq
+\`\`\`
+
+Use repo-first checks only when you already know the GitHub repository:
+\`\`\`
+curl -s https://isitalive.dev/api/check/github/vercel/next.js \\
+  -H "X-IsItAlive-Client: codex/1.0" | jq
+\`\`\`
+
+Use manifest audit for batches. If \`complete\` is false, wait \`retryAfterMs\` and repeat the same request; add \`include=metrics\` only when you need normalized raw measurements:
+\`\`\`
+curl -s -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\
+  -H "Authorization: Bearer sk_your_api_key" \\
+  -H "X-IsItAlive-Client: codex/1.0" \\
+  -H "Content-Type: application/json" \\
+  -d '{"format":"package.json","content":"<contents of package.json>"}' | jq
+\`\`\`
 
 ### Check Package Health
 \`GET /api/check/package/{ecosystem}/{packageName}\`
@@ -97,6 +125,7 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 \`\`\`
 curl -X POST https://isitalive.dev/api/manifest \\
   -H "Authorization: Bearer sk_your_api_key" \\
+  -H "X-IsItAlive-Client: codex/1.0" \\
   -H "Content-Type: application/json" \\
   -d '{"format":"go.mod","content":"<contents of go.mod>"}'
 \`\`\`

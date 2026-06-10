@@ -181,6 +181,31 @@ export const PRESET_QUERIES: PresetQuery[] = [
     chart: 'bar',
   },
   {
+    label: 'Agent/Client Traffic (30d)',
+    sql: `SELECT client_family, SUM(requests) as requests\nFROM daily_client_usage\nWHERE day >= date('now', '-30 days')\nGROUP BY client_family\nORDER BY requests DESC`,
+    chart: 'donut',
+  },
+  {
+    label: 'Top Clients (30d)',
+    sql: `SELECT client_name, SUM(requests) as requests\nFROM daily_client_usage\nWHERE day >= date('now', '-30 days')\nGROUP BY client_name\nORDER BY requests DESC\nLIMIT 20`,
+    chart: 'bar',
+  },
+  {
+    label: 'Agent Conversion by Endpoint',
+    sql: `SELECT source, SUM(requests) as requests\nFROM daily_client_usage\nWHERE day >= date('now', '-30 days')\n  AND client_family IN ('agent', 'ci')\nGROUP BY source\nORDER BY requests DESC`,
+    chart: 'bar',
+  },
+  {
+    label: 'GitHub Actions / OIDC Usage',
+    sql: `SELECT COALESCE(owner, 'unknown') as owner, SUM(used) as requests\nFROM monthly_oidc_usage\nGROUP BY owner\nORDER BY requests DESC\nLIMIT 20`,
+    chart: 'bar',
+  },
+  {
+    label: 'Unknown Clients to Classify',
+    sql: `SELECT client_name, source, SUM(requests) as requests\nFROM daily_client_usage\nWHERE day >= date('now', '-30 days')\n  AND client_family IN ('unknown', 'api')\nGROUP BY client_name, source\nORDER BY requests DESC\nLIMIT 20`,
+    chart: 'bar',
+  },
+  {
     label: 'Geo Distribution',
     sql: `SELECT country, COUNT(*) as requests\nFROM usage_events\nWHERE country != 'XX'\nGROUP BY country\nORDER BY requests DESC\nLIMIT 20`,
     chart: 'bar',
@@ -191,8 +216,8 @@ export const PRESET_QUERIES: PresetQuery[] = [
     chart: 'donut',
   },
   {
-    label: 'User Agents',
-    sql: `SELECT user_agent, COUNT(*) as count\nFROM usage_events\nGROUP BY user_agent`,
+    label: 'Client Families',
+    sql: `SELECT client_family, SUM(requests) as count\nFROM daily_client_usage\nGROUP BY client_family\nORDER BY count DESC`,
     chart: 'donut',
   },
   {

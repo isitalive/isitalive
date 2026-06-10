@@ -264,6 +264,20 @@ describe('d1sql', () => {
       const labels = PRESET_QUERIES.map(p => p.label)
       expect(new Set(labels).size).toBe(labels.length)
     })
+
+    it('includes client attribution presets backed by daily rollups', () => {
+      const byLabel = new Map(PRESET_QUERIES.map(p => [p.label, p.sql]))
+      for (const label of [
+        'Agent/Client Traffic (30d)',
+        'Top Clients (30d)',
+        'Agent Conversion by Endpoint',
+        'Unknown Clients to Classify',
+        'Client Families',
+      ]) {
+        expect(byLabel.get(label)).toContain('daily_client_usage')
+      }
+      expect(byLabel.get('GitHub Actions / OIDC Usage')).toContain('monthly_oidc_usage')
+    })
   })
 
   // ─── queryD1SQL: auto-LIMIT enforcement ─────────────────────────────

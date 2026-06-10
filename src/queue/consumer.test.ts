@@ -23,6 +23,11 @@ function usageEvent(id = 'usage-1'): UsageEvent {
       cache_status: 'l3-miss',
       country: 'US',
       user_agent: 'browser',
+      client_family: 'agent',
+      client_name: 'codex',
+      client_version: '1.0',
+      client_source: 'header',
+      client_label: 'codex/1.0',
       response_time_ms: 42,
       ip_hash: 'hash',
       oidc_repository: null,
@@ -78,6 +83,7 @@ function createMockD1() {
     archiveRows: 0,
     usageRows: 0,
     dailyUsageChecks: 0,
+    dailyClientRequests: 0,
   }
 
   const db = {
@@ -120,6 +126,16 @@ function createMockD1() {
           } else {
             lastChanges = 0
           }
+          continue
+        }
+
+        if (statement.sql.includes('INSERT INTO daily_client_usage')) {
+          if (lastChanges === 1) {
+            state.dailyClientRequests += 1
+            lastChanges = 1
+          } else {
+            lastChanges = 0
+          }
         }
       }
 
@@ -148,6 +164,7 @@ describe('queue consumer', () => {
     expect(state.archiveRows).toBe(1)
     expect(state.usageRows).toBe(1)
     expect(state.dailyUsageChecks).toBe(1)
+    expect(state.dailyClientRequests).toBe(1)
   })
 
   it('does not write D1 when the R2 archive write fails', async () => {
@@ -178,6 +195,35 @@ describe('queue consumer', () => {
 
     expect(state.usageRows).toBe(1)
     expect(state.dailyUsageChecks).toBe(1)
+    expect(state.dailyClientRequests).toBe(1)
+  })
+
+  it('persists normalized client attribution and client rollup fields', async () => {
+    const { db, prepared } = createMockD1()
+    const put = vi.fn(async () => null)
+    const event = usageEvent()
+
+    await handleEventQueue(
+      batch([message({ domain: 'usage', event })]),
+      { DB: db, DATA_BUCKET: { put } } as any,
+    )
+
+    const usageInsert = prepared.find((statement) => statement.sql.includes('INSERT INTO usage_events'))
+    const clientRollup = prepared.find((statement) => statement.sql.includes('INSERT INTO daily_client_usage'))
+
+    expect(usageInsert?.sql).toContain('client_family')
+    expect(usageInsert?.values).toContain('agent')
+    expect(usageInsert?.values).toContain('codex')
+    expect(usageInsert?.values).toContain('codex/1.0')
+    expect(clientRollup?.values).toEqual([
+      '2026-06-04',
+      'agent',
+      'codex',
+      'api',
+      1,
+      42,
+      '2026-06-04T12:34:56.000Z',
+    ])
   })
 
   it('guards aggregate latest metadata against out-of-order queue events', async () => {
