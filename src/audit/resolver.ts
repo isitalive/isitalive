@@ -66,6 +66,32 @@ async function resolveSingle(
   env: Env,
   ctx?: ExecutionContext,
 ): Promise<ResolvedDep> {
+  if (dep.ecosystem === 'github') {
+    const [owner, repo] = dep.name.split('/');
+    if (owner && repo) {
+      return {
+        ...dep,
+        github: { owner, repo },
+        resolvedFrom: 'direct',
+      };
+    }
+    return {
+      ...dep,
+      github: null,
+      resolvedFrom: null,
+      unresolvedReason: 'invalid_github_repo',
+    };
+  }
+
+  if (dep.ecosystem === 'unsupported') {
+    return {
+      ...dep,
+      github: null,
+      resolvedFrom: null,
+      unresolvedReason: 'unsupported_ecosystem',
+    };
+  }
+
   // Check cache first
   const cacheKey = `${RESOLVE_CACHE_PREFIX}${dep.ecosystem}:${dep.name}`;
   try {

@@ -19,7 +19,8 @@ Common terms used throughout the IsItAlive codebase, documentation, and API.
 | Term | Definition |
 | --- | --- |
 | **Check** | `GET /api/check/{provider}/{owner}/{repo}` — returns a health score for a single repository. |
-| **Manifest Audit** | `POST /api/manifest` — accepts a `package.json` or `go.mod`, resolves all dependencies to GitHub repos, and scores each one. Requires authentication. |
+| **Manifest Audit** | `POST /api/manifest` / `POST /api/check/manifest` — accepts supported npm/Go manifests and lockfiles, resolves dependencies to GitHub repos, and scores each one. Requires authentication. |
+| **Batch Check** | `POST /api/check/batch` — accepts up to 200 package descriptors, purls, or GitHub repos and returns per-item maintenance-health JSON. Requires authentication. |
 | **Badge** | `GET /api/badge/{provider}/{owner}/{repo}` — returns an SVG health badge for README embedding. |
 | **Trending** | A ranked list of the most-checked projects in the last 24 hours, ordered by check frequency. |
 

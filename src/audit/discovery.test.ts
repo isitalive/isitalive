@@ -43,7 +43,7 @@ describe('discoverManifests', () => {
     expect(kv.put).toHaveBeenCalledOnce()
   })
 
-  it('discovers go.mod at repo root', async () => {
+  it('discovers Go manifests at repo root', async () => {
     const kv = createMockKV()
     const mockResponse = [
       { name: 'go.mod', type: 'file', download_url: 'https://raw.githubusercontent.com/owner/repo/main/go.mod' },
@@ -56,9 +56,27 @@ describe('discoverManifests', () => {
 
     const result = await discoverManifests('owner', 'repo', 'test-token', kv as any)
 
-    expect(result).toHaveLength(1)
-    expect(result[0].filename).toBe('go.mod')
-    expect(result[0].format).toBe('go.mod')
+    expect(result).toHaveLength(2)
+    expect(result.map(m => m.filename).sort()).toEqual(['go.mod', 'go.sum'])
+    expect(result.map(m => m.format).sort()).toEqual(['go.mod', 'go.sum'])
+  })
+
+  it('discovers npm lockfiles at repo root', async () => {
+    const kv = createMockKV()
+    const mockResponse = [
+      { name: 'package-lock.json', type: 'file', download_url: 'https://raw.githubusercontent.com/owner/repo/main/package-lock.json' },
+      { name: 'pnpm-lock.yaml', type: 'file', download_url: 'https://raw.githubusercontent.com/owner/repo/main/pnpm-lock.yaml' },
+      { name: 'yarn.lock', type: 'file', download_url: 'https://raw.githubusercontent.com/owner/repo/main/yarn.lock' },
+    ]
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockResponse), { status: 200 }),
+    )
+
+    const result = await discoverManifests('owner', 'repo', 'test-token', kv as any)
+
+    expect(result).toHaveLength(3)
+    expect(result.map(m => m.format).sort()).toEqual(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'])
   })
 
   it('discovers both package.json and go.mod', async () => {

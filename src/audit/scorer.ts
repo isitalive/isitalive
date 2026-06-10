@@ -14,16 +14,35 @@ import type {
   ScoreDriver,
   ScoringResult,
   SignalResult,
+  Verdict,
 } from '../scoring/types';
 import { CacheManager, type Tier } from '../cache/index';
 import { providers } from '../providers/index';
-import { isProviderError } from '../providers/errors';
+import { classifyError, isProviderError } from '../providers/errors';
 import { scoreProject } from '../scoring/engine';
 import { METHODOLOGY } from '../scoring/methodology';
 import { bufferToHex } from '../utils/crypto';
 import { runWithConcurrency } from '../utils/concurrency';
 import type { Env } from '../types/env';
 import { auditCacheGetText, auditCachePutText } from '../db/state';
+import {
+  aggregatePolicyVerdict,
+  buildDataFreshness,
+  buildIdentity,
+  buildResolution,
+  evaluatePolicy,
+  riskFlagsFor,
+  stateFromFailure,
+  topDrivers,
+  type AgentDataFreshness,
+  type AgentDependencyIdentity,
+  type AgentDependencyResolution,
+  type AgentPolicy,
+  type AgentPolicyResult,
+  type AgentState,
+  type PolicyVerdict,
+} from './agent';
+import type { CacheResult } from '../cache/index';
 
 const github = providers.github;
 
@@ -39,7 +58,7 @@ export interface AuditDep {
   /** Dev dependency? */
   dev: boolean;
   /** Ecosystem */
-  ecosystem: 'npm' | 'go';
+  ecosystem: ResolvedDep['ecosystem'];
   /** Resolved GitHub path (e.g. "zitadel/zitadel") or null */
   github: string | null;
   /** Health score 0-100, or null if pending/unresolved */
@@ -62,6 +81,22 @@ export interface AuditDep {
   cacheStatus?: 'fresh' | 'cached' | 'pending' | 'unresolved';
   /** If unresolved, why */
   unresolvedReason?: string;
+  /** Canonical package identity for agents */
+  identity?: AgentDependencyIdentity;
+  /** Canonical resolution metadata for agents */
+  resolution?: AgentDependencyResolution;
+  /** Processing state separate from maintenance-health verdict */
+  state?: AgentState;
+  /** Maintenance-health verdict only; null when not scored */
+  healthVerdict?: Verdict | null;
+  /** Cache and freshness metadata for this dependency score */
+  dataFreshness?: AgentDataFreshness;
+  /** Compact top drivers for policy-style decisions */
+  topDrivers?: ScoreDriver[];
+  /** Machine-readable risk flags */
+  riskFlags?: string[];
+  /** Optional policy evaluation result */
+  policy?: AgentPolicyResult;
 }
 
 export interface AuditResult {
@@ -93,11 +128,21 @@ export interface AuditResult {
   };
   /** Per-dependency results */
   dependencies: AuditDep[];
+  /** Optional aggregate policy verdict */
+  policyVerdict?: PolicyVerdict;
 }
 
-const AUDIT_CACHE_PREFIX = `audit:result:${METHODOLOGY.version}:`;
+export interface ScoreAuditOptions {
+  tier?: Tier;
+  budgetMs?: number;
+  policy?: AgentPolicy;
+  maxAgeSeconds?: number;
+  preferFresh?: boolean;
+}
+
+const AUDIT_CACHE_PREFIX = `audit:result:${METHODOLOGY.version}:agent-v1:`;
 const AUDIT_CACHE_TTL = 6 * 60 * 60; // 6 hours
-const AUDIT_CACHE_URL_PREFIX = `https://cache.isitalive.dev/api/manifest/${METHODOLOGY.version}/`;
+const AUDIT_CACHE_URL_PREFIX = `https://cache.isitalive.dev/api/manifest/${METHODOLOGY.version}/agent-v1/`;
 
 export function buildAuditCacheKey(contentHash: string): string {
   return `${AUDIT_CACHE_PREFIX}${contentHash}`
@@ -128,21 +173,25 @@ export async function scoreAudit(
   contentHash: string,
   env: Env,
   ctx: ExecutionContext,
-  tierOrBudget: Tier | number = 'free',
+  tierOrBudget: Tier | number | ScoreAuditOptions = 'free',
   maybeBudgetMs = 28_000,
 ): Promise<AuditResult> {
-  const tier: Tier = typeof tierOrBudget === 'string' ? tierOrBudget : 'free'
-  const budgetMs = typeof tierOrBudget === 'number' ? tierOrBudget : maybeBudgetMs
+  const options = normalizeScoreAuditOptions(tierOrBudget, maybeBudgetMs)
+  const tier = options.tier
+  const budgetMs = options.budgetMs
+  const hasRequestSpecificOptions = Boolean(options.policy || options.maxAgeSeconds !== undefined || options.preferFresh)
   const start = Date.now();
   const cacheManager = new CacheManager(env, ctx);
 
   // ── 1. Check for a cached full audit by manifest hash ──────────────
   const auditCacheKey = buildAuditCacheKey(contentHash);
-  const cachedAudit = await auditCacheGetText(env, auditCacheKey);
-  if (cachedAudit) {
-    const parsed = JSON.parse(cachedAudit) as AuditResult;
-    if (parsed.complete) return parsed;
-    // Partial cached result — we'll try to complete it below
+  if (!hasRequestSpecificOptions) {
+    const cachedAudit = await auditCacheGetText(env, auditCacheKey);
+    if (cachedAudit) {
+      const parsed = JSON.parse(cachedAudit) as AuditResult;
+      if (parsed.complete) return parsed;
+      // Partial cached result — we'll try to complete it below
+    }
   }
 
   // ── 2. Separate resolvable from unresolvable ───────────────────────
@@ -162,6 +211,7 @@ export async function scoreAudit(
       methodology: undefined,
       cacheStatus: 'unresolved' as const,
       unresolvedReason: d.unresolvedReason,
+      ...agentFieldsForDep(d, null, 'unresolved', tier, undefined, options, d.unresolvedReason),
     }));
 
   // ── 3. Batch check KV cache for existing scores ────────────────────
@@ -175,13 +225,24 @@ export async function scoreAudit(
 
   const scored: AuditDep[] = [];
   const uncached: ResolvedDep[] = [];
+  const staleFallbacks = new Map<string, { dep: ResolvedDep; cached: CacheResult }>();
 
-  for (const result of cacheChecks) {
-    if (result.status === 'rejected') continue;
-    const { dep, cached } = result.value;
+  for (let i = 0; i < cacheChecks.length; i++) {
+    const result = cacheChecks[i];
+    const dep = resolvable[i];
+    if (result.status === 'rejected') {
+      uncached.push(dep);
+      continue;
+    }
+    const { cached } = result.value;
 
     if ((cached.status === 'l2-hit' || cached.status === 'l1-hit' || cached.status === 'l2-stale') && cached.result) {
-      scored.push(depToAudit(dep, cached.result, 'cached'));
+      if (shouldRefreshCached(cached, options)) {
+        staleFallbacks.set(depKey(dep), { dep, cached });
+        uncached.push(dep);
+      } else {
+        scored.push(depToAudit(dep, cached.result, 'cached', tier, cached, options));
+      }
     } else {
       uncached.push(dep);
     }
@@ -203,7 +264,7 @@ export async function scoreAudit(
         return { result, error: null as string | null };
       } catch (err: unknown) {
         const is404 = isProviderError(err) && err.code === 'not_found';
-        return { result: null, error: is404 ? 'repo_not_found' : 'scoring_error' };
+        return { result: null, error: is404 ? 'repo_not_found' : classifyError(err) };
       }
     },
     {
@@ -229,16 +290,23 @@ export async function scoreAudit(
         checkedAt: undefined,
         methodology: undefined,
         cacheStatus: 'pending',
+        ...agentFieldsForDep(dep, null, 'pending', tier, undefined, options, undefined, true),
       });
       continue;
     }
 
     if (entry.status === 'fulfilled' && entry.value.result) {
-      scored.push(depToAudit(dep, entry.value.result, 'fresh'));
+      scored.push(depToAudit(dep, entry.value.result, 'fresh', tier, undefined, options));
       continue;
     }
 
     const reason = entry.status === 'fulfilled' ? (entry.value.error ?? 'scoring_error') : 'scoring_error';
+    const fallback = staleFallbacks.get(depKey(dep));
+    if (fallback?.cached.result) {
+      scored.push(depToAudit(dep, fallback.cached.result, 'cached', tier, fallback.cached, options));
+      continue;
+    }
+
     unresolvedDeps.push({
       name: dep.name,
       version: dep.version,
@@ -252,6 +320,7 @@ export async function scoreAudit(
       methodology: undefined,
       cacheStatus: 'unresolved',
       unresolvedReason: reason,
+      ...agentFieldsForDep(dep, null, 'unresolved', tier, undefined, options, reason),
     });
   }
 
@@ -284,6 +353,7 @@ export async function scoreAudit(
     methodology: METHODOLOGY,
     summary,
     dependencies: allDeps,
+    policyVerdict: aggregatePolicyVerdict(allDeps.map((dep) => dep.policy)),
   };
 
   if (!complete) {
@@ -294,12 +364,14 @@ export async function scoreAudit(
   }
 
   // ── 6. Persist current audit state immediately ─────────────────────
-  await persistAuditResult(env, auditCacheKey, auditResult)
+  if (!hasRequestSpecificOptions) {
+    await persistAuditResult(env, auditCacheKey, auditResult)
+  }
 
   // If incomplete, finish the remaining deps in the background and promote
   // the manifest-hash cache entry to a complete result.
-  if (!complete && remaining.length > 0) {
-    ctx.waitUntil(completeAuditInBackground(remaining, auditResult, auditCacheKey, contentHash, env));
+  if (!hasRequestSpecificOptions && !complete && remaining.length > 0) {
+    ctx.waitUntil(completeAuditInBackground(remaining, auditResult, auditCacheKey, env, tier, options));
   }
 
   return auditResult;
@@ -309,7 +381,14 @@ export async function scoreAudit(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function depToAudit(dep: ResolvedDep, result: ScoringResult, cacheStatus: 'fresh' | 'cached'): AuditDep {
+function depToAudit(
+  dep: ResolvedDep,
+  result: ScoringResult,
+  cacheStatus: 'fresh' | 'cached',
+  tier: Tier,
+  cacheMeta: CacheResult | undefined,
+  options: ScoreAuditOptions,
+): AuditDep {
   return {
     name: dep.name,
     version: dep.version,
@@ -325,6 +404,7 @@ function depToAudit(dep: ResolvedDep, result: ScoringResult, cacheStatus: 'fresh
     drivers: result.drivers,
     metrics: result.metrics,
     cacheStatus,
+    ...agentFieldsForDep(dep, result, cacheStatus, tier, cacheMeta, options),
   };
 }
 
@@ -353,8 +433,9 @@ async function completeAuditInBackground(
   remaining: AuditDep[],
   currentResult: AuditResult,
   auditCacheKey: string,
-  contentHash: string,
   env: Env,
+  tier: Tier,
+  options: ScoreAuditOptions,
 ): Promise<void> {
   const cacheManager = new CacheManager(env);
   const replacements = new Map<string, AuditDep>()
@@ -379,14 +460,43 @@ async function completeAuditInBackground(
           drivers: result.drivers,
           metrics: result.metrics,
           cacheStatus: 'fresh',
+          state: 'resolved',
+          healthVerdict: result.verdict,
+          dataFreshness: buildDataFreshness(result.checkedAt, 'fresh', tier, undefined, options.maxAgeSeconds),
+          riskFlags: riskFlagsFor('resolved', buildDataFreshness(result.checkedAt, 'fresh', tier, undefined, options.maxAgeSeconds)),
+          topDrivers: topDrivers(result.drivers),
+          policy: evaluatePolicy({
+            score: result.score,
+            state: 'resolved',
+            dev: dep.dev,
+            dependencyType: dep.identity?.dependencyType ?? (dep.dev ? 'dev' : 'direct'),
+            healthVerdict: result.verdict,
+            resolution: dep.resolution ?? { provider: null, repo: null, source: null, confidence: 'none' },
+            metrics: result.metrics,
+          }, options.policy),
         })
       } catch {
+        const state = stateFromFailure('scoring_error')
+        const dataFreshness = buildDataFreshness(undefined, 'unresolved', tier, undefined, options.maxAgeSeconds)
         replacements.set(dep.github, {
           ...dep,
           score: null,
           verdict: 'unresolved',
           cacheStatus: 'unresolved',
           unresolvedReason: 'scoring_error',
+          state,
+          healthVerdict: null,
+          dataFreshness,
+          riskFlags: riskFlagsFor(state, dataFreshness),
+          policy: evaluatePolicy({
+            score: null,
+            state,
+            dev: dep.dev,
+            dependencyType: dep.identity?.dependencyType ?? (dep.dev ? 'dev' : 'direct'),
+            healthVerdict: null,
+            resolution: dep.resolution ?? { provider: null, repo: null, source: null, confidence: 'none' },
+            metrics: undefined,
+          }, options.policy),
         })
       }
     },
@@ -395,13 +505,7 @@ async function completeAuditInBackground(
 
   const finalDeps = currentResult.dependencies
     .map((dep) => dep.cacheStatus === 'pending' && dep.github
-      ? (replacements.get(dep.github) ?? {
-          ...dep,
-          score: null,
-          verdict: 'unresolved' as const,
-          cacheStatus: 'unresolved' as const,
-          unresolvedReason: 'scoring_error',
-        } satisfies AuditDep)
+      ? (replacements.get(dep.github) ?? failedPendingDep(dep, tier, options))
       : dep,
     )
     .sort((a, b) => {
@@ -421,9 +525,117 @@ async function completeAuditInBackground(
     retryAfterMs: undefined,
     summary: buildSummary(scoredDeps),
     dependencies: finalDeps,
+    policyVerdict: aggregatePolicyVerdict(finalDeps.map((dep) => dep.policy)),
   }
 
   await persistAuditResult(env, auditCacheKey, finalResult)
+}
+
+function failedPendingDep(dep: AuditDep, tier: Tier, options: ScoreAuditOptions): AuditDep {
+  const state = stateFromFailure('scoring_error')
+  const dataFreshness = buildDataFreshness(undefined, 'unresolved', tier, undefined, options.maxAgeSeconds)
+  return {
+    ...dep,
+    score: null,
+    verdict: 'unresolved',
+    cacheStatus: 'unresolved',
+    unresolvedReason: 'scoring_error',
+    state,
+    healthVerdict: null,
+    dataFreshness,
+    riskFlags: riskFlagsFor(state, dataFreshness),
+    policy: evaluatePolicy({
+      score: null,
+      state,
+      dev: dep.dev,
+      dependencyType: dep.identity?.dependencyType ?? (dep.dev ? 'dev' : 'direct'),
+      healthVerdict: null,
+      resolution: dep.resolution ?? { provider: null, repo: null, source: null, confidence: 'none' },
+      metrics: undefined,
+    }, options.policy),
+  }
+}
+
+function normalizeScoreAuditOptions(
+  tierOrBudget: Tier | number | ScoreAuditOptions,
+  maybeBudgetMs: number,
+): Required<Pick<ScoreAuditOptions, 'tier' | 'budgetMs'>> & Omit<ScoreAuditOptions, 'tier' | 'budgetMs'> {
+  if (typeof tierOrBudget === 'number') {
+    return { tier: 'free', budgetMs: tierOrBudget }
+  }
+  if (typeof tierOrBudget === 'string') {
+    return { tier: tierOrBudget, budgetMs: maybeBudgetMs }
+  }
+  return {
+    tier: tierOrBudget.tier ?? 'free',
+    budgetMs: tierOrBudget.budgetMs ?? maybeBudgetMs,
+    policy: tierOrBudget.policy,
+    maxAgeSeconds: tierOrBudget.maxAgeSeconds,
+    preferFresh: tierOrBudget.preferFresh,
+  }
+}
+
+function shouldRefreshCached(cached: CacheResult, options: ScoreAuditOptions): boolean {
+  if (!cached.result) return false
+  if (options.preferFresh && cached.status === 'l2-stale') return true
+  if (typeof options.maxAgeSeconds !== 'number') return false
+  const ageSeconds = cached.ageSeconds ?? ageSecondsFromIso(cached.result.checkedAt)
+  return ageSeconds !== null && ageSeconds > options.maxAgeSeconds
+}
+
+function depKey(dep: ResolvedDep): string {
+  return `${dep.ecosystem}:${dep.name}:${dep.version}:${dep.github?.owner ?? ''}/${dep.github?.repo ?? ''}`
+}
+
+function agentFieldsForDep(
+  dep: ResolvedDep,
+  result: ScoringResult | null,
+  cacheStatus: 'fresh' | 'cached' | 'pending' | 'unresolved',
+  tier: Tier,
+  cacheMeta: CacheResult | undefined,
+  options: ScoreAuditOptions,
+  failureReason?: string,
+  pending = false,
+): Pick<AuditDep, 'identity' | 'resolution' | 'state' | 'healthVerdict' | 'dataFreshness' | 'riskFlags' | 'topDrivers' | 'policy'> {
+  const identity = buildIdentity(dep)
+  const resolution = buildResolution(dep)
+  const state = result ? 'resolved' : stateFromFailure(failureReason, pending)
+  const freshnessStatus: 'fresh' | 'pending' | 'unresolved' | CacheResult['status'] = result
+    ? (cacheStatus === 'fresh' ? 'fresh' : cacheMeta?.status ?? 'fresh')
+    : (cacheStatus === 'cached' ? 'fresh' : cacheStatus)
+  const dataFreshness = buildDataFreshness(
+    result?.checkedAt,
+    freshnessStatus,
+    tier,
+    cacheMeta,
+    options.maxAgeSeconds,
+  )
+  const policy = evaluatePolicy({
+    score: result?.score ?? null,
+    state,
+    dev: dep.dev,
+    dependencyType: dep.dependencyType,
+    healthVerdict: result?.verdict ?? null,
+    resolution,
+    metrics: result?.metrics,
+  }, options.policy)
+
+  return {
+    identity,
+    resolution,
+    state,
+    healthVerdict: result?.verdict ?? null,
+    dataFreshness,
+    riskFlags: riskFlagsFor(state, dataFreshness),
+    topDrivers: topDrivers(result?.drivers),
+    policy,
+  }
+}
+
+function ageSecondsFromIso(iso: string): number | null {
+  const time = Date.parse(iso)
+  if (!Number.isFinite(time)) return null
+  return Math.max(0, Math.round((Date.now() - time) / 1000))
 }
 
 async function persistAuditResult(

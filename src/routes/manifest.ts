@@ -3,9 +3,9 @@
 //
 // POST /api/manifest — submit a manifest for scoring (auth required)
 //
-// Accepts X-Manifest-Hash header for fast-path cache lookup BEFORE parsing the
-// JSON body. If the hash matches a cached result, returns immediately (<1ms CPU).
-// Supports If-None-Match → 304 for ETag-based client caching.
+// Accepts X-Manifest-Hash for client-side dedupe and supports If-None-Match →
+// 304 for ETag-based client caching. Request-specific policy/freshness controls
+// bypass whole-audit result caches so responses remain deterministic.
 //
 // GET /api/manifest/hash/:hash was removed in ADR-006 — Workers always wake
 // up, so the GET was a redundant round-trip at the same $0.30/M cost.
@@ -26,11 +26,12 @@ import { readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http';
 import { includeKey, parseIncludeFlags, shapeAuditResult, type IncludeFlags } from '../utils/healthResponse';
 import { METHODOLOGY } from '../scoring/methodology';
 import { auditCacheDelete, auditCacheGetText } from '../db/state';
+import { parseAuditRequestOptions } from '../audit/requestOptions';
 
 type AppEnv = { Bindings: Env; Variables: { tier: Tier; keyName: string | null; isAuthenticated: boolean; oidcClaims: OidcClaims | null } }
 const audit = new Hono<AppEnv>();
 
-const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'package.json'];
+const SUPPORTED_FORMATS: ManifestFormat[] = ['go.mod', 'go.sum', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'];
 const MAX_CONTENT_SIZE = 512 * 1024; // 512 KB
 const MAX_REQUEST_BODY_BYTES = 576 * 1024; // ~576 KB total JSON payload
 
@@ -73,8 +74,8 @@ function buildCachedAuditResponse(
 // ---------------------------------------------------------------------------
 // POST /api/manifest — submit manifest for scoring (auth required)
 //
-// Fast path: if X-Manifest-Hash header is present, checks L1/L2 cache BEFORE
-// parsing the JSON body — returns in <1ms CPU on cache hits.
+// Whole-audit cache hits are served only after parsing the request body so
+// policy and freshness controls can intentionally bypass cached base results.
 // ---------------------------------------------------------------------------
 
 audit.post('/', async (c) => {
@@ -90,40 +91,8 @@ audit.post('/', async (c) => {
   }
   const oidcClaims = c.get('oidcClaims') ?? null
 
-  // ── FAST PATH: X-Manifest-Hash header check BEFORE parsing body (ADR-006)
-  // If the client sends a hash, we can check L1/L2 cache without the cost of
-  // JSON.parse() on the request body. Saves ~50ms CPU on cache hits.
-  const rawHash = c.req.header('X-Manifest-Hash');
-  const clientHash = rawHash?.toLowerCase();
-  if (clientHash && /^[a-f0-9]{64}$/.test(clientHash)) {
-    const auditCacheKey = buildAuditCacheKey(clientHash);
-    const syntheticCacheUrl = buildAuditCacheUrl(clientHash, includeCacheKey);
-    const cache = caches.default;
-
-    // L1: Cache API hit (Worker-internal, free ops)
-    const l1Hit = await cache.match(syntheticCacheUrl);
-    if (l1Hit) {
-      return l1Hit;
-    }
-
-    // L2: D1 cache hit
-    const d1Cached = await auditCacheGetText(c.env, auditCacheKey);
-    if (d1Cached) {
-      const response = buildCachedAuditResponse(d1Cached, clientHash, c.req.header('If-None-Match'), includeFlags)
-      if (!response) {
-        c.executionCtx.waitUntil(auditCacheDelete(c.env, auditCacheKey))
-      } else {
-        if (response.headers.get('Cache-Control') !== 'no-cache') {
-          c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()))
-        }
-        c.executionCtx.waitUntil(emitUsageFromCached(d1Cached, c))
-        return response
-      }
-    }
-  }
-
   // ── Parse request ──────────────────────────────────────────────────
-  let body: { format?: string; content?: string };
+  let body: { format?: string; content?: string; policy?: unknown; maxAgeSeconds?: unknown; preferFresh?: unknown };
   try {
     const rawBody = await readBodyWithByteLimit(c.req.raw, MAX_REQUEST_BODY_BYTES)
     body = JSON.parse(rawBody || '{}')
@@ -135,6 +104,15 @@ audit.post('/', async (c) => {
   }
 
   const { format, content } = body;
+  const optionResult = parseAuditRequestOptions(body as Record<string, unknown>)
+  if (optionResult.error) {
+    return c.json({ error: optionResult.error.message, error_code: optionResult.error.error_code }, 400)
+  }
+  const hasRequestOptions = Boolean(
+    optionResult.options.policy ||
+    optionResult.options.maxAgeSeconds !== undefined ||
+    optionResult.options.preferFresh,
+  )
 
   if (!format || !content) {
     return c.json(
@@ -167,16 +145,18 @@ audit.post('/', async (c) => {
   const cache = caches.default;
   const syntheticCacheUrl = buildAuditCacheUrl(contentHash, includeCacheKey);
 
-  const l1Hit = await cache.match(syntheticCacheUrl);
-  if (l1Hit) {
-    return l1Hit;
+  if (!hasRequestOptions) {
+    const l1Hit = await cache.match(syntheticCacheUrl);
+    if (l1Hit) {
+      return l1Hit;
+    }
   }
 
   // ── L2: D1 cache (persistent) ────────────────────────────────────
   // Check D1 BEFORE parsing/resolving — skips expensive npm lookups.
   // Only complete results are ever written to this key, so no need to
   // parse and re-serialize — return the raw JSON string directly.
-  const d1Cached = await auditCacheGetText(c.env, auditCacheKey);
+  const d1Cached = hasRequestOptions ? null : await auditCacheGetText(c.env, auditCacheKey);
   if (d1Cached) {
     const response = buildCachedAuditResponse(d1Cached, contentHash, c.req.header('If-None-Match'), includeFlags)
     if (!response) {
@@ -229,7 +209,10 @@ audit.post('/', async (c) => {
     contentHash,
     c.env,
     c.executionCtx,
-    c.get('tier') ?? 'free',
+    {
+      tier: c.get('tier') ?? 'free',
+      ...optionResult.options,
+    },
   );
 
   // ── Response ───────────────────────────────────────────────────────
@@ -244,7 +227,7 @@ audit.post('/', async (c) => {
   }
 
   // ── Write to L1 edge cache if complete ─────────────────────────────
-  if (result.complete) {
+  if (!hasRequestOptions && result.complete) {
     c.executionCtx.waitUntil(cache.put(syntheticCacheUrl, response.clone()));
   }
 

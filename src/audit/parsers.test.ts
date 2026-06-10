@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
-import { parseGoMod, parsePackageJson, parseManifest } from './parsers'
+import {
+  parseGoMod,
+  parseGoSum,
+  parsePackageJson,
+  parsePackageLock,
+  parsePnpmLock,
+  parseYarnLockFile,
+  parseManifest,
+} from './parsers'
 
 // ── parseGoMod ─────────────────────────────────────────────────────────
 describe('parseGoMod', () => {
@@ -22,6 +30,8 @@ require (
       version: 'v1.8.4',
       dev: false,
       ecosystem: 'go',
+      dependencyType: 'direct',
+      sourceFormat: 'go.mod',
     })
   })
 
@@ -148,6 +158,8 @@ describe('parsePackageJson', () => {
       version: '^4.0.0',
       dev: false,
       ecosystem: 'npm',
+      dependencyType: 'direct',
+      sourceFormat: 'package.json',
     })
   })
 
@@ -207,6 +219,113 @@ describe('parsePackageJson', () => {
   })
 })
 
+// ── lockfile parsers ──────────────────────────────────────────────────
+describe('lockfile parsers', () => {
+  it('parses package-lock v3 packages and preserves duplicate package versions', () => {
+    const content = JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        '': { dependencies: { react: '^18.2.0' } },
+        'node_modules/react': { version: '18.2.0' },
+        'node_modules/app/node_modules/react': { version: '17.0.2', dev: true },
+        'node_modules/@scope/pkg': { version: '1.0.0' },
+      },
+    })
+
+    const deps = parsePackageLock(content)
+
+    expect(deps.map(dep => `${dep.name}@${dep.version}`).sort()).toEqual([
+      '@scope/pkg@1.0.0',
+      'react@17.0.2',
+      'react@18.2.0',
+    ])
+    expect(deps.find(dep => dep.version === '17.0.2')).toMatchObject({
+      dev: true,
+      dependencyType: 'dev',
+      sourceFormat: 'package-lock.json',
+    })
+  })
+
+  it('parses package-lock v2/v1 dependency trees', () => {
+    const content = JSON.stringify({
+      lockfileVersion: 2,
+      dependencies: {
+        leftpad: { version: '1.3.0' },
+        nested: {
+          version: '1.0.0',
+          dependencies: {
+            transitive: { version: '2.0.0', dev: true },
+          },
+        },
+      },
+    })
+
+    const deps = parsePackageLock(content)
+
+    expect(deps.map(dep => dep.name).sort()).toEqual(['leftpad', 'nested', 'transitive'])
+    expect(deps.find(dep => dep.name === 'transitive')).toMatchObject({ dev: true })
+  })
+
+  it('parses pnpm-lock.yaml packages with direct/dev/transitive metadata', () => {
+    const deps = parsePnpmLock(`
+lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      react:
+        specifier: ^18.2.0
+        version: 18.2.0
+    devDependencies:
+      vitest:
+        specifier: ^1.0.0
+        version: 1.0.0
+packages:
+  react@18.2.0: {}
+  vitest@1.0.0: {}
+  '@scope/pkg@2.0.0': {}
+`)
+
+    expect(deps.find(dep => dep.name === 'react')).toMatchObject({ dependencyType: 'direct', dev: false })
+    expect(deps.find(dep => dep.name === 'vitest')).toMatchObject({ dependencyType: 'dev', dev: true })
+    expect(deps.find(dep => dep.name === '@scope/pkg')).toMatchObject({ dependencyType: 'transitive', version: '2.0.0' })
+  })
+
+  it('parses Yarn v1 lockfiles', () => {
+    const deps = parseYarnLockFile(`
+left-pad@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/left-pad/-/left-pad-1.3.0.tgz"
+
+"@scope/pkg@^2.0.0":
+  version "2.0.1"
+`)
+
+    expect(deps).toEqual([
+      expect.objectContaining({ name: 'left-pad', version: '1.3.0', dependencyType: 'transitive' }),
+      expect.objectContaining({ name: '@scope/pkg', version: '2.0.1', dependencyType: 'transitive' }),
+    ])
+  })
+
+  it('parses go.sum entries, strips /go.mod, and dedupes module versions', () => {
+    const deps = parseGoSum(`
+github.com/foo/bar v1.0.0 h1:abc
+github.com/foo/bar v1.0.0/go.mod h1:def
+github.com/foo/bar v1.1.0 h1:ghi
+`)
+
+    expect(deps.map(dep => `${dep.name}@${dep.version}`)).toEqual([
+      'github.com/foo/bar@v1.0.0',
+      'github.com/foo/bar@v1.1.0',
+    ])
+    expect(deps.every(dep => dep.dependencyType === 'transitive')).toBe(true)
+  })
+
+  it('throws sanitized parser errors for malformed lockfiles', () => {
+    expect(() => parsePackageLock('{')).toThrow('Invalid package-lock.json')
+    expect(() => parsePnpmLock('packages:\n  - [')).toThrow('Invalid pnpm-lock.yaml')
+  })
+})
+
 // ── parseManifest (dispatch) ───────────────────────────────────────────
 describe('parseManifest', () => {
   it('dispatches to parseGoMod for go.mod format', () => {
@@ -224,6 +343,13 @@ require github.com/foo/bar v1.0.0
     const deps = parseManifest('package.json', content)
     expect(deps).toHaveLength(1)
     expect(deps[0].ecosystem).toBe('npm')
+  })
+
+  it('dispatches to lockfile parsers', () => {
+    expect(parseManifest('go.sum', 'github.com/foo/bar v1.0.0 h1:abc')).toHaveLength(1)
+    expect(parseManifest('package-lock.json', JSON.stringify({ packages: { 'node_modules/a': { version: '1.0.0' } } }))).toHaveLength(1)
+    expect(parseManifest('pnpm-lock.yaml', 'packages:\n  a@1.0.0: {}\n')).toHaveLength(1)
+    expect(parseManifest('yarn.lock', 'a@^1.0.0:\n  version "1.0.0"\n')).toHaveLength(1)
   })
 
   it('throws on unsupported format', () => {

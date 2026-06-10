@@ -14,6 +14,10 @@ This is a maintenance-risk signal, not a security, license, or compliance verdic
 ```bash
 curl -s https://isitalive.dev/api/check/package/npm/react | jq
 curl -s https://isitalive.dev/api/check/github/vercel/next.js | jq
+curl -s -X POST https://isitalive.dev/api/check/batch \
+  -H "Authorization: Bearer sk_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"kind":"package","ecosystem":"npm","name":"react"}]}' | jq
 ```
 
 ## Links

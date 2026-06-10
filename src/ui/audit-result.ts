@@ -90,7 +90,7 @@ function installActionUrl(repoOwner?: string, repoName?: string): string {
   const yaml = `name: Dependency Health Audit
 on:
   pull_request:
-    paths: ['package.json', 'go.mod']
+    paths: ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'package.json', 'go.sum', 'go.mod']
 permissions:
   contents: read
   pull-requests: write
@@ -130,7 +130,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
   const pendingRows = pendingDeps.map(renderDepRow).join('')
   const devRows = devDeps.map(renderDepRow).join('')
 
-  const formatLabel = result.format === 'package.json' ? 'package.json' : 'go.mod'
+  const formatLabel = result.format
 
   const hashUrl = `https://isitalive.dev/audit/${result.auditHash}`
   const apiUrl = `curl -X POST https://isitalive.dev/api/manifest -H 'X-Manifest-Hash: ${result.auditHash}'`

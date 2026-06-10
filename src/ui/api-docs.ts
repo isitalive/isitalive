@@ -350,6 +350,16 @@ export function apiDocsPage(analyticsToken?: string): string {
       <p class="endpoint-desc">Return only the package-to-GitHub mapping, including <span class="inline-code">package</span>, <span class="inline-code">github</span>, and <span class="inline-code">resolvedFrom</span>. Query fallback: <span class="inline-code">/api/resolve/{ecosystem}?name=...</span>.</p>
     </div>
 
+    <h3>Batch Check Dependencies</h3>
+    <div class="endpoint">
+      <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
+      <span class="endpoint-path">/api/check/batch</span>
+      <p class="endpoint-desc">Authenticated batch endpoint for up to 200 mixed package descriptors, package URLs (purls), and GitHub repositories. Optional policy fields return per-dependency pass, warn, fail, or skipped outcomes plus an aggregate <span class="inline-code">policyVerdict</span>.</p>
+    </div>
+
+    <h3>Batch Example</h3>
+    <div class="code-block"><span class="comment"># Check mixed package and purl inputs with policy</span><br>curl -X POST https://isitalive.dev/api/check/batch \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"items":[{"kind":"package","ecosystem":"npm","name":"react"},{"kind":"purl","purl":"pkg:golang/golang.org%2Fx%2Fcrypto"}],"policy":{"failBelowScore":60,"failOnUnresolved":true}}'</span></div>
+
     <h3>Check Project Maintenance</h3>
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>
@@ -457,13 +467,15 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="endpoint">
       <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
       <span class="endpoint-path">/api/manifest</span>
-      <p class="endpoint-desc">Upload a <span class="inline-code">go.mod</span> or <span class="inline-code">package.json</span> and get a scored maintenance-health report for every dependency. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
+      <p class="endpoint-desc">Upload a <span class="inline-code">package.json</span>, <span class="inline-code">package-lock.json</span>, <span class="inline-code">pnpm-lock.yaml</span>, <span class="inline-code">yarn.lock</span>, <span class="inline-code">go.mod</span>, or <span class="inline-code">go.sum</span> and get a scored maintenance-health report for every dependency. Alias: <span class="inline-code">/api/check/manifest</span>. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
     </div>
 
     <h3>Request Body</h3>
     <div class="field-list">
-      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"go.mod"</span> or <span class="inline-code">"package.json"</span></span></div>
+      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"package.json"</span>, <span class="inline-code">"package-lock.json"</span>, <span class="inline-code">"pnpm-lock.yaml"</span>, <span class="inline-code">"yarn.lock"</span>, <span class="inline-code">"go.mod"</span>, or <span class="inline-code">"go.sum"</span></span></div>
       <div class="field-item"><span class="field-name">content</span><span class="field-desc">Raw manifest file content (max 512KB)</span></div>
+      <div class="field-item"><span class="field-name">policy</span><span class="field-desc">Optional policy thresholds for score, unresolved deps, confidence, dev deps, and release age</span></div>
+      <div class="field-item"><span class="field-name">maxAgeSeconds</span><span class="field-desc">Optional best-effort freshness target; stale cached data is flagged with <span class="inline-code">stale_data</span></span></div>
     </div>
 
     <h3>Query Parameters</h3>
@@ -504,7 +516,7 @@ export function apiDocsPage(analyticsToken?: string): string {
       <div class="field-item"><span class="field-name">complete</span><span class="field-desc"><span class="inline-code">true</span> if all deps scored. If <span class="inline-code">false</span>, call again after <span class="inline-code">retryAfterMs</span></span></div>
       <div class="field-item"><span class="field-name">retryAfterMs</span><span class="field-desc">Suggested wait in ms before calling again (only when incomplete)</span></div>
       <div class="field-item"><span class="field-name">methodology</span><span class="field-desc">Same versioned scoring metadata returned by <span class="inline-code">/api/check</span></span></div>
-      <div class="field-item"><span class="field-name">dependencies[]</span><span class="field-desc">Per-dependency results: name, version, github, score, verdict, dev, unresolvedReason, resolvedFrom, checkedAt, and optional drivers/metrics/signals when requested</span></div>
+      <div class="field-item"><span class="field-name">dependencies[]</span><span class="field-desc">Per-dependency results: name, version, github, score, verdict, dev, unresolvedReason, resolvedFrom, checkedAt, identity, resolution, state, healthVerdict, dataFreshness, riskFlags, policy, and optional drivers/metrics/signals when requested</span></div>
     </div>
 
     <div class="note-box">

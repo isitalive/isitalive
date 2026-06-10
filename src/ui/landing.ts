@@ -778,8 +778,8 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       // No Turnstile (local dev) — do client-side redirect
       e.preventDefault();
 
-      // Detect manifest URL: github.com/.../package.json or go.mod (only these filenames)
-      var manifestRx = /(?:https?:\\/\\/)?(?:www\\.)?github\\.com\\/.+\\/blob\\/.+\\/(package\\.json|go\\.mod)$/i;
+      // Detect manifest URL: github.com/.../supported manifest or lockfile
+      var manifestRx = /(?:https?:\\/\\/)?(?:www\\.)?github\\.com\\/.+\\/blob\\/.+\\/(package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|go\\.mod|go\\.sum)$/i;
       if (manifestRx.test(input)) {
         // Submit as audit — POST to /_audit with url field
         var form = document.createElement('form');

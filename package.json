@@ -16,7 +16,10 @@
     "test:fuzz": "FC_NUM_RUNS=10000 vitest run"
   },
   "dependencies": {
-    "hono": "^4.12.23"
+    "@yarnpkg/lockfile": "^1.1.0",
+    "hono": "^4.12.23",
+    "packageurl-js": "^2.0.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.4.1",

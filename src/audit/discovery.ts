@@ -20,7 +20,11 @@ export interface DiscoveredManifest {
 
 const MANIFEST_FILENAMES: Record<string, ManifestFormat> = {
   'package.json': 'package.json',
+  'package-lock.json': 'package-lock.json',
+  'pnpm-lock.yaml': 'pnpm-lock.yaml',
+  'yarn.lock': 'yarn.lock',
   'go.mod': 'go.mod',
+  'go.sum': 'go.sum',
 }
 
 const DISCOVERY_CACHE_PREFIX = 'discover:'

@@ -111,7 +111,8 @@ These hold true across all decisions:
 | Event domains + Pipelines | ✅ Shipped | 4 pipelines active |
 | KV cron aggregation | ✅ Shipped | Trending, tracked, sitemap |
 | L1 (Cache API) + L2 (KV) caching | ✅ Shipped | Free ops on L1, tiered TTLs on L2 |
-| Manifest audit (`POST /api/manifest`) | ✅ Shipped | X-Manifest-Hash fast path (ADR-006) |
+| Manifest audit (`POST /api/manifest`, `POST /api/check/manifest`) | ✅ Shipped | X-Manifest-Hash fast path (ADR-006); supports npm/Go manifests and lockfiles |
+| Batch check (`POST /api/check/batch`) | ✅ Shipped | Authenticated mixed package, purl, and GitHub repo inputs |
 | ~~Content-addressed GET (`/hash/:hash`)~~ | 🗑️ Removed | ADR-006: redundant Worker invocation |
 | GitHub Action (`isitalive/audit-action`) | ✅ Shipped | POST-only with hash header (ADR-006) |
 | OIDC auth middleware | ✅ Shipped | Public-repo validation; private CI requires API key |
@@ -122,7 +123,7 @@ These hold true across all decisions:
 | Monthly quota enforcement | 🗑️ Removed | ADR-008: no OIDC 500 deps/month cap |
 | Static Assets (UI pages) | ✅ Shipped | Build step emits public pages without pricing |
 | Log Explorer ETL (Phase 2) | ⬜ Not started | Deferred until revenue ≥ $1k/mo |
-| Lock file parsing | ⬜ Not started | Future manifest-format expansion |
+| Lock file parsing | ✅ Shipped | package-lock.json, pnpm-lock.yaml, yarn.lock, go.sum |
 | GitHub App gating | ⬜ Not started | Webhook handler accepts all installations |
 | Billing integration | ⏸️ Paused | ADR-008 removes public pricing |
 | Public API key signup | ⏸️ Paused | Admin-created free access keys only |
@@ -130,6 +131,6 @@ These hold true across all decisions:
 
 ## Open Questions
 
-- **Lock file format coverage** — which formats (yarn.lock, pnpm-lock.yaml, go.sum) to prioritise
+- **Additional ecosystem coverage** — whether to add Cargo/Rust or keep Core v1 focused on npm and Go
 - **Scoring algorithm versioning** — use version-tagged cache keys (e.g., `isitalive:v3:`) and roll gradually (ADR-006: avoids HIBP's "DDoS machine" flush problem)
 - **Product learning** — which user workflows need more support after enough usage and history accumulate

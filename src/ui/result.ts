@@ -147,7 +147,7 @@ function installActionUrl(owner: string, repo: string): string {
   const yaml = `name: Dependency Health Audit
 on:
   pull_request:
-    paths: ['package.json', 'go.mod']
+    paths: ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'package.json', 'go.sum', 'go.mod']
 permissions:
   contents: read
   pull-requests: write
