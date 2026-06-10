@@ -534,4 +534,180 @@ describe('agent-ready health API', () => {
 
     await Promise.all(ctx.pending)
   })
+
+  it('audits lockfiles through /api/check/manifest with canonical agent fields', async () => {
+    const rawData = makeRawProjectData({ owner: 'facebook', name: 'react' })
+    const env = createEnv(cacheKv)
+    stubNpmRegistry({ repository: { url: 'https://github.com/facebook/react.git' } })
+    vi.spyOn(providers.github, 'fetchProject').mockResolvedValue(rawData)
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/manifest', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer sk_pro',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          format: 'package-lock.json',
+          content: JSON.stringify({
+            lockfileVersion: 3,
+            packages: {
+              '': { dependencies: { react: '^18.2.0' } },
+              'node_modules/react': { version: '18.2.0' },
+            },
+          }),
+        }),
+      }),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('ETag')).toMatch(/^"[a-f0-9]{64}"$/)
+    expect(json.format).toBe('package-lock.json')
+    expect(json.dependencies[0]).toMatchObject({
+      identity: {
+        purl: 'pkg:npm/react@18.2.0',
+        ecosystem: 'npm',
+        name: 'react',
+        version: '18.2.0',
+        dependencyType: 'direct',
+        sourceFormat: 'package-lock.json',
+      },
+      resolution: {
+        provider: 'github',
+        repo: 'facebook/react',
+        source: 'registry',
+        confidence: 'medium',
+      },
+      state: 'resolved',
+      healthVerdict: 'healthy',
+    })
+    expect(json.dependencies[0].dataFreshness.checkedAt).toBeTruthy()
+    expect(json.dependencies[0].riskFlags).toEqual([])
+
+    await drainExecutionCtx(ctx)
+  })
+
+  it('checks mixed batch inputs and evaluates policy per dependency', async () => {
+    const env = createEnv(cacheKv)
+    stubNpmRegistry({ repository: { url: 'https://github.com/facebook/react.git' } })
+    vi.spyOn(providers.github, 'fetchProject').mockImplementation(async (owner, repo) =>
+      makeRawProjectData({ owner, name: repo }),
+    )
+
+    const ctx = makeExecutionCtx()
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/batch', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer sk_pro',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            { kind: 'package', ecosystem: 'npm', name: 'react', version: '18.2.0' },
+            { kind: 'purl', purl: 'pkg:golang/golang.org/x/crypto' },
+            { kind: 'github', owner: 'vercel', repo: 'next.js' },
+            { kind: 'package', ecosystem: 'pypi', name: 'django' },
+          ],
+          policy: {
+            requireResolutionConfidence: 'high',
+            failOnUnresolved: true,
+          },
+        }),
+      }),
+      env,
+      ctx,
+    )
+    const json = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(json.batchHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(json.results).toHaveLength(4)
+    expect(json.dependencies).toHaveLength(4)
+    expect(json.policyVerdict).toBe('fail')
+    expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:npm/react@18.2.0')).toBe(true)
+    expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:golang/golang.org/x/crypto')).toBe(true)
+    expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:github/vercel/next.js')).toBe(true)
+    expect(json.results.find((dep: any) => dep.state === 'unsupported_ecosystem')).toMatchObject({
+      score: null,
+      verdict: 'unresolved',
+      policy: { outcome: 'fail' },
+    })
+    expect(json.results.find((dep: any) => dep.identity.name === 'react').policy).toMatchObject({
+      outcome: 'fail',
+      reasons: ['resolution_confidence_below_high'],
+    })
+
+    await drainExecutionCtx(ctx)
+  })
+
+  it('requires authentication for batch checks', async () => {
+    const env = createEnv(cacheKv)
+
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [] }),
+      }),
+      env,
+      makeExecutionCtx(),
+    )
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toMatchObject({ error: 'Authentication required' })
+  })
+
+  it('rejects policy score thresholds outside 0-100', async () => {
+    const env = createEnv(cacheKv)
+
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/batch', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer sk_pro',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [],
+          policy: { warnBelowScore: 101 },
+        }),
+      }),
+      env,
+      makeExecutionCtx(),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error_code: 'invalid_param',
+      error: 'policy.warnBelowScore must be an integer between 0 and 100',
+    })
+  })
+
+  it('rejects over-large batch requests before fanout', async () => {
+    const env = createEnv(cacheKv)
+
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/batch', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer sk_pro',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: Array.from({ length: 201 }, (_, i) => ({ kind: 'github', owner: 'owner', repo: `repo-${i}` })),
+        }),
+      }),
+      env,
+      makeExecutionCtx(),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error_code: 'too_many_items' })
+  })
 })

@@ -165,20 +165,21 @@ Use `?include=metrics` when an agent needs normalized raw measurements and sampl
 
 ```
 POST https://isitalive.dev/api/manifest
+POST https://isitalive.dev/api/check/manifest
 Authorization: Bearer sk_your_api_key
 X-IsItAlive-Client: codex/1.0
 Content-Type: application/json
 
 {
-  "content": "<raw package.json or go.mod content>",
-  "format": "package.json"
+  "content": "<raw manifest or lockfile content>",
+  "format": "package-lock.json"
 }
 ```
 
 Audits all dependencies in a manifest file and returns per-dependency maintenance-health scores.
 Requires authentication (API key or GitHub Actions OIDC token). The old `/api/audit` path redirects here.
 
-Supported formats: `package.json`, `go.mod`.
+Supported formats: `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`.
 
 Optional query params:
 
@@ -192,6 +193,33 @@ Combine them with commas for richer agent output, for example:
 curl -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics' ...
 ```
 
+Optional JSON body fields:
+
+- `policy`: `{ "failBelowScore": 60, "warnBelowScore": 75, "ignoreDevDependencies": true, "failOnUnresolved": true, "requireResolutionConfidence": "medium", "warnIfNoReleaseDays": 365 }`
+- `maxAgeSeconds`: best-effort freshness target
+- `preferFresh`: best-effort stale-cache refresh hint
+
+Each dependency includes additive agent fields: `identity`, `resolution`, `state`, `healthVerdict`, `dataFreshness`, `riskFlags`, and optional `policy`.
+
+## Batch Check
+
+```
+POST https://isitalive.dev/api/check/batch
+Authorization: Bearer sk_your_api_key
+Content-Type: application/json
+
+{
+  "items": [
+    { "kind": "package", "ecosystem": "npm", "name": "react", "version": "18.2.0" },
+    { "kind": "purl", "purl": "pkg:golang/golang.org%2Fx%2Fcrypto" },
+    { "kind": "github", "owner": "vercel", "repo": "next.js" }
+  ],
+  "policy": { "failBelowScore": 60, "failOnUnresolved": true }
+}
+```
+
+Batch checks accept up to 200 items and return per-item maintenance-health results plus `batchHash`, `results[]`, and optional `policyVerdict`.
+
 ### Authentication
 
 Two authentication methods are supported:
@@ -199,7 +227,7 @@ Two authentication methods are supported:
 1. **API key** (all repos): `Authorization: Bearer sk_your_api_key`
 2. **GitHub Actions OIDC** (public repos only): `Authorization: Bearer <oidc_jwt>`
 
-OIDC tokens are obtained automatically by the [`isitalive/audit-action`](https://github.com/isitalive/audit-action). Public repos get 500 deps scored/month free.
+OIDC tokens are obtained automatically by the [`isitalive/audit-action`](https://github.com/isitalive/audit-action).
 
 ## Badge
 
@@ -241,9 +269,10 @@ Rate limiting is purely infrastructure protection (not billing):
 3. **Cache results** — free access uses 24h fresh / 48h stale repo-score freshness for anonymous and authenticated requests
 4. **Use `GET /api/check/...` first** for individual dependencies — it returns `methodology`, `signals`, and `drivers` by default
 5. **Use `?include=metrics`** on `GET /api/check/...` when you need normalized raw measurements and sampling metadata
-6. **Use the manifest endpoint** for batch checks of all dependencies at once (requires API key or OIDC)
+6. **Use the manifest endpoint** for lockfile/manifest checks of all dependencies at once (requires API key or OIDC)
 7. **Use `include=drivers,metrics,signals` on `/api/manifest`** when an agent needs richer per-dependency evidence without rescoring
-8. **Check the `verdict` field** for a quick human-readable assessment
-9. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
-10. **Archived repos** are instantly scored 0 — no need to inspect signals
-11. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI
+8. **Use `/api/check/batch`** when you already have a mixed dependency list, purls, or GitHub repos
+9. **Check the `verdict` field** for a quick human-readable assessment and `state` for partial-failure semantics
+10. **The `signals` and `drivers` arrays** provide granular, machine-readable rationale
+11. **Archived repos** are instantly scored 0 — no need to inspect signals
+12. **GitHub Actions** — use [`isitalive/audit-action`](https://github.com/isitalive/audit-action) for zero-config dependency auditing in CI

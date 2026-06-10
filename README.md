@@ -34,6 +34,13 @@ curl -s -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,sign
   -H "X-IsItAlive-Client: my-agent/0.3 (https://example.com)" \
   -H "Content-Type: application/json" \
   -d '{"format":"package.json","content":"<contents of package.json>"}' | jq
+
+# Batch check package, purl, or GitHub inputs with optional policy
+curl -s -X POST https://isitalive.dev/api/check/batch \
+  -H "Authorization: Bearer sk_your_api_key" \
+  -H "X-IsItAlive-Client: my-agent/0.3 (https://example.com)" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"kind":"package","ecosystem":"npm","name":"react"}],"policy":{"failBelowScore":60}}' | jq
 ```
 
 ## Links

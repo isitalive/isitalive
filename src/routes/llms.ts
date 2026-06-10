@@ -36,7 +36,7 @@ IsItAlive is free to use for public maintenance-health checks. Infrastructure li
 - JSON score, verdict, signals, and drivers via \`/api/check\`
 - Package-first checks via \`/api/check/package\` and package-to-GitHub resolution via \`/api/resolve\`
 - SVG README badges
-- \`go.mod\` and \`package.json\` manifest audits with API key or public GitHub Actions OIDC
+- Manifest and lockfile audits for \`package.json\`, \`package-lock.json\`, \`pnpm-lock.yaml\`, \`yarn.lock\`, \`go.mod\`, and \`go.sum\` with API key or public GitHub Actions OIDC
 - OpenAPI, \`llms.txt\`, and AI plugin manifest for agents
 - Methodology, trending, recent queries, and score history where data is available
 
@@ -107,10 +107,28 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 - \`metrics\`: only present when \`include=metrics\`
 - \`cache.nextRefreshSeconds\`: When to re-poll for fresh data
 
-### Audit Dependency Manifest
-\`POST /api/manifest\`
+### Batch Check Dependencies
+\`POST /api/check/batch\`
 
-**Requires authentication** (API key or GitHub Actions OIDC for public repositories). Upload a go.mod or package.json and get a scored maintenance-health report for every dependency. Synchronous, idempotent, cache-first.
+**Requires authentication.** Accepts up to 200 mixed inputs: npm/Go package descriptors, package URLs (purls), or GitHub owner/repo objects. Returns the same maintenance-health result shape used by manifest audits, plus \`batchHash\` and \`results[]\`.
+
+**Request body (JSON):**
+- \`items[]\`: \`{kind:"package", ecosystem, name, version?}\`, \`{kind:"purl", purl}\`, or \`{kind:"github", owner, repo, version?}\`
+- \`policy\`: optional policy with \`failBelowScore\`, \`warnBelowScore\`, \`ignoreDevDependencies\`, \`failOnUnresolved\`, \`requireResolutionConfidence\`, and \`warnIfNoReleaseDays\`
+- \`maxAgeSeconds\`, \`preferFresh\`: optional best-effort freshness controls
+
+**Example:**
+\`\`\`
+curl -X POST https://isitalive.dev/api/check/batch \\
+  -H "Authorization: Bearer sk_your_api_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"items":[{"kind":"package","ecosystem":"npm","name":"react"},{"kind":"purl","purl":"pkg:golang/golang.org/x/crypto"}],"policy":{"failBelowScore":60,"failOnUnresolved":true}}'
+\`\`\`
+
+### Audit Dependency Manifest
+\`POST /api/manifest\` or \`POST /api/check/manifest\`
+
+**Requires authentication** (API key or GitHub Actions OIDC for public repositories). Upload a supported manifest or lockfile and get a scored maintenance-health report for every dependency. Synchronous, idempotent, cache-first.
 
 **Optional query params:**
 - \`include=drivers\`: include per-dependency top drivers
@@ -118,8 +136,9 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 - \`include=signals\`: include per-dependency signal breakdowns
 
 **Request body (JSON):**
-- \`format\`: "go.mod" | "package.json"
+- \`format\`: "package.json" | "package-lock.json" | "pnpm-lock.yaml" | "yarn.lock" | "go.mod" | "go.sum"
 - \`content\`: Raw manifest file content
+- \`policy\`, \`maxAgeSeconds\`, \`preferFresh\`: optional policy/freshness controls
 
 **Example:**
 \`\`\`
@@ -138,6 +157,11 @@ curl -X POST https://isitalive.dev/api/manifest \\
 - \`scored\` / \`total\` / \`pending\` / \`unresolved\`: Counts
 - \`summary\`: Aggregate verdict counts and average score
 - \`dependencies[]\`: Per-dep results with name, version, github, score, verdict, dev flag, resolvedFrom, checkedAt, methodology
+- \`dependencies[].identity\`: canonical purl, ecosystem, name, version, dependencyType, and sourceFormat
+- \`dependencies[].resolution\`: provider, repo, source, and resolution confidence
+- \`dependencies[].state\`: resolved | pending | unresolved | unsupported_ecosystem | private_repo | rate_limited | provider_error
+- \`dependencies[].dataFreshness\`: checkedAt, cacheStatus, ageSeconds, freshUntil, staleUntil, and max-age satisfaction
+- \`dependencies[].policy\` and \`policyVerdict\`: present when a policy is supplied
 - \`dependencies[].drivers\`, \`dependencies[].metrics\`, \`dependencies[].signals\`: present only when requested via \`include\`
 
 **Retry logic:** If \`complete\` is false, call the same endpoint again after \`retryAfterMs\`. The cache fills progressively — each call is faster.

@@ -62,6 +62,8 @@ export function makePackageDep(
     name,
     version,
     dev: false,
+    dependencyType: 'direct',
+    sourceFormat: 'batch',
   }
 }
 

@@ -29,7 +29,7 @@ import {
 } from './api';
 import { detectManifests } from './detector'
 import { buildCheckRunOutput, getConclusion, buildPRCommentBody, COMMENT_MARKER } from './report'
-import { parseManifest } from '../audit/parsers'
+import { parseManifest, type ManifestFormat } from '../audit/parsers'
 import { resolveAll } from '../audit/resolver'
 import { scoreAudit, hashManifest } from '../audit/scorer'
 import { buildManifestEvent } from '../events/manifest'
@@ -87,12 +87,19 @@ export async function handlePullRequest(
     let isBaseline = false;
 
     if (!manifest) {
-      const fallbackPaths = ['package.json', 'go.mod'] as const;
+      const fallbackPaths: Array<{ path: string; format: ManifestFormat }> = [
+        { path: 'package-lock.json', format: 'package-lock.json' },
+        { path: 'pnpm-lock.yaml', format: 'pnpm-lock.yaml' },
+        { path: 'yarn.lock', format: 'yarn.lock' },
+        { path: 'package.json', format: 'package.json' },
+        { path: 'go.sum', format: 'go.sum' },
+        { path: 'go.mod', format: 'go.mod' },
+      ];
       for (const path of fallbackPaths) {
         try {
-          const content = await getFileContent(token, owner, repo, path, headSha);
+          const content = await getFileContent(token, owner, repo, path.path, headSha);
           if (content) {
-            manifest = { path, format: path };
+            manifest = { path: path.path, format: path.format };
             isBaseline = true;
             break;
           }
@@ -109,7 +116,7 @@ export async function handlePullRequest(
         conclusion: 'neutral',
         output: {
           title: 'No manifest files found',
-          summary: 'No `package.json` or `go.mod` files found in this repository.',
+          summary: 'No supported manifest or lockfile files found in this repository.',
         },
       });
       await createCommitStatus(token, owner, repo, headSha, {
@@ -261,12 +268,19 @@ export async function handlePush(
 
   // Try to find and audit manifest files on the default branch
   // Check common locations
-  const manifestPaths = ['package.json', 'go.mod'];
+  const manifestPaths: Array<{ path: string; format: ManifestFormat }> = [
+    { path: 'package-lock.json', format: 'package-lock.json' },
+    { path: 'pnpm-lock.yaml', format: 'pnpm-lock.yaml' },
+    { path: 'yarn.lock', format: 'yarn.lock' },
+    { path: 'package.json', format: 'package.json' },
+    { path: 'go.sum', format: 'go.sum' },
+    { path: 'go.mod', format: 'go.mod' },
+  ];
 
   for (const manifestPath of manifestPaths) {
     try {
-      const content = await getFileContent(token, owner, repo, manifestPath, headSha);
-      const format = manifestPath as 'package.json' | 'go.mod';
+      const content = await getFileContent(token, owner, repo, manifestPath.path, headSha);
+      const format = manifestPath.format;
       const deps = parseManifest(format, content);
 
       if (deps.length === 0) continue;

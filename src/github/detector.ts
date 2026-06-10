@@ -23,7 +23,11 @@ export interface DetectedManifest {
  */
 const MANIFEST_PATTERNS: Array<{ basename: string; format: ManifestFormat }> = [
   { basename: 'package.json', format: 'package.json' },
+  { basename: 'package-lock.json', format: 'package-lock.json' },
+  { basename: 'pnpm-lock.yaml', format: 'pnpm-lock.yaml' },
+  { basename: 'yarn.lock', format: 'yarn.lock' },
   { basename: 'go.mod', format: 'go.mod' },
+  { basename: 'go.sum', format: 'go.sum' },
 ];
 
 /** Directories that should be excluded from manifest detection */

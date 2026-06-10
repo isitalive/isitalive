@@ -24,6 +24,8 @@ function makeResolvedDep(overrides: Partial<ResolvedDep> = {}): ResolvedDep {
     version: '1.0.0',
     dev: false,
     ecosystem: 'npm',
+    dependencyType: 'direct',
+    sourceFormat: 'package.json',
     github: { owner: 'owner', repo: 'repo' },
     resolvedFrom: 'registry',
     ...overrides,

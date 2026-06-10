@@ -468,11 +468,78 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/check/batch': {
+      post: {
+        operationId: 'checkBatch',
+        summary: 'Batch check dependency maintenance',
+        description: 'Authenticated batch endpoint for mixed package, package URL (purl), and GitHub repository inputs. Returns per-item maintenance-health results with canonical identity, resolution, state, freshness, and optional policy evaluation.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'include',
+            in: 'query',
+            required: false,
+            description: 'Optional extra per-result sections to include. Combine with commas, for example include=drivers,metrics.',
+            schema: { type: 'string' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/BatchRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Batch maintenance-health result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/BatchResult' },
+              },
+            },
+          },
+          '400': { description: 'Invalid batch request' },
+          '401': { description: 'Authentication required' },
+          '429': { description: 'Rate limit exceeded' },
+        },
+      },
+    },
+    '/api/check/manifest': {
+      post: {
+        operationId: 'auditManifestViaCheck',
+        summary: 'Audit dependency manifest',
+        description: 'Alias for /api/manifest for agents that group all checks under /api/check. Behavior, request body, headers, and response schema are the same as auditManifest.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AuditRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Audit result (complete or partial)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuditResult' },
+              },
+            },
+          },
+          '304': { description: 'Not Modified — manifest unchanged since last audit' },
+          '400': { description: 'Invalid request' },
+          '401': { description: 'Authentication required' },
+        },
+      },
+    },
     '/api/manifest': {
       post: {
         operationId: 'auditManifest',
         summary: 'Audit dependency manifest',
-        description: 'Upload a go.mod or package.json file and receive a scored maintenance-health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
+        description: 'Upload a package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, or go.sum file and receive a scored maintenance-health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -820,13 +887,96 @@ export const openApiSpec = {
         properties: {
           format: {
             type: 'string',
-            enum: ['go.mod', 'package.json'],
+            enum: ['go.mod', 'go.sum', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'],
             description: 'Manifest file format',
           },
           content: {
             type: 'string',
             description: 'Raw manifest file content (max 512KB)',
           },
+          policy: { $ref: '#/components/schemas/AuditPolicy' },
+          maxAgeSeconds: {
+            type: 'integer',
+            minimum: 0,
+            description: 'Best-effort freshness target. Results older than this are flagged with stale_data if fresh data cannot be returned in time.',
+          },
+          preferFresh: {
+            type: 'boolean',
+            description: 'Best-effort hint to refresh stale cached repo scores before responding.',
+          },
+        },
+      },
+      BatchRequest: {
+        type: 'object',
+        required: ['items'],
+        properties: {
+          items: {
+            type: 'array',
+            maxItems: 200,
+            items: { $ref: '#/components/schemas/BatchItem' },
+          },
+          policy: { $ref: '#/components/schemas/AuditPolicy' },
+          maxAgeSeconds: { type: 'integer', minimum: 0 },
+          preferFresh: { type: 'boolean' },
+        },
+      },
+      BatchItem: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['kind', 'ecosystem', 'name'],
+            properties: {
+              kind: { type: 'string', const: 'package' },
+              ecosystem: { type: 'string', enum: ['npm', 'go'] },
+              name: { type: 'string' },
+              version: { type: 'string' },
+            },
+          },
+          {
+            type: 'object',
+            required: ['kind', 'purl'],
+            properties: {
+              kind: { type: 'string', const: 'purl' },
+              purl: { type: 'string', example: 'pkg:npm/react@18.2.0' },
+            },
+          },
+          {
+            type: 'object',
+            required: ['kind', 'owner', 'repo'],
+            properties: {
+              kind: { type: 'string', const: 'github' },
+              owner: { type: 'string' },
+              repo: { type: 'string' },
+              version: { type: 'string' },
+            },
+          },
+        ],
+      },
+      BatchResult: {
+        allOf: [
+          { $ref: '#/components/schemas/AuditResult' },
+          {
+            type: 'object',
+            required: ['batchHash', 'results'],
+            properties: {
+              batchHash: { type: 'string', description: 'SHA-256 hash of the batch request body' },
+              results: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/AuditDep' },
+              },
+            },
+          },
+        ],
+      },
+      AuditPolicy: {
+        type: 'object',
+        properties: {
+          failBelowScore: { type: 'integer', minimum: 0, maximum: 100 },
+          warnBelowScore: { type: 'integer', minimum: 0, maximum: 100 },
+          ignoreDevDependencies: { type: 'boolean' },
+          failOnUnresolved: { type: 'boolean' },
+          requireResolutionConfidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+          warnIfNoReleaseDays: { type: 'integer', minimum: 0 },
         },
       },
       AuditResult: {
@@ -888,6 +1038,11 @@ export const openApiSpec = {
             items: { $ref: '#/components/schemas/AuditDep' },
             description: 'Per-dependency results, sorted by score (highest first)',
           },
+          policyVerdict: {
+            type: 'string',
+            enum: ['pass', 'warn', 'fail'],
+            description: 'Aggregate policy result when a policy is supplied.',
+          },
         },
       },
       AuditDep: {
@@ -896,7 +1051,7 @@ export const openApiSpec = {
           name: { type: 'string', description: 'Original package name from manifest' },
           version: { type: 'string', description: 'Version from manifest' },
           dev: { type: 'boolean', description: 'Whether this is a dev/indirect dependency' },
-          ecosystem: { type: 'string', enum: ['go', 'npm'] },
+          ecosystem: { type: 'string', enum: ['go', 'npm', 'github', 'unsupported'] },
           github: { type: 'string', nullable: true, description: 'Resolved GitHub owner/repo (e.g. "vercel/next.js") or null' },
           score: { type: 'integer', nullable: true, description: 'Maintenance-health score 0-100, or null if unresolved' },
           verdict: { type: 'string', enum: ['healthy', 'stable', 'degraded', 'critical', 'unmaintained', 'pending', 'unresolved'] },
@@ -918,6 +1073,71 @@ export const openApiSpec = {
           metrics: {
             $ref: '#/components/schemas/ProjectMetrics',
           },
+          identity: { $ref: '#/components/schemas/AgentDependencyIdentity' },
+          resolution: { $ref: '#/components/schemas/AgentDependencyResolution' },
+          state: {
+            type: 'string',
+            enum: ['resolved', 'pending', 'unresolved', 'unsupported_ecosystem', 'private_repo', 'rate_limited', 'provider_error'],
+            description: 'Processing state, separate from the maintenance-health verdict.',
+          },
+          healthVerdict: {
+            type: 'string',
+            nullable: true,
+            enum: ['healthy', 'stable', 'degraded', 'critical', 'unmaintained', null],
+            description: 'Maintenance-health verdict only; null when not scored.',
+          },
+          dataFreshness: { $ref: '#/components/schemas/AgentDataFreshness' },
+          topDrivers: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ScoreDriver' },
+          },
+          riskFlags: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          policy: { $ref: '#/components/schemas/AgentPolicyResult' },
+        },
+      },
+      AgentDependencyIdentity: {
+        type: 'object',
+        required: ['purl', 'ecosystem', 'name', 'version', 'dependencyType'],
+        properties: {
+          purl: { type: 'string', nullable: true },
+          ecosystem: { type: 'string', enum: ['npm', 'go', 'github', 'unsupported'] },
+          name: { type: 'string' },
+          version: { type: 'string' },
+          dependencyType: { type: 'string', enum: ['direct', 'dev', 'transitive'] },
+          sourceFormat: { type: 'string' },
+        },
+      },
+      AgentDependencyResolution: {
+        type: 'object',
+        required: ['provider', 'repo', 'source', 'confidence'],
+        properties: {
+          provider: { type: 'string', nullable: true, enum: ['github', null] },
+          repo: { type: 'string', nullable: true },
+          source: { type: 'string', nullable: true, enum: ['direct', 'vanity', 'registry', 'cache', 'input', null] },
+          confidence: { type: 'string', enum: ['none', 'low', 'medium', 'high'] },
+        },
+      },
+      AgentDataFreshness: {
+        type: 'object',
+        required: ['checkedAt', 'cacheStatus', 'ageSeconds', 'freshUntil', 'staleUntil', 'satisfiesRequestedMaxAge'],
+        properties: {
+          checkedAt: { type: 'string', format: 'date-time', nullable: true },
+          cacheStatus: { type: 'string' },
+          ageSeconds: { type: 'integer', nullable: true },
+          freshUntil: { type: 'string', format: 'date-time', nullable: true },
+          staleUntil: { type: 'string', format: 'date-time', nullable: true },
+          satisfiesRequestedMaxAge: { type: 'boolean', nullable: true },
+        },
+      },
+      AgentPolicyResult: {
+        type: 'object',
+        required: ['outcome', 'reasons'],
+        properties: {
+          outcome: { type: 'string', enum: ['pass', 'warn', 'fail', 'skipped'] },
+          reasons: { type: 'array', items: { type: 'string' } },
         },
       },
       ProjectMetrics: {

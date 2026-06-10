@@ -41,7 +41,7 @@ import {
   resolvedGithubSlug,
   type PackageEcosystem,
 } from '../audit/packages'
-import { scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
+import { buildAuditCacheKey, scoreAudit, hashManifest, type AuditResult } from '../audit/scorer'
 import { discoverManifests } from '../audit/discovery'
 import type { ParsedDep } from '../audit/parsers'
 import { fetchWithTimeout, readBodyWithByteLimit, RequestBodyTooLargeError } from '../utils/http'
@@ -480,7 +480,7 @@ ui.post('/_audit', verifyTurnstile, async (c) => {
 
   const manifestMatch = url.match(MANIFEST_URL_RE)
   if (!manifestMatch) {
-    return c.html(errorPage('Invalid manifest URL. Paste a GitHub link to a package.json or go.mod file.'), 400)
+    return c.html(errorPage('Invalid manifest URL. Paste a GitHub link to a supported manifest or lockfile.'), 400)
   }
 
   const filename = manifestMatch[1]
@@ -497,7 +497,7 @@ ui.get('/audit/:hash', async (c) => {
     return c.html(errorPage('Invalid audit hash.'), 400)
   }
 
-  const cached = await auditCacheGetText(c.env, `audit:result:${hash}`)
+  const cached = await auditCacheGetText(c.env, buildAuditCacheKey(hash))
   if (!cached) {
     return c.html(errorPage('Audit not found. This result may have expired or the manifest has not been audited yet.'), 404)
   }
@@ -522,7 +522,7 @@ ui.get('/_data/audit/:hash', async (c) => {
     return c.json({ error: 'Invalid hash' }, 400)
   }
 
-  const cached = await auditCacheGetText(c.env, `audit:result:${hash}`)
+  const cached = await auditCacheGetText(c.env, buildAuditCacheKey(hash))
   if (!cached) {
     return c.json({ error: 'Not found' }, 404)
   }
@@ -721,18 +721,22 @@ async function handleCheck(
 
 const MANIFEST_FORMATS: Record<string, ManifestFormat> = {
   'package.json': 'package.json',
+  'package-lock.json': 'package-lock.json',
+  'pnpm-lock.yaml': 'pnpm-lock.yaml',
+  'yarn.lock': 'yarn.lock',
   'go.mod': 'go.mod',
+  'go.sum': 'go.sum',
 }
 
-/** Matches GitHub blob URLs ending in package.json or go.mod (supports slashed branch names) */
-const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|go\.mod)$/i
+/** Matches GitHub blob URLs ending in supported manifest or lockfile names (supports slashed branch names) */
+const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.mod|go\.sum)$/i
 
 async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Promise<Response> {
   // Determine format from filename
   const filename = filePath.split('/').pop() || ''
   const format = MANIFEST_FORMATS[filename]
   if (!format) {
-    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json and go.mod.`), 400)
+    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, and go.sum.`), 400)
   }
 
   // Fetch raw content from GitHub
@@ -758,7 +762,7 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
 
   // Hash + check cache first
   const contentHash = await hashManifest(content)
-  const auditCacheKey = `audit:result:${contentHash}`
+  const auditCacheKey = buildAuditCacheKey(contentHash)
   const cached = await auditCacheGetText(c.env, auditCacheKey)
 
   if (cached) {
@@ -784,8 +788,7 @@ async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Pro
   // Write KV synchronously before redirect — scoreAudit only writes via
   // waitUntil for complete results, so the redirect could race.
   // Always persist (even partial results) so /audit/:hash can render.
-  const auditCacheKey2 = `audit:result:${contentHash}`
-  await auditCachePutText(c.env, auditCacheKey2, contentHash, JSON.stringify(auditResult), {
+  await auditCachePutText(c.env, auditCacheKey, contentHash, JSON.stringify(auditResult), {
     expirationTtl: 6 * 60 * 60, // 6 hours
   })
 
