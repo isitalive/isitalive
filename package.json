@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "build": "npx tsx --import ./scripts/register-md.mjs scripts/build-static.ts",
-    "predeploy": "npm run build",
+    "d1:migrations:check": "node scripts/check-d1-migrations.mjs",
+    "check:deploy": "npm test && npx tsc --noEmit && npm run types:check && npm run d1:migrations:check",
+    "predeploy": "npm run check:deploy && npm run build",
     "deploy": "wrangler deploy",
     "types:generate": "wrangler types worker-configuration.d.ts",
     "types:check": "wrangler types worker-configuration.d.ts --check",
