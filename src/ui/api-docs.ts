@@ -362,7 +362,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Batch Example</h3>
-    <div class="code-block"><span class="comment"># Check mixed package and purl inputs with policy</span><br>curl -X POST https://isitalive.dev/api/check/batch \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"items":[{"kind":"package","ecosystem":"npm","name":"react"},{"kind":"purl","purl":"pkg:golang/golang.org%2Fx%2Fcrypto"}],"policy":{"failBelowScore":60,"failOnUnresolved":true}}'</span></div>
+    <div class="code-block"><span class="comment"># Check mixed package and purl inputs with policy</span><br>curl -X POST https://isitalive.dev/api/check/batch \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"items":[{"kind":"package","ecosystem":"npm","name":"react"},{"kind":"purl","purl":"pkg:golang/golang.org/x/crypto"}],"policy":{"failBelowScore":60,"failOnUnresolved":true}}'</span></div>
 
     <h3>Check Project Maintenance</h3>
     <div class="endpoint">

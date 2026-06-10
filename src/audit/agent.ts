@@ -1,4 +1,4 @@
-import { PackageURL } from 'packageurl-js'
+import { PackageURL } from '@interlynk-io/purl-js'
 import type { CacheResult, CacheStatus } from '../cache/index'
 import { TIERS, type Tier } from '../cache/index'
 import type { ResolvedDep } from './resolver'
@@ -82,17 +82,20 @@ export function buildPackagePurl(
   try {
     if (ecosystem === 'npm') {
       const scoped = name.startsWith('@') ? name.split('/') : null
-      const namespace = scoped ? scoped[0] : undefined
+      const namespace = scoped ? scoped[0] : null
       const packageName = scoped ? scoped.slice(1).join('/') : name
-      return new PackageURL('npm', namespace, packageName, version || undefined).toString()
+      return new PackageURL('npm', namespace, packageName, version || null, null, null).toString()
     }
     if (ecosystem === 'go') {
-      return new PackageURL('golang', undefined, name, version || undefined).toString()
+      const goNamespace = namespaceFromPackageName(name)
+      const goName = name.split('/').pop()
+      if (!goNamespace || !goName) return null
+      return new PackageURL('golang', goNamespace, goName, version || null, null, null).toString()
     }
     if (ecosystem === 'github') {
       const [owner, repo] = name.split('/')
       if (!owner || !repo) return null
-      return new PackageURL('github', owner, repo, version || undefined).toString()
+      return new PackageURL('github', owner, repo, version || null, null, null).toString()
     }
   } catch {
     return null
@@ -107,7 +110,7 @@ export function parseSupportedPurl(value: string): {
 } | null {
   let parsed: PackageURL
   try {
-    parsed = PackageURL.fromString(value)
+    parsed = PackageURL.parse(value)
   } catch {
     return null
   }
@@ -118,7 +121,8 @@ export function parseSupportedPurl(value: string): {
   }
 
   if (parsed.type === 'golang') {
-    return { ecosystem: 'go', name: parsed.name, version: parsed.version ?? '' }
+    const name = parsed.namespace ? `${parsed.namespace}/${parsed.name}` : parsed.name
+    return { ecosystem: 'go', name, version: parsed.version ?? '' }
   }
 
   if (parsed.type === 'github' && parsed.namespace) {
@@ -126,6 +130,12 @@ export function parseSupportedPurl(value: string): {
   }
 
   return null
+}
+
+function namespaceFromPackageName(name: string): string | null {
+  const lastSlash = name.lastIndexOf('/')
+  if (lastSlash <= 0 || lastSlash === name.length - 1) return null
+  return name.slice(0, lastSlash)
 }
 
 export function buildIdentity(dep: Pick<ResolvedDep, 'ecosystem' | 'name' | 'version' | 'dependencyType' | 'sourceFormat'>): AgentDependencyIdentity {

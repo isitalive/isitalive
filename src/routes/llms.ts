@@ -122,7 +122,7 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 curl -X POST https://isitalive.dev/api/check/batch \\
   -H "Authorization: Bearer sk_your_api_key" \\
   -H "Content-Type: application/json" \\
-  -d '{"items":[{"kind":"package","ecosystem":"npm","name":"react"},{"kind":"purl","purl":"pkg:golang/golang.org%2Fx%2Fcrypto"}],"policy":{"failBelowScore":60,"failOnUnresolved":true}}'
+  -d '{"items":[{"kind":"package","ecosystem":"npm","name":"react"},{"kind":"purl","purl":"pkg:golang/golang.org/x/crypto"}],"policy":{"failBelowScore":60,"failOnUnresolved":true}}'
 \`\`\`
 
 ### Audit Dependency Manifest

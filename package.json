@@ -16,9 +16,9 @@
     "test:fuzz": "FC_NUM_RUNS=10000 vitest run"
   },
   "dependencies": {
+    "@interlynk-io/purl-js": "^1.0.3",
     "@yarnpkg/lockfile": "^1.1.0",
     "hono": "^4.12.23",
-    "packageurl-js": "^2.0.1",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

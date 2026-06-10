@@ -610,7 +610,7 @@ describe('agent-ready health API', () => {
         body: JSON.stringify({
           items: [
             { kind: 'package', ecosystem: 'npm', name: 'react', version: '18.2.0' },
-            { kind: 'purl', purl: 'pkg:golang/golang.org%2Fx%2Fcrypto' },
+            { kind: 'purl', purl: 'pkg:golang/golang.org/x/crypto' },
             { kind: 'github', owner: 'vercel', repo: 'next.js' },
             { kind: 'package', ecosystem: 'pypi', name: 'django' },
           ],
@@ -631,7 +631,7 @@ describe('agent-ready health API', () => {
     expect(json.dependencies).toHaveLength(4)
     expect(json.policyVerdict).toBe('fail')
     expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:npm/react@18.2.0')).toBe(true)
-    expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:golang/golang.org%2Fx%2Fcrypto')).toBe(true)
+    expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:golang/golang.org/x/crypto')).toBe(true)
     expect(json.results.some((dep: any) => dep.identity.purl === 'pkg:github/vercel/next.js')).toBe(true)
     expect(json.results.find((dep: any) => dep.state === 'unsupported_ecosystem')).toMatchObject({
       score: null,
