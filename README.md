@@ -50,6 +50,17 @@ curl -s -X POST https://isitalive.dev/api/check/batch \
 - **Methodology**: [isitalive.dev/methodology](https://isitalive.dev/methodology)
 - **Audit Action**: [isitalive/audit-action](https://github.com/isitalive/audit-action)
 
+## Operations
+
+Production deploys run tests, type checks, generated Worker type checks, and a
+remote D1 migration preflight before `wrangler deploy`. If Worker code depends
+on a new D1 schema migration, apply it first:
+
+```bash
+CI=1 npx wrangler d1 migrations apply isitalive-db --remote
+npm run deploy
+```
+
 ## License
 
 [AGPL-3.0](LICENSE)
