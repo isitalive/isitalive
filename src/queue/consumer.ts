@@ -136,18 +136,28 @@ function archiveBatchStatement(
     )
 }
 
+function stringOrDefault(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.length > 0 ? value : fallback
+}
+
 function usageStatements(db: D1Database, event: UsageEvent, archivedAt: string): D1PreparedStatement[] {
   const data = event.data
   const day = event.timestamp.slice(0, 10)
+  const clientFamily = stringOrDefault(data.client_family, 'unknown')
+  const clientName = stringOrDefault(data.client_name, 'unknown')
+  const clientVersion = stringOrDefault(data.client_version, '')
+  const clientSource = stringOrDefault(data.client_source, 'default')
+  const clientLabel = stringOrDefault(data.client_label, clientName)
   const statements = [
     ingestMarker(db, event, 'usage', archivedAt),
     db
       .prepare(`
         INSERT INTO usage_events (
           id, timestamp, repo, provider, score, verdict, source, api_key, cache_status,
-          country, user_agent, response_time_ms, ip_hash, oidc_repository, oidc_owner, data_json
+          country, user_agent, client_family, client_name, client_version, client_source,
+          client_label, response_time_ms, ip_hash, oidc_repository, oidc_owner, data_json
         )
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE changes() = 1
       `)
       .bind(
@@ -162,6 +172,11 @@ function usageStatements(db: D1Database, event: UsageEvent, archivedAt: string):
         data.cache_status,
         data.country,
         data.user_agent,
+        clientFamily,
+        clientName,
+        clientVersion,
+        clientSource,
+        clientLabel,
         data.response_time_ms,
         data.ip_hash,
         data.oidc_repository,
@@ -188,6 +203,32 @@ function usageStatements(db: D1Database, event: UsageEvent, archivedAt: string):
           last_seen = MAX(daily_usage_repo.last_seen, excluded.last_seen)
       `)
       .bind(day, data.repo, data.provider, data.source, data.score, data.verdict, event.timestamp),
+    db
+      .prepare(`
+        INSERT INTO daily_client_usage (
+          day, client_family, client_name, source, requests, repos_checked, avg_response_time_ms, last_seen
+        )
+        SELECT ?, ?, ?, ?, 1, ?, ?, ?
+        WHERE changes() = 1
+        ON CONFLICT(day, client_family, client_name, source) DO UPDATE SET
+          requests = daily_client_usage.requests + excluded.requests,
+          repos_checked = daily_client_usage.repos_checked + excluded.repos_checked,
+          avg_response_time_ms = ROUND(
+            ((daily_client_usage.avg_response_time_ms * daily_client_usage.requests) + excluded.avg_response_time_ms)
+            / (daily_client_usage.requests + excluded.requests),
+            1
+          ),
+          last_seen = MAX(daily_client_usage.last_seen, excluded.last_seen)
+      `)
+      .bind(
+        day,
+        clientFamily,
+        clientName,
+        data.source,
+        data.repo ? 1 : 0,
+        data.response_time_ms,
+        event.timestamp,
+      ),
   ]
 
   if (data.source === 'audit' && data.oidc_repository && data.cache_status !== 'l2-hit') {

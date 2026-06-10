@@ -4,6 +4,14 @@
 
 import { CACHE_STATUS_DEFINITIONS, METHODOLOGY, SIGNAL_DEFINITIONS } from '../scoring/methodology'
 
+const clientHeaderParameter = {
+  name: 'X-IsItAlive-Client',
+  in: 'header',
+  required: false,
+  description: 'Optional client attribution for aggregate product analytics. Format: `name/version` or `name/version (url-or-contact)`. This is not authentication and should not contain secrets.',
+  schema: { type: 'string', examples: ['codex/1.0', 'my-agent/0.3 (https://example.com)'] },
+}
+
 export const openApiSpec = {
   openapi: '3.1.0',
   info: {
@@ -59,6 +67,7 @@ export const openApiSpec = {
             description: 'Optional extra sections to include. Use include=metrics to include normalized raw measurements and sampling metadata.',
             schema: { type: 'string', enum: ['metrics'] },
           },
+          clientHeaderParameter,
         ],
         security: [{ bearerAuth: [] }, {}],
         responses: {
@@ -264,6 +273,7 @@ export const openApiSpec = {
             description: 'Optional version string echoed in the package context. Scoring remains repo-level.',
             schema: { type: 'string' },
           },
+          clientHeaderParameter,
         ],
         security: [{ bearerAuth: [] }, {}],
         responses: {
@@ -305,6 +315,7 @@ export const openApiSpec = {
             required: false,
             schema: { type: 'string' },
           },
+          clientHeaderParameter,
         ],
         security: [{ bearerAuth: [] }, {}],
         responses: {
@@ -354,6 +365,7 @@ export const openApiSpec = {
             description: 'Optional version string echoed in the package context. Scoring remains repo-level.',
             schema: { type: 'string' },
           },
+          clientHeaderParameter,
         ],
         security: [{ bearerAuth: [] }, {}],
         responses: {
@@ -401,6 +413,7 @@ export const openApiSpec = {
             required: false,
             schema: { type: 'string' },
           },
+          clientHeaderParameter,
         ],
         security: [{ bearerAuth: [] }, {}],
         responses: {
@@ -469,6 +482,7 @@ export const openApiSpec = {
             description: 'Optional extra per-dependency sections to include. Combine with commas, for example include=drivers,metrics.',
             schema: { type: 'string' },
           },
+          clientHeaderParameter,
         ],
         requestBody: {
           required: true,
