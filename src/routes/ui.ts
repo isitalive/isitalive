@@ -615,7 +615,10 @@ async function handleCheck(
       buildUsageEvent(`${owner}/${repo}`, provider, 0, '', {
         source: 'browser', apiKey: 'anon', cacheStatus: 'l1-hit',
         responseTimeMs: Date.now() - startTime,
-        cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+        cf: (c.req.raw as any).cf,
+        userAgent: c.req.header('User-Agent') ?? null,
+        clientHeader: c.req.header('X-IsItAlive-Client') ?? null,
+        ip: null,
       }).then(ue => emitAll(c.env, { usage: [ue] })),
     )
     return cachedResponse
@@ -641,7 +644,10 @@ async function handleCheck(
         buildUsageEvent(`${owner}/${repo}`, provider, cached.score, cached.verdict, {
           source: 'browser', apiKey: 'anon', cacheStatus: status,
           responseTimeMs: Date.now() - startTime,
-          cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+          cf: (c.req.raw as any).cf,
+          userAgent: c.req.header('User-Agent') ?? null,
+          clientHeader: c.req.header('X-IsItAlive-Client') ?? null,
+          ip: null,
         }).then(ue => emitAll(c.env, { usage: [ue] })),
         trackRecentQuery(c.env, {
           owner, repo, score: cached.score, verdict: cached.verdict, checkedAt: cached.checkedAt,
@@ -672,7 +678,10 @@ async function handleCheck(
       buildUsageEvent(`${owner}/${repo}`, provider, result.score, result.verdict, {
         source: 'browser', apiKey: 'anon', cacheStatus: 'l3-miss',
         responseTimeMs: Date.now() - startTime,
-        cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+        cf: (c.req.raw as any).cf,
+        userAgent: c.req.header('User-Agent') ?? null,
+        clientHeader: c.req.header('X-IsItAlive-Client') ?? null,
+        ip: null,
       }).then(ue => emitAll(c.env, {
         usage: [ue],
         result: [buildResultEvent(result, 'browser')],

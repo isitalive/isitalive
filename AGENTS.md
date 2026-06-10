@@ -85,6 +85,36 @@ curl -s https://isitalive.dev/api/check/package/go/golang.org/x/crypto | jq
 
 Package checks resolve to GitHub and score the underlying repository. They are still maintenance-health checks, not package security, license, provenance, or registry-health verdicts.
 
+### Agent Quick Start
+
+Start with package-first checks when you have dependency names. Add the optional `X-IsItAlive-Client` header so aggregate analytics can distinguish agents, CLIs, CI, and browsers:
+
+```
+X-IsItAlive-Client: <tool>/<version> (<url-or-contact>)
+```
+
+Examples: `X-IsItAlive-Client: codex/1.0`, `X-IsItAlive-Client: my-agent/0.3 (https://example.com)`.
+
+The header is not authentication and must not contain secrets.
+
+```bash
+curl -s https://isitalive.dev/api/check/package/npm/react \
+  -H "X-IsItAlive-Client: codex/1.0" | jq
+
+curl -s https://isitalive.dev/api/check/github/vercel/next.js \
+  -H "X-IsItAlive-Client: codex/1.0" | jq
+```
+
+Use manifest audit for batches. If the response returns `complete: false`, wait `retryAfterMs` and repeat the same request:
+
+```bash
+curl -s -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \
+  -H "Authorization: Bearer sk_your_api_key" \
+  -H "X-IsItAlive-Client: codex/1.0" \
+  -H "Content-Type: application/json" \
+  -d '{"format":"package.json","content":"<contents of package.json>"}' | jq
+```
+
 For repo-first checks:
 
 ```
@@ -137,6 +167,7 @@ Use `?include=metrics` when an agent needs normalized raw measurements and sampl
 POST https://isitalive.dev/api/manifest
 POST https://isitalive.dev/api/check/manifest
 Authorization: Bearer sk_your_api_key
+X-IsItAlive-Client: codex/1.0
 Content-Type: application/json
 
 {

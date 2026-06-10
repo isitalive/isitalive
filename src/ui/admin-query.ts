@@ -144,7 +144,7 @@ export function adminQueryPage(): string {
     content: `
     <div class="admin-header">
       <h1>Query Console</h1>
-      <p>Run read-only SQL queries against D1 analytics tables</p>
+      <p>Run read-only SQL queries against D1 analytics tables. Prefer daily rollup presets for dashboards; use raw event tables for debugging narrow windows.</p>
     </div>
 
     <div class="query-toolbar">

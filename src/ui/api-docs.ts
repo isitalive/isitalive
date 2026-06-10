@@ -312,6 +312,10 @@ export function apiDocsPage(analyticsToken?: string): string {
     <p>Authentication is optional for project checks and badges. It is <strong>required</strong> for the manifest audit endpoint. Use an API key for all repos, or GitHub Actions OIDC for public-repo audits:</p>
     <div class="code-block"><span class="comment"># Add to any request</span><br>Authorization: Bearer sk_your_api_key</div>
 
+    <h2>Agent Quick Start</h2>
+    <p>Start from package names when possible. Add <span class="inline-code">X-IsItAlive-Client</span> so aggregate analytics can distinguish agent and client integrations. This header is not authentication and should not contain secrets.</p>
+    <div class="code-block"><span class="comment"># Package-first check</span><br>curl -s https://isitalive.dev/api/check/package/npm/react \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> | jq<br><br><span class="comment"># Repo-first check when you already know owner/repo</span><br>curl -s https://isitalive.dev/api/check/github/vercel/next.js \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> | jq<br><br><span class="comment"># Manifest audit; retry after retryAfterMs when complete is false</span><br>curl -s -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"package.json","content":"&lt;package.json contents&gt;"}'</span> | jq</div>
+
     <h2>Endpoints</h2>
 
     <h3>Check Package Maintenance</h3>
@@ -341,7 +345,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Example Request</h3>
-    <div class="code-block"><span class="comment"># Check an npm package's underlying GitHub repo</span><br>curl https://isitalive.dev/api/check/package/npm/react?include=metrics</div>
+    <div class="code-block"><span class="comment"># Check an npm package's underlying GitHub repo</span><br>curl https://isitalive.dev/api/check/package/npm/react \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span></div>
 
     <h3>Resolve Package Only</h3>
     <div class="endpoint">
@@ -392,7 +396,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Example Request</h3>
-    <div class="code-block"><span class="comment"># Check a project's maintenance-health with metrics</span><br>curl https://isitalive.dev/api/check/github/vercel/next.js?include=metrics</div>
+    <div class="code-block"><span class="comment"># Check a project's maintenance-health</span><br>curl https://isitalive.dev/api/check/github/vercel/next.js \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span><br><br><span class="comment"># Add ?include=metrics only when raw normalized measurements are needed</span><br>curl https://isitalive.dev/api/check/github/vercel/next.js?include=metrics \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span></div>
 
     <h3>Example Response</h3>
     <div class="code-block">{<br>
@@ -484,7 +488,7 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <h3>Example Request</h3>
-    <div class="code-block"><span class="comment"># Audit a go.mod file with rich agent output</span><br>curl -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
+    <div class="code-block"><span class="comment"># Audit a go.mod file with rich agent output</span><br>curl -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"go.mod","content":"&lt;go.mod contents&gt;"}'</span></div>
 
     <h3>Example Response</h3>
     <div class="code-block">{<br>

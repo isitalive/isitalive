@@ -85,8 +85,8 @@ export function adminOverviewPage(data: AdminOverview): string {
           </div>
         </div>
         <div class="breakdown-panel">
-          <div class="breakdown-label">By User Agent</div>
-          <div id="ua-breakdown" class="breakdown-list">
+          <div class="breakdown-label">By Client Family</div>
+          <div id="client-breakdown" class="breakdown-list">
             <div class="shimmer-row"></div>
             <div class="shimmer-row"></div>
             <div class="shimmer-row"></div>
@@ -266,17 +266,17 @@ export function adminOverviewPage(data: AdminOverview): string {
             AND source != 'cron'
         \`,
         source: \`
-          SELECT source, COUNT(*) as count
-          FROM usage_events
-          WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
+          SELECT source, SUM(requests) as count
+          FROM daily_client_usage
+          WHERE day >= date('now', '-1 day')
           GROUP BY source
           ORDER BY count DESC
         \`,
-        ua: \`
-          SELECT user_agent, COUNT(*) as count
-          FROM usage_events
-          WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
-          GROUP BY user_agent
+        client: \`
+          SELECT client_family, SUM(requests) as count
+          FROM daily_client_usage
+          WHERE day >= date('now', '-1 day')
+          GROUP BY client_family
           ORDER BY count DESC
         \`,
         pipeline_usage: \`SELECT 'usage_events' as tbl, COUNT(*) as rows, MAX(timestamp) as latest FROM usage_events\`,
@@ -405,7 +405,20 @@ export function adminOverviewPage(data: AdminOverview): string {
           container.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem">No data</div>';
           return;
         }
-        const LABELS = { browser: 'UI Page', api: 'API', cron: 'Cron', audit: 'Manifest Audit', 'page-view': 'Beacon', badge: 'Badge', 'github-app': 'GitHub App' };
+        const LABELS = {
+          browser: 'Browser',
+          api: 'API',
+          cron: 'Cron',
+          audit: 'Manifest Audit',
+          'page-view': 'Beacon',
+          badge: 'Badge',
+          'github-app': 'GitHub App',
+          agent: 'Agents',
+          ci: 'CI',
+          cli: 'CLI',
+          bot: 'Bots',
+          unknown: 'Unknown',
+        };
         const maxCount = Math.max(...data.rows.map(r => parseInt(r[1])));
         container.innerHTML = data.rows.map(row => {
           const rawName = row[0] || 'unknown';
@@ -425,12 +438,12 @@ export function adminOverviewPage(data: AdminOverview): string {
 
       async function loadBreakdowns() {
         try {
-          const [sourceData, uaData] = await Promise.all([
+          const [sourceData, clientData] = await Promise.all([
             runQuery(QUERIES.source),
-            runQuery(QUERIES.ua),
+            runQuery(QUERIES.client),
           ]);
           renderBreakdown('source-breakdown', sourceData);
-          renderBreakdown('ua-breakdown', uaData);
+          renderBreakdown('client-breakdown', clientData);
         } catch (e) {
           console.error('Breakdown query failed:', e);
         }

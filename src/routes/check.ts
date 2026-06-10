@@ -84,7 +84,10 @@ export async function handleProjectCheck(
       buildUsageEvent(`${owner}/${repo}`, provider, 0, '', {
         source: 'api', apiKey: c.get('keyName') ?? 'anon', cacheStatus: 'l1-hit',
         responseTimeMs: Date.now() - startTime,
-        cf: (c.req.raw as any).cf, userAgent: c.req.header('User-Agent') ?? null, ip: null,
+        cf: (c.req.raw as any).cf,
+        userAgent: c.req.header('User-Agent') ?? null,
+        clientHeader: c.req.header('X-IsItAlive-Client') ?? null,
+        ip: null,
       }).then(ue => emitAll(c.env, { usage: [ue] })),
     )
     return cachedResponse
@@ -114,6 +117,7 @@ export async function handleProjectCheck(
     responseTimeMs: Date.now() - startTime,
     cf: (c.req.raw as any).cf,
     userAgent: c.req.header('User-Agent') ?? null,
+    clientHeader: c.req.header('X-IsItAlive-Client') ?? null,
     ip: null,
   })
 
