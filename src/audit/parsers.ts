@@ -55,15 +55,12 @@ export function parseGoMod(content: string): ParsedDep[] {
     }
   }
 
-  // Match single-line requires: require github.com/foo/bar v1.2.3
+  // Match single-line requires: require github.com/foo/bar v1.2.3 [// indirect]
   // Must NOT match block syntax: require (
-  const singleRe = /^require\s+(\S+)\s+(v\S+)/gm;
+  const singleRe = /^require\s+(.+)$/gm;
   while ((match = singleRe.exec(content)) !== null) {
-    const name = match[1];
-    const version = match[2];
-    if (!isGoStdlib(name)) {
-        deps.push(makeDep({ name, version, dev: false, ecosystem: 'go', dependencyType: 'direct', sourceFormat: 'go.mod' }));
-    }
+    const dep = parseGoRequireLine(match[1]);
+    if (dep) deps.push(dep);
   }
 
   // Deduplicate by name (keep first occurrence)
@@ -328,7 +325,7 @@ function makeNpmLockDep(
   return makeDep({
     name,
     version,
-    dev: dependencyType === 'dev',
+    dev: dependencyType !== 'direct',
     ecosystem: 'npm',
     dependencyType,
     sourceFormat,

@@ -44,7 +44,7 @@ Anonymous traffic uses L1 Cache API (free ops, per-datacenter); Workers always w
 
 ### ADR-003 — GitHub Action: Dependency Health Auditing in CI
 
-A **composite GitHub Action** hashes manifest content client-side (SHA-256) and sends `POST /api/manifest` with `X-Manifest-Hash` header for fast-path cache lookup (ADR-006). ~~GET /api/manifest/hash/:hash removed~~ — Workers always wake, so it was a redundant round-trip. Public repos authenticate via **GitHub OIDC** (zero config); private CI uses an authenticated API key.
+A **composite GitHub Action** sends manifest content to `POST /api/manifest`; the Worker derives the SHA-256 audit hash from the submitted content and returns it as the ETag. ~~GET /api/manifest/hash/:hash removed~~ — Workers always wake, so it was a redundant round-trip. Public repos authenticate via **GitHub OIDC** (zero config); private CI uses an authenticated API key.
 
 ### ADR-004 — Quota Accounting & Cache Freshness Tiers
 
@@ -111,10 +111,10 @@ These hold true across all decisions:
 | Event domains + Pipelines | ✅ Shipped | 4 pipelines active |
 | KV cron aggregation | ✅ Shipped | Trending, tracked, sitemap |
 | L1 (Cache API) + L2 (KV) caching | ✅ Shipped | Free ops on L1, tiered TTLs on L2 |
-| Manifest audit (`POST /api/manifest`, `POST /api/check/manifest`) | ✅ Shipped | X-Manifest-Hash fast path (ADR-006); supports npm/Go manifests and lockfiles |
+| Manifest audit (`POST /api/manifest`, `POST /api/check/manifest`) | ✅ Shipped | Content-derived audit hash and ETag; supports npm/Go manifests and lockfiles |
 | Batch check (`POST /api/check/batch`) | ✅ Shipped | Authenticated mixed package, purl, and GitHub repo inputs |
 | ~~Content-addressed GET (`/hash/:hash`)~~ | 🗑️ Removed | ADR-006: redundant Worker invocation |
-| GitHub Action (`isitalive/audit-action`) | ✅ Shipped | POST-only with hash header (ADR-006) |
+| GitHub Action (`isitalive/audit-action`) | ✅ Shipped | POST-only manifest submission with OIDC auth |
 | OIDC auth middleware | ✅ Shipped | Public-repo validation; private CI requires API key |
 | Score history (aggregate) | ✅ Shipped | On-demand Iceberg query, KV cached 6h |
 | Anonymous rate limit (5/min) | ✅ Shipped | ADR-008 free-to-use limit |

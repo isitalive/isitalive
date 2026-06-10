@@ -133,7 +133,7 @@ export function auditResultPage(result: AuditResult, analyticsToken?: string, re
   const formatLabel = result.format
 
   const hashUrl = `https://isitalive.dev/audit/${result.auditHash}`
-  const apiUrl = `curl -X POST https://isitalive.dev/api/manifest -H 'X-Manifest-Hash: ${result.auditHash}'`
+  const apiUrl = `curl -X POST https://isitalive.dev/api/manifest -H 'Authorization: Bearer sk_your_api_key' -H 'Content-Type: application/json' -d '{"format":"${result.format}","content":"<manifest contents>"}'`
   const installUrl = installActionUrl(repoOwner, repoName)
 
   // Verdict emoji for the gauge area

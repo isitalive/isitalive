@@ -663,6 +663,32 @@ describe('agent-ready health API', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'Authentication required' })
   })
 
+  it('rejects policy score thresholds outside 0-100', async () => {
+    const env = createEnv(cacheKv)
+
+    const response = await app.fetch(
+      new Request('https://isitalive.dev/api/check/batch', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer sk_pro',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [],
+          policy: { warnBelowScore: 101 },
+        }),
+      }),
+      env,
+      makeExecutionCtx(),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error_code: 'invalid_param',
+      error: 'policy.warnBelowScore must be an integer between 0 and 100',
+    })
+  })
+
   it('rejects over-large batch requests before fanout', async () => {
     const env = createEnv(cacheKv)
 

@@ -47,6 +47,22 @@ require github.com/foo/bar v1.2.3
     expect(deps[0].version).toBe('v1.2.3')
   })
 
+  it('marks single-line indirect requires as transitive', () => {
+    const content = `
+module example.com/app
+go 1.21
+require github.com/foo/bar v1.2.3 // indirect
+`
+    const deps = parseGoMod(content)
+    expect(deps).toHaveLength(1)
+    expect(deps[0]).toMatchObject({
+      name: 'github.com/foo/bar',
+      version: 'v1.2.3',
+      dev: true,
+      dependencyType: 'transitive',
+    })
+  })
+
   it('marks indirect deps as dev', () => {
     const content = `
 module example.com/app
@@ -244,6 +260,10 @@ describe('lockfile parsers', () => {
       dependencyType: 'dev',
       sourceFormat: 'package-lock.json',
     })
+    expect(deps.find(dep => dep.name === '@scope/pkg')).toMatchObject({
+      dev: true,
+      dependencyType: 'transitive',
+    })
   })
 
   it('parses package-lock v2/v1 dependency trees', () => {
@@ -264,6 +284,7 @@ describe('lockfile parsers', () => {
 
     expect(deps.map(dep => dep.name).sort()).toEqual(['leftpad', 'nested', 'transitive'])
     expect(deps.find(dep => dep.name === 'transitive')).toMatchObject({ dev: true })
+    expect(deps.find(dep => dep.name === 'leftpad')).toMatchObject({ dev: true, dependencyType: 'transitive' })
   })
 
   it('parses pnpm-lock.yaml packages with direct/dev/transitive metadata', () => {

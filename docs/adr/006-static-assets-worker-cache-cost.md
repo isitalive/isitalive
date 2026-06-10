@@ -52,12 +52,13 @@ CF [Static Assets](https://developers.cloudflare.com/workers/static-assets/) ser
 The GET-first (`GET /hash/:hash`) → POST-on-miss pattern was designed for CDN caching at $0. Since Workers always wake up, the GET is a redundant round-trip at the same $0.30/M cost.
 
 **New flow:**
-1. `POST /api/manifest` with `X-Manifest-Hash: <sha256>` header
-2. Worker checks KV for hash *before parsing JSON body* → cached result returned in <1ms
-3. `If-None-Match` support → 304 when client already has the result
-4. On cache miss → parse body, score, cache by hash
+1. `POST /api/manifest` with manifest content in the JSON body
+2. Worker derives the SHA-256 audit hash from `content`
+3. Whole-audit cache lookup returns cached results when no request-specific policy or freshness controls are present
+4. `If-None-Match` support → 304 when client already has a complete cached result
+5. On cache miss → score, cache by hash, and return the audit hash as the ETag
 
-This halves CI/CD network trips and eliminates JSON parsing on cache hits.
+This halves CI/CD network trips while keeping policy and freshness controls deterministic.
 
 ### 4. Rate Limits
 
@@ -134,7 +135,7 @@ OIDC requests with `repository_visibility: 'private'` get a graceful 401 with up
 ## Consequences
 
 - ADR-002's "zero Worker cost for anonymous traffic" is **corrected** — Worker always wakes
-- `GET /api/manifest/hash/:hash` endpoint **removed** — replaced by POST with hash header
+- `GET /api/manifest/hash/:hash` endpoint **removed** — replaced by POST with content-derived audit hashes
 - Anonymous rate limit tightened (10 → 5/min)
 - UI pages will move to Static Assets (Phase 2)
 - Pricing model uses private repo count, not audit count, at **$19/$49/$99** tiers

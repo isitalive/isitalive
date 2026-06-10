@@ -43,11 +43,15 @@ function parsePolicy(value: unknown): { policy?: AgentPolicy; error?: { message:
   const raw = value as Record<string, unknown>
   const policy: AgentPolicy = {}
 
-  for (const field of ['failBelowScore', 'warnBelowScore', 'warnIfNoReleaseDays'] as const) {
-    const parsed = parseNonNegativeInteger(raw[field], `policy.${field}`)
+  for (const field of ['failBelowScore', 'warnBelowScore'] as const) {
+    const parsed = parseIntegerRange(raw[field], `policy.${field}`, 0, 100)
     if (parsed.error) return { error: parsed.error }
     if (parsed.value !== undefined) policy[field] = parsed.value
   }
+
+  const releaseAgeDays = parseNonNegativeInteger(raw.warnIfNoReleaseDays, 'policy.warnIfNoReleaseDays')
+  if (releaseAgeDays.error) return { error: releaseAgeDays.error }
+  if (releaseAgeDays.value !== undefined) policy.warnIfNoReleaseDays = releaseAgeDays.value
 
   if (raw.ignoreDevDependencies !== undefined) {
     if (typeof raw.ignoreDevDependencies !== 'boolean') {
@@ -85,6 +89,19 @@ function parseNonNegativeInteger(
   if (value === undefined || value === null) return {}
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     return { error: { message: `${field} must be a non-negative integer`, error_code: 'invalid_param' } }
+  }
+  return { value }
+}
+
+function parseIntegerRange(
+  value: unknown,
+  field: string,
+  min: number,
+  max: number,
+): { value?: number; error?: { message: string; error_code: string } } {
+  if (value === undefined || value === null) return {}
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    return { error: { message: `${field} must be an integer between ${min} and ${max}`, error_code: 'invalid_param' } }
   }
   return { value }
 }

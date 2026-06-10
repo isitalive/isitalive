@@ -3,9 +3,10 @@
 //
 // POST /api/manifest — submit a manifest for scoring (auth required)
 //
-// Accepts X-Manifest-Hash for client-side dedupe and supports If-None-Match →
-// 304 for ETag-based client caching. Request-specific policy/freshness controls
-// bypass whole-audit result caches so responses remain deterministic.
+// The audit hash and ETag are derived from the submitted `content` field.
+// If-None-Match can return 304 on whole-audit cache hits. Request-specific
+// policy/freshness controls bypass whole-audit result caches so responses
+// remain deterministic.
 //
 // GET /api/manifest/hash/:hash was removed in ADR-006 — Workers always wake
 // up, so the GET was a redundant round-trip at the same $0.30/M cost.
