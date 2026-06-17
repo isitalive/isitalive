@@ -44,12 +44,14 @@ export function parseChangelog(markdown: string): Version[] {
     // ## [Unreleased]          (date optional — in-progress section)
     const versionMatch = line.match(/^##\s+\[([^\]]+)\]\s*(?:-\s*(.+))?$/);
     if (versionMatch) {
+      const version = versionMatch[1].trim();
+      const date = (versionMatch[2] ?? '').trim();
+      // A missing date is only valid for the in-progress [Unreleased] section.
+      // Any other dateless heading is malformed — leave the current version
+      // context untouched rather than open a broken, dateless release card.
+      if (!date && version !== 'Unreleased') continue;
       if (current) versions.push(current);
-      current = {
-        version: versionMatch[1],
-        date: (versionMatch[2] ?? '').trim(),
-        entries: [],
-      };
+      current = { version, date, entries: [] };
       currentType = null;
       continue;
     }

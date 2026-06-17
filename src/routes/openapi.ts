@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { CACHE_STATUS_DEFINITIONS, METHODOLOGY, SIGNAL_DEFINITIONS } from '../scoring/methodology'
+import { version } from '../../package.json'
 
 const clientHeaderParameter = {
   name: 'X-IsItAlive-Client',
@@ -16,7 +17,7 @@ export const openApiSpec = {
   openapi: '3.1.0',
   info: {
     title: 'Is It Alive? API',
-    version: '0.7.2',
+    version,
     description: 'Check the maintenance-health of open-source GitHub projects before humans or AI agents choose a dependency. IsItAlive is free to use for public maintenance-health checks; infrastructure limits apply. Returns a weighted 0-100 score, verdict, methodology metadata, and agent-readable evidence. This is not a security, license, or compliance verdict.',
     license: {
       name: 'AGPL-3.0',

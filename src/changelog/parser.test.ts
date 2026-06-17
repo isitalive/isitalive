@@ -91,6 +91,26 @@ describe('parseChangelog', () => {
     expect(versions[0].entries).toHaveLength(1)
   })
 
+  it('rejects a dateless non-Unreleased heading (malformed release)', () => {
+    const markdown = `
+## [1.0.0] - 2026-03-20
+
+### Added
+- Real entry
+
+## [2.0.0]
+
+### Added
+- No date — heading is ignored, entry folds into 1.0.0
+`
+    const versions = parseChangelog(markdown)
+    // Only [Unreleased] may omit the date; a dateless [2.0.0] is malformed and
+    // does not open a new (dateless) version card.
+    expect(versions).toHaveLength(1)
+    expect(versions[0].version).toBe('1.0.0')
+    expect(versions[0].entries).toHaveLength(2)
+  })
+
   it('returns empty array for empty input', () => {
     expect(parseChangelog('')).toEqual([])
   })
