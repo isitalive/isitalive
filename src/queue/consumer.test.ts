@@ -240,7 +240,7 @@ describe('queue consumer', () => {
 
     const dailyUsage = prepared.find((statement) => statement.sql.includes('INSERT INTO daily_usage_repo'))
     const dailyResult = prepared.find((statement) => statement.sql.includes('INSERT INTO daily_result_scores'))
-    expect(dailyUsage?.sql).toContain('WHEN excluded.last_seen >= daily_usage_repo.last_seen')
+    expect(dailyUsage?.sql).toContain("WHEN excluded.latest_verdict != '' AND excluded.last_seen >= daily_usage_repo.last_seen")
     expect(dailyUsage?.sql).toContain('ELSE daily_usage_repo.latest_score')
     expect(dailyUsage?.sql).toContain('ELSE daily_usage_repo.latest_verdict')
     expect(dailyResult?.sql).toContain('WHEN excluded.last_seen >= daily_result_scores.last_seen')

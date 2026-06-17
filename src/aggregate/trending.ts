@@ -73,6 +73,7 @@ async function queryTrending(db: D1Queryable, days: number): Promise<TrendingRep
             ORDER BY last_seen DESC, day DESC
           ) as recency_rank
         FROM trusted
+        WHERE latest_verdict != ''
       )
       SELECT counts.repo, counts.checks, latest.score, latest.verdict
       FROM counts
@@ -156,15 +157,17 @@ export async function getTrendingCache(store: StateStore): Promise<TrendingCache
 async function readStoredTrendingCache(store: StateStore): Promise<TrendingCache> {
   const raw = await cacheGetJson<TrendingCache | TrendingRepo[]>(store, TRENDING_KEY)
   if (!raw) return emptyCache()
-  if (Array.isArray(raw)) {
-    return {
-      repos: raw,
-      generatedAt: new Date(0).toISOString(),
-      windowUsed: '24 hours',
-      degraded: false,
-    }
-  }
-  return raw
+  const cache: TrendingCache = Array.isArray(raw)
+    ? {
+        repos: raw,
+        generatedAt: new Date(0).toISOString(),
+        windowUsed: '24 hours',
+        degraded: false,
+      }
+    : raw
+  // Older builds could persist unscored rows (empty verdict) from cache-hit
+  // tracking events. Drop them so the fallback never shows a 0 / blank entry.
+  return { ...cache, repos: cache.repos.filter((r) => r.verdict !== '') }
 }
 
 function emptyCache(): TrendingCache {
