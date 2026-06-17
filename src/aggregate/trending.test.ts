@@ -67,6 +67,9 @@ describe('aggregate/trending', () => {
     expect(reads).toHaveLength(1)
     expect(reads[0].sql).toContain('FROM daily_usage_repo')
     expect(reads[0].sql).toContain("source IN ('api', 'browser', 'badge', 'audit', 'github-app')")
+    // Latest score/verdict must come from a real scored row, not a cache-hit
+    // tracking event (which carries an empty verdict).
+    expect(reads[0].sql).toContain("latest_verdict != ''")
     expect(reads[0].sql).toContain('ROW_NUMBER() OVER')
     expect(reads[0].sql).toContain('ORDER BY last_seen DESC, day DESC')
     expect(reads[0].sql).not.toContain('MAX(latest_score)')

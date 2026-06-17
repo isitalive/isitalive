@@ -183,6 +183,11 @@ function usageStatements(db: D1Database, event: UsageEvent, archivedAt: string):
         data.oidc_owner,
         JSON.stringify(event),
       ),
+    // L1 cache-hit tracking events carry score 0 / empty verdict because only
+    // the cached HTTP response is available, not the parsed score. Guard the
+    // latest_* columns on a present verdict so these events still count as
+    // checks and advance last_seen, but never clobber a known-good score
+    // (otherwise popular, mostly-cached repos show 0 on the trending page).
     db
       .prepare(`
         INSERT INTO daily_usage_repo (
@@ -193,11 +198,11 @@ function usageStatements(db: D1Database, event: UsageEvent, archivedAt: string):
         ON CONFLICT(day, repo, source) DO UPDATE SET
           checks = daily_usage_repo.checks + 1,
           latest_score = CASE
-            WHEN excluded.last_seen >= daily_usage_repo.last_seen THEN excluded.latest_score
+            WHEN excluded.latest_verdict != '' AND excluded.last_seen >= daily_usage_repo.last_seen THEN excluded.latest_score
             ELSE daily_usage_repo.latest_score
           END,
           latest_verdict = CASE
-            WHEN excluded.last_seen >= daily_usage_repo.last_seen THEN excluded.latest_verdict
+            WHEN excluded.latest_verdict != '' AND excluded.last_seen >= daily_usage_repo.last_seen THEN excluded.latest_verdict
             ELSE daily_usage_repo.latest_verdict
           END,
           last_seen = MAX(daily_usage_repo.last_seen, excluded.last_seen)
