@@ -13,7 +13,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Is It Alive? — Maintenance checks for dependencies & AI agents</title>
+  <title>Is It Alive? — Maintenance checks for dependencies &amp; AI agents</title>
   <meta name="description" content="AI coding agents add open-source dependencies faster than anyone can vet them. IsItAlive scores whether any npm, Go, or GitHub project is still maintained — one number, inspectable evidence, an API your agent can call.">
   ${ogTags({
     title: 'Is It Alive? — Maintenance checks for dependencies & AI agents',
@@ -324,9 +324,10 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       border-color: var(--text-muted);
     }
 
-    .adopt-block:last-child {
+    /* Agent block leads: it is first in the DOM (so reading/tab order matches
+       the visual order) and spans the full width as the hero row. */
+    .adopt-block:first-child {
       grid-column: 1 / -1;
-      order: -1;
     }
 
     .adopt-header {
@@ -466,7 +467,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     /* ── Responsive ─────────────────────────── */
     @media (max-width: 768px) {
       .adopt-grid { grid-template-columns: 1fr; }
-      .adopt-block:last-child { grid-column: auto; }
+      .adopt-block:first-child { grid-column: auto; }
     }
 
     @media (max-width: 640px) {
@@ -640,6 +641,19 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
       <div class="adopt-grid">
         <div class="adopt-block">
           <div class="adopt-header">
+            <div class="adopt-icon icon-bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
+            <h3>Give your agent a liveness API</h3>
+          </div>
+          <p>Let Claude Code, Codex, Cursor, or any MCP server check a dependency's pulse before they add it.</p>
+          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/package/npm/react
+
+{ <span class="gr">"score"</span>: 96, <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
+  <span class="gr">"signals"</span>: [ ... ],
+  <span class="gr">"drivers"</span>: [ ... ] }</div>
+          <span class="adopt-tag"><a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
+        </div>
+        <div class="adopt-block">
+          <div class="adopt-header">
             <div class="adopt-icon icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
             <h3>Check before adopting</h3>
           </div>
@@ -661,19 +675,6 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <span class="ac">with:</span>
     <span class="ac">threshold:</span> 40</div>
           <span class="adopt-tag">Free to use for public repos · <a href="https://github.com/isitalive/audit-action">GitHub Action</a> · <a href="/api">Docs →</a></span>
-        </div>
-        <div class="adopt-block">
-          <div class="adopt-header">
-            <div class="adopt-icon icon-bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
-            <h3>Give your agent a liveness API</h3>
-          </div>
-          <p>Let Claude Code, Codex, Cursor, or any MCP server check a dependency's pulse before they add it.</p>
-          <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/package/npm/react
-
-{ <span class="gr">"score"</span>: 96, <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
-  <span class="gr">"signals"</span>: [ ... ],
-  <span class="gr">"drivers"</span>: [ ... ] }</div>
-          <span class="adopt-tag"><a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
         </div>
       </div>
     </section>
