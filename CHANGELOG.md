@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-06-17
+
 ### Added
 
 - Core v1 agent audit API: `/api/check/manifest` alias, authenticated `/api/check/batch`, npm/Go lockfile formats (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.sum`), canonical dependency identity/state/freshness fields, and optional policy evaluation.

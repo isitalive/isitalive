@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 export interface ChangeEntry {
-  type: 'added' | 'changed' | 'fixed' | 'removed';
+  type: 'added' | 'changed' | 'deprecated' | 'removed' | 'fixed' | 'security';
   text: string;
 }
 
@@ -18,11 +18,15 @@ export interface Version {
   entries: ChangeEntry[];
 }
 
+// Full Keep a Changelog section vocabulary. Any heading outside this set is
+// dropped from the rendered page, so keep it in sync with the changelog.
 const TYPE_MAP: Record<string, ChangeEntry['type']> = {
   added: 'added',
   changed: 'changed',
-  fixed: 'fixed',
+  deprecated: 'deprecated',
   removed: 'removed',
+  fixed: 'fixed',
+  security: 'security',
 };
 
 /**
@@ -36,13 +40,14 @@ export function parseChangelog(markdown: string): Version[] {
   for (const rawLine of markdown.split('\n')) {
     const line = rawLine.trim();
 
-    // ## [0.3.0] - 2026-03-20
-    const versionMatch = line.match(/^##\s+\[([^\]]+)\]\s*-\s*(.+)$/);
+    // ## [0.3.0] - 2026-03-20  (dated release)
+    // ## [Unreleased]          (date optional — in-progress section)
+    const versionMatch = line.match(/^##\s+\[([^\]]+)\]\s*(?:-\s*(.+))?$/);
     if (versionMatch) {
       if (current) versions.push(current);
       current = {
         version: versionMatch[1],
-        date: versionMatch[2].trim(),
+        date: (versionMatch[2] ?? '').trim(),
         entries: [],
       };
       currentType = null;

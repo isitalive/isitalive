@@ -54,8 +54,10 @@ import {
   cachePutText,
 } from '../db/state'
 
-// Parse changelog once at module scope — avoids re-parsing on every /_data/changelog request
-const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd)
+// Parse changelog once at module scope — avoids re-parsing on every /_data/changelog
+// request. Drop entry-less versions (e.g. an empty [Unreleased] section between
+// releases) so they never surface as blank cards or skew pagination.
+const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd).filter((v) => v.entries.length > 0)
 
 const ui = new Hono<{ Bindings: Env }>()
 

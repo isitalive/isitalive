@@ -48,12 +48,26 @@ describe('parseChangelog', () => {
     expect(versions[1].version).toBe('1.0.0')
   })
 
-  it('ignores unknown section types', () => {
+  it('parses the full Keep a Changelog section vocabulary', () => {
     const markdown = `
 ## [1.0.0] - 2026-03-20
 
 ### Security
-- Security patch
+- Patched an auth bypass
+
+### Deprecated
+- Old endpoint scheduled for removal
+`
+    const versions = parseChangelog(markdown)
+    expect(versions[0].entries.map(e => e.type)).toEqual(['security', 'deprecated'])
+  })
+
+  it('ignores unknown section types', () => {
+    const markdown = `
+## [1.0.0] - 2026-03-20
+
+### Notes
+- A note that is not a changelog category
 
 ### Added
 - Real feature
@@ -61,6 +75,20 @@ describe('parseChangelog', () => {
     const versions = parseChangelog(markdown)
     expect(versions[0].entries).toHaveLength(1)
     expect(versions[0].entries[0].type).toBe('added')
+  })
+
+  it('parses a dateless [Unreleased] heading', () => {
+    const markdown = `
+## [Unreleased]
+
+### Added
+- Work in progress
+`
+    const versions = parseChangelog(markdown)
+    expect(versions).toHaveLength(1)
+    expect(versions[0].version).toBe('Unreleased')
+    expect(versions[0].date).toBe('')
+    expect(versions[0].entries).toHaveLength(1)
   })
 
   it('returns empty array for empty input', () => {
@@ -128,7 +156,7 @@ Another paragraph.
 
 // ── Fuzz: parseChangelog never throws (fast-check) ────────────────────
 describe('parseChangelog fuzz', () => {
-  const validTypes = new Set(['added', 'changed', 'fixed', 'removed'])
+  const validTypes = new Set(['added', 'changed', 'deprecated', 'removed', 'fixed', 'security'])
 
   test.prop([fc.string()])('never throws on arbitrary input', (input) => {
     expect(() => parseChangelog(input)).not.toThrow()
@@ -151,7 +179,7 @@ describe('parseChangelog fuzz', () => {
     fc.array(fc.record({
       version: fc.stringMatching(/^\d{1,3}\.\d{1,3}\.\d{1,3}$/),
       date: fc.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      section: fc.constantFrom('Added', 'Changed', 'Fixed', 'Removed'),
+      section: fc.constantFrom('Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'),
       items: fc.array(fc.lorem({ maxCount: 5 }), { minLength: 1, maxLength: 5 }),
     }), { minLength: 1, maxLength: 5 }),
   ])('round-trips structured changelog entries', (versions) => {

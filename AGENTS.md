@@ -61,7 +61,21 @@ src/
 - PR titles should be semantic-release friendly because the squash/merge title may drive versioning and changelog output.
 - Prefer standard types such as `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, or `ci`; include a concise scope when useful, for example `fix(ui): handle missing recent queries`.
 - Keep PRs focused — one feature or fix per PR
-- Update `CHANGELOG.md` for user-facing changes
+- Update `CHANGELOG.md` for user-facing changes (see Changelog & releases below)
+
+## Changelog & releases
+
+The `/changelog` page parses `CHANGELOG.md` directly (`src/changelog/parser.ts`), so the file is a **product surface with a strict contract**, not just dev notes:
+
+- Headings must be `## [x.y.z] - YYYY-MM-DD` (a dated release) or `## [Unreleased]` (date omitted, for in-progress work).
+- Entries must sit under one of the six Keep a Changelog sections: `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`, `### Security`. Anything under any other heading is silently dropped from the page.
+- Write entries as human-readable prose — they render publicly, so they are not a commit-message dump.
+
+Accumulate changes under `## [Unreleased]` (it renders live once it has entries; an empty one stays hidden). To cut a release:
+
+1. Rename `## [Unreleased]` to `## [x.y.z] - <today>` and add a fresh empty `## [Unreleased]` above it.
+2. Bump `version` in `package.json` to match — it is the same number surfaced at `/health`.
+3. After the release merges to `main`, tag it: `git tag vx.y.z <commit> && git push origin vx.y.z`.
 
 ## Quick Check API
 
