@@ -13,11 +13,11 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Is It Alive? — Maintenance Signals for Dependencies</title>
-  <meta name="description" content="Before humans or AI agents add a dependency, check whether the project is still alive. Fast maintenance-health scores with inspectable evidence.">
+  <title>Is It Alive? — Maintenance checks for dependencies & AI agents</title>
+  <meta name="description" content="AI coding agents add open-source dependencies faster than anyone can vet them. IsItAlive scores whether any npm, Go, or GitHub project is still maintained — one number, inspectable evidence, an API your agent can call.">
   ${ogTags({
-    title: 'Is It Alive? — Maintenance Signals for Dependencies',
-    description: 'Before humans or AI agents add a dependency, check whether the project is still alive. Fast maintenance-health scores with inspectable evidence.',
+    title: 'Is It Alive? — Maintenance checks for dependencies & AI agents',
+    description: 'AI coding agents add open-source dependencies faster than anyone can vet them. IsItAlive scores whether any npm, Go, or GitHub project is still maintained — one number, inspectable evidence, an API your agent can call.',
     url: 'https://isitalive.dev/',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -326,6 +326,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 
     .adopt-block:last-child {
       grid-column: 1 / -1;
+      order: -1;
     }
 
     .adopt-header {
@@ -600,7 +601,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <div class="container">    <header>
 
       <h1>Don't let your agent install dead dependencies.</h1>
-      <p class="subtitle">Check maintenance-health for any package or GitHub project with one score, inspectable evidence, and agent-readable signals.</p>
+      <p class="subtitle">AI agents add packages faster than anyone can vet them. Check whether any npm, Go, or GitHub project is still alive — one score, inspectable evidence, an API agents can call.</p>
 
       <div class="search-container">
         <form action="/_check" method="POST" id="searchForm">
@@ -620,7 +621,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
           </div>
           ${hasTurnstile ? `<div class="cf-turnstile" data-sitekey="${siteKey}" data-theme="auto" data-size="flexible" data-callback="onTurnstileSuccess" data-expired-callback="onTurnstileExpired"></div>` : ''}
         </form>
-        <p class="search-hint">Paste an npm package, Go module, or GitHub repo before you adopt, recommend, or automate it</p>
+        <p class="search-hint">Paste an npm package, Go module, or GitHub repo — before you, or your agent, depend on it</p>
       </div>
     </header>
 
@@ -635,7 +636,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
     </div>
 
     <section class="adopt-section">
-      <div class="section-label"><span>Use it where dependencies enter your workflow</span></div>
+      <div class="section-label"><span>Give your agents, pipelines, and READMEs a liveness check</span></div>
       <div class="adopt-grid">
         <div class="adopt-block">
           <div class="adopt-header">
@@ -664,15 +665,14 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
         <div class="adopt-block">
           <div class="adopt-header">
             <div class="adopt-icon icon-bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
-            <h3>Give agents a liveness API</h3>
+            <h3>Give your agent a liveness API</h3>
           </div>
-          <p>Let LLMs and MCP servers sanity-check dependencies before recommending or adding them.</p>
+          <p>Let Claude Code, Codex, Cursor, or any MCP server check a dependency's pulse before they add it.</p>
           <div class="adopt-code"><span class="ac">$</span> curl https://isitalive.dev/api/check/package/npm/react
 
-{ <span class="gr">"package"</span>: { <span class="gr">"name"</span>: <span class="gr">"react"</span> },
-  <span class="gr">"score"</span>: 96,
-  <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
-  <span class="gr">"signals"</span>: [...] }</div>
+{ <span class="gr">"score"</span>: 96, <span class="gr">"verdict"</span>: <span class="gr">"healthy"</span>,
+  <span class="gr">"signals"</span>: [ ... ],
+  <span class="gr">"drivers"</span>: [ ... ] }</div>
           <span class="adopt-tag"><a href="/llms.txt">llms.txt</a> · <a href="/openapi.json">openapi.json</a> · <a href="/.well-known/ai-plugin.json">ai-plugin.json</a></span>
         </div>
       </div>
