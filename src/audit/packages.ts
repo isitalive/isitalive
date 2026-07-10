@@ -1,8 +1,9 @@
 import type { Env } from '../types/env'
 import type { ParsedDep } from './parsers'
+import { normalizePypiName } from './parsers'
 import { resolveAll, type ResolvedDep } from './resolver'
 
-export const SUPPORTED_PACKAGE_ECOSYSTEMS = ['npm', 'go'] as const
+export const SUPPORTED_PACKAGE_ECOSYSTEMS = ['npm', 'go', 'pypi'] as const
 export type PackageEcosystem = typeof SUPPORTED_PACKAGE_ECOSYSTEMS[number]
 
 export type ResolvedPackage = {
@@ -26,6 +27,8 @@ const MAX_PACKAGE_VERSION_LENGTH = 128
 const CONTROL_CHARS_RE = /[\0-\x1F\x7F]/
 const NPM_UNSCOPED_RE = /^[a-z0-9][a-z0-9._~-]*$/
 const NPM_SCOPED_RE = /^@[a-z0-9][a-z0-9._~-]*\/[a-z0-9][a-z0-9._~-]*$/
+// PEP 503 normalized names: lowercase alphanumerics separated by single hyphens
+const PYPI_NAME_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
 export function parsePackageEcosystem(value: string): PackageEcosystem | null {
   return SUPPORTED_PACKAGE_ECOSYSTEMS.includes(value as PackageEcosystem)
@@ -35,11 +38,18 @@ export function parsePackageEcosystem(value: string): PackageEcosystem | null {
 
 export function normalizePackageName(ecosystem: PackageEcosystem, value: string): string | null {
   const rawName = value.trim().replace(/\/+$/, '')
-  const name = ecosystem === 'npm' ? rawName.toLowerCase() : rawName
+  const name = ecosystem === 'npm'
+    ? rawName.toLowerCase()
+    : ecosystem === 'pypi'
+      ? normalizePypiName(rawName)
+      : rawName
   if (!name || name.length > MAX_PACKAGE_NAME_LENGTH) return null
   if (CONTROL_CHARS_RE.test(name)) return null
   if (ecosystem === 'npm') {
     return NPM_UNSCOPED_RE.test(name) || NPM_SCOPED_RE.test(name) ? name : null
+  }
+  if (ecosystem === 'pypi') {
+    return PYPI_NAME_RE.test(name) ? name : null
   }
   if (ecosystem === 'go' && (/\s/.test(name) || !name.includes('.'))) return null
   return name

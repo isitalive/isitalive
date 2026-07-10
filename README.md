@@ -15,6 +15,9 @@ This is a maintenance-risk signal, not a security, license, or compliance verdic
 curl -s https://isitalive.dev/api/check/package/npm/react \
   -H "X-IsItAlive-Client: codex/1.0" | jq
 
+curl -s https://isitalive.dev/api/check/package/pypi/requests \
+  -H "X-IsItAlive-Client: codex/1.0" | jq
+
 curl -s https://isitalive.dev/api/check/github/vercel/next.js \
   -H "X-IsItAlive-Client: codex/1.0" | jq
 ```

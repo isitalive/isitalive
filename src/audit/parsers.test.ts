@@ -7,6 +7,8 @@ import {
   parsePackageLock,
   parsePnpmLock,
   parseYarnLockFile,
+  parseRequirementsTxt,
+  parsePyprojectToml,
   parseManifest,
 } from './parsers'
 
@@ -374,7 +376,7 @@ require github.com/foo/bar v1.0.0
   })
 
   it('throws on unsupported format', () => {
-    expect(() => parseManifest('requirements.txt' as any, 'flask==2.0')).toThrow('Unsupported format')
+    expect(() => parseManifest('Cargo.toml' as any, '[dependencies]')).toThrow('Unsupported format')
   })
 })
 
@@ -457,5 +459,145 @@ describe('parsePackageJson fuzz', () => {
       // Only acceptable error is invalid JSON
       expect(e.message).toContain('Invalid package.json')
     }
+  })
+})
+
+// ── parseRequirementsTxt ───────────────────────────────────────────────
+describe('parseRequirementsTxt', () => {
+  it('parses plain and pinned requirements', () => {
+    const content = `
+# Production deps
+requests==2.31.0
+flask>=2.0,<3.0
+django
+`
+    const deps = parseRequirementsTxt(content)
+    expect(deps).toHaveLength(3)
+    expect(deps[0]).toEqual({
+      name: 'requests',
+      version: '==2.31.0',
+      dev: false,
+      ecosystem: 'pypi',
+      dependencyType: 'direct',
+      sourceFormat: 'requirements.txt',
+    })
+    expect(deps[1].version).toBe('>=2.0,<3.0')
+    expect(deps[2].version).toBe('')
+  })
+
+  it('normalizes names per PEP 503', () => {
+    const deps = parseRequirementsTxt('Typing_Extensions==4.9.0\nzope.interface\n')
+    expect(deps.map((d) => d.name)).toEqual(['typing-extensions', 'zope-interface'])
+  })
+
+  it('handles extras, markers, and parenthesized specifiers', () => {
+    const content = `
+uvicorn[standard]>=0.23
+pywin32>=1.0 ; sys_platform == 'win32'
+pytest (>=7.0)
+`
+    const deps = parseRequirementsTxt(content)
+    expect(deps).toHaveLength(3)
+    expect(deps[0]).toMatchObject({ name: 'uvicorn', version: '>=0.23' })
+    expect(deps[1]).toMatchObject({ name: 'pywin32', version: ">=1.0" })
+    expect(deps[2]).toMatchObject({ name: 'pytest', version: '>=7.0' })
+  })
+
+  it('skips pip options, URLs, and local paths', () => {
+    const content = `
+-r other-requirements.txt
+--index-url https://private.example.com/simple
+-e .
+https://example.com/pkg.tar.gz
+./local/path
+requests==2.31.0
+`
+    const deps = parseRequirementsTxt(content)
+    expect(deps).toHaveLength(1)
+    expect(deps[0].name).toBe('requests')
+  })
+
+  it('keeps named direct URL references without a version', () => {
+    const deps = parseRequirementsTxt('mypkg @ https://example.com/mypkg-1.0.tar.gz\n')
+    expect(deps).toHaveLength(1)
+    expect(deps[0]).toMatchObject({ name: 'mypkg', version: '' })
+  })
+
+  it('joins backslash line continuations', () => {
+    const deps = parseRequirementsTxt('requests \\\n  ==2.31.0\n')
+    expect(deps).toHaveLength(1)
+    expect(deps[0]).toMatchObject({ name: 'requests', version: '==2.31.0' })
+  })
+
+  it('deduplicates repeated requirements', () => {
+    const deps = parseRequirementsTxt('requests==2.31.0\nrequests==2.31.0\n')
+    expect(deps).toHaveLength(1)
+  })
+})
+
+// ── parsePyprojectToml ─────────────────────────────────────────────────
+describe('parsePyprojectToml', () => {
+  it('parses PEP 621 dependencies and optional-dependencies', () => {
+    const content = `
+[project]
+name = "myapp"
+dependencies = [
+  "requests>=2.28",
+  "click",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+`
+    const deps = parsePyprojectToml(content)
+    expect(deps).toHaveLength(3)
+    expect(deps[0]).toEqual({
+      name: 'requests',
+      version: '>=2.28',
+      dev: false,
+      ecosystem: 'pypi',
+      dependencyType: 'direct',
+      sourceFormat: 'pyproject.toml',
+    })
+    expect(deps[2]).toMatchObject({ name: 'pytest', dev: true, dependencyType: 'dev' })
+  })
+
+  it('parses Poetry dependency tables and groups', () => {
+    const content = `
+[tool.poetry]
+name = "myapp"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+Django = "^4.2"
+rich = { version = ">=13.0", optional = true }
+internal = { git = "https://internal.example.com/repo.git" }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+
+[tool.poetry.dev-dependencies]
+black = "*"
+`
+    const deps = parsePyprojectToml(content)
+    expect(deps.map((d) => d.name)).toEqual(['django', 'rich', 'black', 'pytest'])
+    expect(deps[0]).toMatchObject({ version: '^4.2', dev: false })
+    expect(deps[2]).toMatchObject({ dev: true, dependencyType: 'dev' })
+  })
+
+  it('throws on invalid TOML', () => {
+    expect(() => parsePyprojectToml('[project\nbroken')).toThrow('Invalid pyproject.toml')
+  })
+
+  it('returns empty for a pyproject with no dependency tables', () => {
+    expect(parsePyprojectToml('[build-system]\nrequires = ["setuptools"]\n')).toEqual([])
+  })
+})
+
+// ── parseManifest dispatch for Python formats ──────────────────────────
+describe('parseManifest python formats', () => {
+  it('dispatches requirements.txt and pyproject.toml', () => {
+    expect(parseManifest('requirements.txt', 'requests==2.31.0\n')[0].ecosystem).toBe('pypi')
+    expect(parseManifest('pyproject.toml', '[project]\ndependencies = ["requests"]\n')[0].ecosystem).toBe('pypi')
   })
 })

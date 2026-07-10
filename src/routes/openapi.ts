@@ -251,19 +251,19 @@ export const openApiSpec = {
       get: {
         operationId: 'resolvePackage',
         summary: 'Resolve package to GitHub repository',
-        description: 'Resolve an npm package or Go module to the GitHub repository IsItAlive will score. Use this when an agent starts from a dependency name instead of a repo slug.',
+        description: 'Resolve an npm package, Go module, or PyPI package to the GitHub repository IsItAlive will score. Use this when an agent starts from a dependency name instead of a repo slug.',
         parameters: [
           {
             name: 'ecosystem',
             in: 'path',
             required: true,
-            schema: { type: 'string', enum: ['npm', 'go'] },
+            schema: { type: 'string', enum: ['npm', 'go', 'pypi'] },
           },
           {
             name: 'packageName',
             in: 'path',
             required: true,
-            description: 'Package name or module path, for example react, @types/node, or golang.org/x/crypto.',
+            description: 'Package name or module path, for example react, @types/node, golang.org/x/crypto, or requests.',
             schema: { type: 'string' },
           },
           {
@@ -301,7 +301,7 @@ export const openApiSpec = {
             name: 'ecosystem',
             in: 'path',
             required: true,
-            schema: { type: 'string', enum: ['npm', 'go'] },
+            schema: { type: 'string', enum: ['npm', 'go', 'pypi'] },
           },
           {
             name: 'name',
@@ -337,13 +337,13 @@ export const openApiSpec = {
       get: {
         operationId: 'checkPackage',
         summary: 'Check package maintenance',
-        description: 'Resolve an npm package or Go module to GitHub, then return the normal maintenance-health score for that repository with package context attached.',
+        description: 'Resolve an npm package, Go module, or PyPI package to GitHub, then return the normal maintenance-health score for that repository with package context attached.',
         parameters: [
           {
             name: 'ecosystem',
             in: 'path',
             required: true,
-            schema: { type: 'string', enum: ['npm', 'go'] },
+            schema: { type: 'string', enum: ['npm', 'go', 'pypi'] },
           },
           {
             name: 'packageName',
@@ -393,7 +393,7 @@ export const openApiSpec = {
             name: 'ecosystem',
             in: 'path',
             required: true,
-            schema: { type: 'string', enum: ['npm', 'go'] },
+            schema: { type: 'string', enum: ['npm', 'go', 'pypi'] },
           },
           {
             name: 'name',
@@ -539,7 +539,7 @@ export const openApiSpec = {
       post: {
         operationId: 'auditManifest',
         summary: 'Audit dependency manifest',
-        description: 'Upload a package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, or go.sum file and receive a scored maintenance-health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
+        description: 'Upload a package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, go.sum, requirements.txt, or pyproject.toml file and receive a scored maintenance-health report for every dependency. Synchronous, idempotent, and cache-first — calling again with the same manifest content is instant (~50ms). If not all dependencies can be scored within the time budget, the response includes `complete: false` and a `retryAfterMs` hint. Simply call again to get remaining results.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -670,7 +670,7 @@ export const openApiSpec = {
         type: 'object',
         required: ['ecosystem', 'name', 'version'],
         properties: {
-          ecosystem: { type: 'string', enum: ['npm', 'go'] },
+          ecosystem: { type: 'string', enum: ['npm', 'go', 'pypi'] },
           name: { type: 'string' },
           version: {
             type: 'string',
@@ -887,7 +887,7 @@ export const openApiSpec = {
         properties: {
           format: {
             type: 'string',
-            enum: ['go.mod', 'go.sum', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'],
+            enum: ['go.mod', 'go.sum', 'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'requirements.txt', 'pyproject.toml'],
             description: 'Manifest file format',
           },
           content: {
@@ -927,7 +927,7 @@ export const openApiSpec = {
             required: ['kind', 'ecosystem', 'name'],
             properties: {
               kind: { type: 'string', const: 'package' },
-              ecosystem: { type: 'string', enum: ['npm', 'go'] },
+              ecosystem: { type: 'string', enum: ['npm', 'go', 'pypi'] },
               name: { type: 'string' },
               version: { type: 'string' },
             },
@@ -1103,7 +1103,7 @@ export const openApiSpec = {
         required: ['purl', 'ecosystem', 'name', 'version', 'dependencyType'],
         properties: {
           purl: { type: 'string', nullable: true },
-          ecosystem: { type: 'string', enum: ['npm', 'go', 'github', 'unsupported'] },
+          ecosystem: { type: 'string', enum: ['npm', 'go', 'pypi', 'github', 'unsupported'] },
           name: { type: 'string' },
           version: { type: 'string' },
           dependencyType: { type: 'string', enum: ['direct', 'dev', 'transitive'] },

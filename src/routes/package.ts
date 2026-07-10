@@ -49,7 +49,9 @@ async function resolveForRequest(c: AppContext, rawEcosystem: string, rawName: s
         error_code: 'invalid_param',
         hint: ecosystem === 'go'
           ? 'Use a Go module path such as golang.org/x/crypto.'
-          : 'Use an npm package name such as react or @types/node.',
+          : ecosystem === 'pypi'
+            ? 'Use a PyPI package name such as requests or django.'
+            : 'Use an npm package name such as react or @types/node.',
       }, 400),
     }
   }

@@ -21,6 +21,7 @@
     "@interlynk-io/purl-js": "^1.0.3",
     "@yarnpkg/lockfile": "^1.1.0",
     "hono": "^4.12.25",
+    "smol-toml": "^1.7.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

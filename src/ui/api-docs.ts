@@ -322,19 +322,19 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>
       <span class="endpoint-path">/api/check/package/{ecosystem}/{packageName}</span>
-      <p class="endpoint-desc">Resolve an npm package or Go module to GitHub, then return the normal maintenance-health score with package context attached. Use this when an agent or human starts from a dependency name such as <span class="inline-code">react</span>, <span class="inline-code">@types/node</span>, or <span class="inline-code">golang.org/x/crypto</span>. Query fallback: <span class="inline-code">/api/check/package/{ecosystem}?name=...</span>.</p>
+      <p class="endpoint-desc">Resolve an npm package, Go module, or PyPI package to GitHub, then return the normal maintenance-health score with package context attached. Use this when an agent or human starts from a dependency name such as <span class="inline-code">react</span>, <span class="inline-code">@types/node</span>, <span class="inline-code">golang.org/x/crypto</span>, or <span class="inline-code">requests</span>. Query fallback: <span class="inline-code">/api/check/package/{ecosystem}?name=...</span>.</p>
 
       <table class="params-table">
         <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
         <tr>
           <td><span class="param-name">ecosystem</span><span class="param-required">required</span></td>
           <td><span class="param-type">string</span></td>
-          <td><span class="inline-code">npm</span> or <span class="inline-code">go</span></td>
+          <td><span class="inline-code">npm</span>, <span class="inline-code">go</span>, or <span class="inline-code">pypi</span></td>
         </tr>
         <tr>
           <td><span class="param-name">packageName</span><span class="param-required">required</span></td>
           <td><span class="param-type">string</span></td>
-          <td>Package name or Go module path. Use URL encoding when needed.</td>
+          <td>Package name, Go module path, or PyPI package name. Use URL encoding when needed.</td>
         </tr>
         <tr>
           <td><span class="param-name">include</span></td>
@@ -471,12 +471,12 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="endpoint">
       <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
       <span class="endpoint-path">/api/manifest</span>
-      <p class="endpoint-desc">Upload a <span class="inline-code">package.json</span>, <span class="inline-code">package-lock.json</span>, <span class="inline-code">pnpm-lock.yaml</span>, <span class="inline-code">yarn.lock</span>, <span class="inline-code">go.mod</span>, or <span class="inline-code">go.sum</span> and get a scored maintenance-health report for every dependency. Alias: <span class="inline-code">/api/check/manifest</span>. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
+      <p class="endpoint-desc">Upload a <span class="inline-code">package.json</span>, <span class="inline-code">package-lock.json</span>, <span class="inline-code">pnpm-lock.yaml</span>, <span class="inline-code">yarn.lock</span>, <span class="inline-code">go.mod</span>, <span class="inline-code">go.sum</span>, <span class="inline-code">requirements.txt</span>, or <span class="inline-code">pyproject.toml</span> and get a scored maintenance-health report for every dependency. Alias: <span class="inline-code">/api/check/manifest</span>. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
     </div>
 
     <h3>Request Body</h3>
     <div class="field-list">
-      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"package.json"</span>, <span class="inline-code">"package-lock.json"</span>, <span class="inline-code">"pnpm-lock.yaml"</span>, <span class="inline-code">"yarn.lock"</span>, <span class="inline-code">"go.mod"</span>, or <span class="inline-code">"go.sum"</span></span></div>
+      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"package.json"</span>, <span class="inline-code">"package-lock.json"</span>, <span class="inline-code">"pnpm-lock.yaml"</span>, <span class="inline-code">"yarn.lock"</span>, <span class="inline-code">"go.mod"</span>, <span class="inline-code">"go.sum"</span>, <span class="inline-code">"requirements.txt"</span>, or <span class="inline-code">"pyproject.toml"</span></span></div>
       <div class="field-item"><span class="field-name">content</span><span class="field-desc">Raw manifest file content (max 512KB)</span></div>
       <div class="field-item"><span class="field-name">policy</span><span class="field-desc">Optional policy thresholds for score, unresolved deps, confidence, dev deps, and release age</span></div>
       <div class="field-item"><span class="field-name">maxAgeSeconds</span><span class="field-desc">Optional best-effort freshness target; stale cached data is flagged with <span class="inline-code">stale_data</span></span></div>

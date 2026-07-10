@@ -404,7 +404,7 @@ describe('agent-ready health API', () => {
   it('returns stable package route errors', async () => {
     const env = createEnv(cacheKv)
 
-    const unsupported = await app.fetch(new Request('https://isitalive.dev/api/resolve/pypi/django'), env, makeExecutionCtx())
+    const unsupported = await app.fetch(new Request('https://isitalive.dev/api/resolve/cargo/serde'), env, makeExecutionCtx())
     expect(unsupported.status).toBe(400)
     await expect(unsupported.json()).resolves.toMatchObject({ error_code: 'unsupported_ecosystem' })
 
@@ -617,7 +617,7 @@ describe('agent-ready health API', () => {
             { kind: 'package', ecosystem: 'npm', name: 'react', version: '18.2.0' },
             { kind: 'purl', purl: 'pkg:golang/golang.org/x/crypto' },
             { kind: 'github', owner: 'vercel', repo: 'next.js' },
-            { kind: 'package', ecosystem: 'pypi', name: 'django' },
+            { kind: 'package', ecosystem: 'cargo', name: 'serde' },
           ],
           policy: {
             requireResolutionConfidence: 'high',

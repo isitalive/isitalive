@@ -550,10 +550,21 @@ function parseNpmPackageUrl(input: string): string | null {
   }
 }
 
+function parsePypiPackageUrl(input: string): string | null {
+  const match = input.match(/^(?:https?:\/\/)?(?:www\.)?pypi\.org\/project\/([^/?#]+)\/?(?:[?#].*)?$/i)
+  if (!match) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
+
 function parsePackageInput(input: string): { ecosystem: PackageEcosystem; name: string } | null {
-  const explicit = input.match(/^(npm|go):(.+)$/i)
+  const explicit = input.match(/^(npm|go|pypi|pip):(.+)$/i)
   if (explicit) {
-    const ecosystem = parsePackageEcosystem(explicit[1].toLowerCase())
+    const prefix = explicit[1].toLowerCase()
+    const ecosystem = parsePackageEcosystem(prefix === 'pip' ? 'pypi' : prefix)
     if (!ecosystem) return null
     const name = normalizePackageName(ecosystem, explicit[2])
     return name ? { ecosystem, name } : null
@@ -563,6 +574,12 @@ function parsePackageInput(input: string): { ecosystem: PackageEcosystem; name: 
   if (npmUrlName) {
     const name = normalizePackageName('npm', npmUrlName)
     return name ? { ecosystem: 'npm', name } : null
+  }
+
+  const pypiUrlName = parsePypiPackageUrl(input)
+  if (pypiUrlName) {
+    const name = normalizePackageName('pypi', pypiUrlName)
+    return name ? { ecosystem: 'pypi', name } : null
   }
 
   if (input.startsWith('@') || !input.includes('/')) {
@@ -726,17 +743,19 @@ const MANIFEST_FORMATS: Record<string, ManifestFormat> = {
   'yarn.lock': 'yarn.lock',
   'go.mod': 'go.mod',
   'go.sum': 'go.sum',
+  'requirements.txt': 'requirements.txt',
+  'pyproject.toml': 'pyproject.toml',
 }
 
 /** Matches GitHub blob URLs ending in supported manifest or lockfile names (supports slashed branch names) */
-const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.mod|go\.sum)$/i
+const MANIFEST_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/.+\/blob\/.+\/(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.mod|go\.sum|requirements\.txt|pyproject\.toml)$/i
 
 async function handleAuditFromUrl(c: any, rawUrl: string, filePath: string): Promise<Response> {
   // Determine format from filename
   const filename = filePath.split('/').pop() || ''
   const format = MANIFEST_FORMATS[filename]
   if (!format) {
-    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, and go.sum.`), 400)
+    return c.html(errorPage(`Unsupported file: ${filename}. We support package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, go.mod, go.sum, requirements.txt, and pyproject.toml.`), 400)
   }
 
   // Fetch raw content from GitHub

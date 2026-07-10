@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- PyPI ecosystem support: `pypi` package checks and resolution via `/api/check/package/pypi/{name}` and `/api/resolve/pypi/{name}`, `pkg:pypi/...` purls in `/api/check/batch`, and `requirements.txt` / `pyproject.toml` (PEP 621 and Poetry) manifest audits.
 - Core v1 agent audit API: `/api/check/manifest` alias, authenticated `/api/check/batch`, npm/Go lockfile formats (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.sum`), canonical dependency identity/state/freshness fields, and optional policy evaluation.
 - Package-first lookup for humans and agents: npm packages and Go modules can now be resolved via `/api/resolve/{ecosystem}/{packageName}` and checked via `/api/check/package/{ecosystem}/{packageName}` before falling back to GitHub repo-level maintenance-health scoring.
 - D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
