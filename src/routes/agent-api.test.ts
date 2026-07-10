@@ -56,6 +56,11 @@ async function drainExecutionCtx(ctx: ExecutionContext & { pending: Promise<unkn
   }
 }
 
+/** Relative dates keep scoring fixtures from decaying as wall-clock time passes */
+function daysAgoIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+}
+
 function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProjectData {
   return {
     archived: false,
@@ -69,8 +74,8 @@ function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProject
     homepageUrl: null,
     language: 'TypeScript',
     languageColor: '#3178c6',
-    lastCommitDate: '2026-03-25T00:00:00.000Z',
-    lastReleaseDate: '2026-03-20T00:00:00.000Z',
+    lastCommitDate: daysAgoIso(3),
+    lastReleaseDate: daysAgoIso(8),
     issueStalenessMedianDays: 2,
     issueSampleSize: 4,
     issueSampleLimit: 50,
@@ -87,7 +92,7 @@ function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProject
     contributorWindowDays: 90,
     topContributorCommitShare: 0.5,
     hasCi: true,
-    lastCiRunDate: '2026-03-28T00:00:00.000Z',
+    lastCiRunDate: daysAgoIso(1),
     ciRunSuccessRate: 0.9,
     ciRunCount: 12,
     ciWorkflowRunSampleSize: 10,
