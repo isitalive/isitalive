@@ -40,6 +40,20 @@ IsItAlive is free to use for public maintenance-health checks. Infrastructure li
 - OpenAPI, \`llms.txt\`, and AI plugin manifest for agents
 - Methodology, trending, recent queries, and score history where data is available
 
+## MCP Server
+
+IsItAlive is also a native Model Context Protocol server at \`https://isitalive.dev/mcp\` (Streamable HTTP, stateless, JSON responses). Tools: \`check_package\`, \`check_repo\`, and \`audit_manifest\`.
+
+\`\`\`
+# Claude Code
+claude mcp add --transport http isitalive https://isitalive.dev/mcp
+
+# Generic MCP client config
+{"mcpServers": {"isitalive": {"type": "http", "url": "https://isitalive.dev/mcp"}}}
+\`\`\`
+
+\`check_package\` and \`check_repo\` work anonymously. \`audit_manifest\` requires authentication — add \`"headers": {"Authorization": "Bearer sk_your_api_key"}\` to the server config.
+
 ## Agent Quick Start
 
 Start with package-first checks when you have a dependency name:

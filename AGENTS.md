@@ -63,6 +63,21 @@ src/
 - Keep PRs focused — one feature or fix per PR
 - Update `CHANGELOG.md` for user-facing changes
 
+## MCP Server
+
+IsItAlive is a native Model Context Protocol server at `https://isitalive.dev/mcp` (Streamable HTTP, stateless). Tools: `check_package`, `check_repo`, and `audit_manifest`.
+
+```bash
+# Claude Code
+claude mcp add --transport http isitalive https://isitalive.dev/mcp
+```
+
+```json
+{ "mcpServers": { "isitalive": { "type": "http", "url": "https://isitalive.dev/mcp" } } }
+```
+
+`check_package` and `check_repo` work anonymously. `audit_manifest` requires authentication — add `"headers": {"Authorization": "Bearer sk_your_api_key"}` to the server config.
+
 ## Quick Check API
 
 For package-first dependency checks:

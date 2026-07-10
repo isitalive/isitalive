@@ -22,6 +22,18 @@ curl -s https://isitalive.dev/api/check/github/vercel/next.js \
   -H "X-IsItAlive-Client: codex/1.0" | jq
 ```
 
+## MCP Server
+
+Add IsItAlive to any MCP-capable agent — tools for package checks, repo checks, and manifest audits:
+
+```bash
+claude mcp add --transport http isitalive https://isitalive.dev/mcp
+```
+
+```json
+{ "mcpServers": { "isitalive": { "type": "http", "url": "https://isitalive.dev/mcp" } } }
+```
+
 ## Agent Quick Start
 
 Start from packages when you have dependency names, and use repo checks only when you already know the GitHub owner/repo. Add `X-IsItAlive-Client` for aggregate product analytics; it is not authentication and must not contain secrets.
