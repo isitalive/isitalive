@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Open Graph share card image (`/assets/og-card.png`, 1200×630) for the landing and result pages, with `summary_large_image` Twitter cards and image dimension/alt metadata, so shared links render a branded preview instead of a bare text card.
+- Social media launch kit under `docs/social-media-kit.md` with positioning, proof points, and per-platform copy.
+
 - Core v1 agent audit API: `/api/check/manifest` alias, authenticated `/api/check/batch`, npm/Go lockfile formats (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.sum`), canonical dependency identity/state/freshness fields, and optional policy evaluation.
 - Package-first lookup for humans and agents: npm packages and Go modules can now be resolved via `/api/resolve/{ecosystem}/{packageName}` and checked via `/api/check/package/{ecosystem}/{packageName}` before falling back to GitHub repo-level maintenance-health scoring.
 - D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
@@ -27,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Refresh workflows now keep externally discovered repositories fresh on a tiered cadence, separate from user/request-tracked repositories.
 - `/health` now probes D1 in production.
 - Public, README, and agent-facing copy now positions Is It Alive as a maintenance-risk signal for humans and AI agents choosing open-source dependencies, not as a security scanner.
+- README now leads with the one-call value proposition, documents how to obtain an API key for the authenticated manifest/batch endpoints, and adds an explicit limitations section; result-page share metadata now leads with the score and verdict.
 
 ### Removed
 

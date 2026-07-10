@@ -13,12 +13,17 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Is It Alive? — Maintenance checks for dependencies &amp; AI agents</title>
-  <meta name="description" content="AI coding agents add open-source dependencies faster than anyone can vet them. IsItAlive scores whether any npm, Go, or GitHub project is still maintained — one number, inspectable evidence, an API your agent can call.">
+  <title>Is It Alive? — Is that dependency still maintained?</title>
+  <meta name="description" content="Check whether any npm package, Go module, or GitHub repo is still maintained. One 0–100 score from eight inspectable signals — free, no signup, with an API built for AI coding agents.">
   ${ogTags({
-    title: 'Is It Alive? — Maintenance checks for dependencies & AI agents',
-    description: 'AI coding agents add open-source dependencies faster than anyone can vet them. IsItAlive scores whether any npm, Go, or GitHub project is still maintained — one number, inspectable evidence, an API your agent can call.',
+    title: 'Is It Alive? — Is that dependency still maintained?',
+    description: 'Check whether any npm package, Go module, or GitHub repo is still maintained. One 0–100 score from eight inspectable signals — free, no signup, with an API built for AI coding agents.',
     url: 'https://isitalive.dev/',
+    image: 'https://isitalive.dev/assets/og-card.png',
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageAlt: "Is It Alive? — Don't let your AI agent install dead dependencies. curl isitalive.dev/api/check/package/npm/react returns score 96, verdict healthy.",
+    twitterCard: 'summary_large_image',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -602,7 +607,7 @@ export function landingPage(siteKey?: string, analyticsToken?: string): string {
   <div class="container">    <header>
 
       <h1>Don't let your agent install dead dependencies.</h1>
-      <p class="subtitle">AI agents add packages faster than anyone can vet them. Check whether any npm, Go, or GitHub project is still alive — one score, inspectable evidence, an API agents can call.</p>
+      <p class="subtitle">AI agents add packages faster than anyone can vet them. Check whether any npm, Go, or GitHub project is still alive — one score, eight inspectable signals, an API agents can call. Free, no signup.</p>
 
       <div class="search-container">
         <form action="/_check" method="POST" id="searchForm">

@@ -211,10 +211,14 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
   <title>${owner}/${repo} — Is It Alive?</title>
   <meta name="description" content="${owner}/${repo} maintenance-health score: ${result.score}/100 (${label}). Checked by Is It Alive?">
   ${ogTags({
-    title: `${rawOwner}/${rawRepo} — Is It Alive?`,
-    description: `${rawOwner}/${rawRepo} maintenance-health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
+    title: `${rawOwner}/${rawRepo}: ${result.score}/100 (${label}) — Is It Alive?`,
+    description: `Is ${rawOwner}/${rawRepo} still maintained? Maintenance-health score ${result.score}/100 (${label}), from eight observable signals: commits, releases, PR responsiveness, issue triage, contributors, and more.`,
     url: `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`,
-    image: badgeUrl,
+    image: 'https://isitalive.dev/assets/og-card.png',
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageAlt: `Is It Alive? maintenance-health check — ${rawOwner}/${rawRepo} scores ${result.score}/100 (${label}).`,
+    twitterCard: 'summary_large_image',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
