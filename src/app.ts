@@ -11,6 +11,7 @@ import { mcp } from './routes/mcp';
 import { packageCheck, packageResolve } from './routes/package';
 import { batch } from './routes/batch';
 import { badge } from './routes/badge';
+import { og } from './routes/og';
 import { audit } from './routes/manifest';
 import { githubWebhook } from './github/webhook';
 import { admin } from './routes/admin';
@@ -85,6 +86,8 @@ app.route('/api/check/manifest', audit);
 app.route('/api/check/batch', batch);
 app.route('/api/check', check);
 app.route('/api/badge', badge);
+// OG share cards — like badges: no auth/rate-limit, CDN-cached, fetched by crawlers
+app.route('/og', og);
 app.route('/api/manifest', audit);
 app.route('/mcp', mcp);
 

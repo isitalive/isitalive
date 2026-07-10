@@ -214,7 +214,11 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     title: `${rawOwner}/${rawRepo} — Is It Alive?`,
     description: `${rawOwner}/${rawRepo} maintenance-health score: ${result.score}/100 (${label}). Checked by Is It Alive?`,
     url: `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`,
-    image: badgeUrl,
+    image: `https://isitalive.dev/og/github/${encodedOwner}/${encodedRepo}.png`,
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageAlt: `${rawOwner}/${rawRepo} maintenance-health score: ${result.score}/100 (${label})`,
+    twitterCard: 'summary_large_image',
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

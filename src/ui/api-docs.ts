@@ -542,6 +542,13 @@ export function apiDocsPage(analyticsToken?: string): string {
 
     <div class="code-block"><span class="comment"># Markdown</span><br>[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)<br><br><span class="comment"># HTML</span><br>&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;<br>&nbsp;&nbsp;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;<br>&lt;/a&gt;</div>
 
+    <h3>Get Share Card (PNG)</h3>
+    <div class="endpoint">
+      <span class="endpoint-method method-get">GET</span>
+      <span class="endpoint-path">/og/{provider}/{owner}/{repo}.png</span>
+      <p class="endpoint-desc">A 1200×630 Open Graph card with the live score and verdict — the image behind shared result links. Use it directly in blog posts or dashboards. Edge-cached for 24 hours.</p>
+    </div>
+
     <h2>Rate Limits</h2>
     <p>IsItAlive is free to use for public maintenance-health checks. Infrastructure limits apply. Freshness is the same for anonymous and authenticated requests; request limits vary by authentication state.</p>
     <table class="tier-table">
