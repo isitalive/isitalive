@@ -45,6 +45,28 @@ describe('ogTags', () => {
     expect(html).not.toContain('twitter:image')
   })
 
+  it('includes image dimensions and alt text when provided', () => {
+    const html = ogTags({
+      ...base,
+      image: 'https://isitalive.dev/assets/og-card.png',
+      imageWidth: 1200,
+      imageHeight: 630,
+      imageAlt: 'Share card with "score" & <markup>',
+    })
+    expect(html).toContain('property="og:image:width" content="1200"')
+    expect(html).toContain('property="og:image:height" content="630"')
+    expect(html).toContain('property="og:image:alt" content="Share card with &quot;score&quot; &amp; &lt;markup&gt;"')
+    expect(html).toContain('name="twitter:image:alt" content="Share card with &quot;score&quot; &amp; &lt;markup&gt;"')
+  })
+
+  it('omits image dimension and alt tags when not provided', () => {
+    const html = ogTags({ ...base, image: 'https://isitalive.dev/assets/og-card.png' })
+    expect(html).not.toContain('og:image:width')
+    expect(html).not.toContain('og:image:height')
+    expect(html).not.toContain('og:image:alt')
+    expect(html).not.toContain('twitter:image:alt')
+  })
+
   it('HTML-escapes values to prevent XSS', () => {
     const html = ogTags({
       title: '<script>alert("xss")</script>',

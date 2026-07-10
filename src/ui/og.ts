@@ -11,6 +11,9 @@ export interface OgMeta {
   description: string
   url: string
   image?: string
+  imageWidth?: number
+  imageHeight?: number
+  imageAlt?: string
   type?: 'website' | 'article'
   twitterCard?: 'summary' | 'summary_large_image'
 }
@@ -41,8 +44,13 @@ export function ogTags(meta: OgMeta): string {
 
   if (meta.image) {
     const img = escapeHtml(meta.image)
-    lines.splice(5, 0, `<meta property="og:image" content="${img}">`)
+    const imageTags = [`<meta property="og:image" content="${img}">`]
+    if (meta.imageWidth) imageTags.push(`<meta property="og:image:width" content="${meta.imageWidth}">`)
+    if (meta.imageHeight) imageTags.push(`<meta property="og:image:height" content="${meta.imageHeight}">`)
+    if (meta.imageAlt) imageTags.push(`<meta property="og:image:alt" content="${escapeHtml(meta.imageAlt)}">`)
+    lines.splice(5, 0, ...imageTags)
     lines.push(`<meta name="twitter:image" content="${img}">`)
+    if (meta.imageAlt) lines.push(`<meta name="twitter:image:alt" content="${escapeHtml(meta.imageAlt)}">`)
   }
 
   return lines.join('\n  ')
