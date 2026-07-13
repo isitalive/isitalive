@@ -3,12 +3,13 @@
 //
 // Parses the standard format:
 //   ## [version] - date
-//   ### Added/Changed/Fixed/Removed
-//   - entry text
+//   ## [version](compare-url) (date)  (Release Please)
+//   ### Added/Changed/Deprecated/Removed/Fixed/Security/Breaking Changes
+//   - entry text (or * entry text)
 // ---------------------------------------------------------------------------
 
 export interface ChangeEntry {
-  type: 'added' | 'changed' | 'fixed' | 'removed';
+  type: 'added' | 'changed' | 'deprecated' | 'removed' | 'fixed' | 'security' | 'breaking';
   text: string;
 }
 
@@ -21,8 +22,12 @@ export interface Version {
 const TYPE_MAP: Record<string, ChangeEntry['type']> = {
   added: 'added',
   changed: 'changed',
-  fixed: 'fixed',
+  deprecated: 'deprecated',
   removed: 'removed',
+  fixed: 'fixed',
+  security: 'security',
+  'breaking changes': 'breaking',
+  '⚠ breaking changes': 'breaking',
 };
 
 /**
@@ -37,19 +42,23 @@ export function parseChangelog(markdown: string): Version[] {
     const line = rawLine.trim();
 
     // ## [0.3.0] - 2026-03-20
-    const versionMatch = line.match(/^##\s+\[([^\]]+)\]\s*-\s*(.+)$/);
+    // ## [0.3.0](compare-url) (2026-03-20)  (Release Please)
+    // ## [Unreleased]
+    const versionMatch = line.match(
+      /^##\s+\[([^\]]+)\](?:\([^)]*\))?\s*(?:-\s*(.+)|\((\d{4}-\d{2}-\d{2})\))?$/,
+    );
     if (versionMatch) {
       if (current) versions.push(current);
       current = {
         version: versionMatch[1],
-        date: versionMatch[2].trim(),
+        date: (versionMatch[2] ?? versionMatch[3] ?? '').trim(),
         entries: [],
       };
       currentType = null;
       continue;
     }
 
-    // ### Added / Changed / Fixed / Removed
+    // Full Keep a Changelog section vocabulary.
     const sectionMatch = line.match(/^###\s+(.+)$/);
     if (sectionMatch) {
       const key = sectionMatch[1].toLowerCase().trim();
@@ -57,8 +66,8 @@ export function parseChangelog(markdown: string): Version[] {
       continue;
     }
 
-    // - Entry text
-    const entryMatch = line.match(/^-\s+(.+)$/);
+    // - Entry text / * Release Please entry text
+    const entryMatch = line.match(/^[-*]\s+(.+)$/);
     if (entryMatch && current && currentType) {
       current.entries.push({
         type: currentType,

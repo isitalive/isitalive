@@ -58,10 +58,11 @@ src/
 ## PR and commit conventions
 
 - Use Conventional Commit style for both PR titles and commit messages: `type(scope): description`.
-- PR titles should be semantic-release friendly because the squash/merge title may drive versioning and changelog output.
+- PR titles must be semantic-release friendly because the squash/merge title drives versioning and changelog output.
 - Prefer standard types such as `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, or `ci`; include a concise scope when useful, for example `fix(ui): handle missing recent queries`.
 - Keep PRs focused — one feature or fix per PR
-- Update `CHANGELOG.md` for user-facing changes
+- Release Please maintains `CHANGELOG.md`, `package.json`, `package-lock.json`, and the OpenAPI version from merged Conventional Commit titles. Do not hand-edit released changelog sections during normal feature work.
+- `feat` triggers a minor release, `fix` triggers a patch release, and a `BREAKING CHANGE:` footer triggers a major release. Documentation, test, CI, and chore-only changes do not appear in release notes.
 
 ## MCP Server
 

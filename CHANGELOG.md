@@ -1,21 +1,32 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented here. Releases are prepared
+from Conventional Commit PR titles by Release Please.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/) and this
+project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.14.0] - 2026-07-13
 
 ### Added
 
-- Dynamic Open Graph share cards at `/og/{provider}/{owner}/{repo}.png`: result links shared on social platforms and chat apps now render a 1200×630 PNG card with the live score and verdict (rendered on-Worker via workers-og). Result pages use these per-repo cards; the landing page keeps the static `/assets/og-card.png` brand card.
-- MCP server at `/mcp` (Model Context Protocol over Streamable HTTP): `check_package`, `check_repo`, and `audit_manifest` tools so AI agents can install IsItAlive as a first-class tool. Anonymous access for checks, API key or OIDC for manifest audits, same rate limits as the REST API.
 - PyPI ecosystem support: `pypi` package checks and resolution via `/api/check/package/pypi/{name}` and `/api/resolve/pypi/{name}`, `pkg:pypi/...` purls in `/api/check/batch`, and `requirements.txt` / `pyproject.toml` (PEP 621 and Poetry) manifest audits.
+- MCP server at `/mcp` (Model Context Protocol over Streamable HTTP): `check_package`, `check_repo`, and `audit_manifest` tools so AI agents can install IsItAlive as a first-class tool. Anonymous access for checks, API key or OIDC for manifest audits, same rate limits as the REST API.
+- Dynamic Open Graph share cards at `/og/{provider}/{owner}/{repo}.png`: result links shared on social platforms and chat apps now render a 1200×630 PNG card with the live score and verdict (rendered on-Worker via workers-og). Result pages use these per-repo cards; the landing page keeps the static `/assets/og-card.png` brand card.
 - Open Graph share card image (`/assets/og-card.png`, 1200×630) for the landing and result pages, with `summary_large_image` Twitter cards and image dimension/alt metadata, so shared links render a branded preview instead of a bare text card.
 - Social media launch kit under `docs/social-media-kit.md` with positioning, proof points, and per-platform copy.
 
+### Changed
+
+- README now leads with the one-call value proposition, documents how to obtain an API key for authenticated manifest and batch endpoints, and calls out the limits of maintenance-health scoring.
+
+## [0.13.0] - 2026-06-17
+
+### Added
+
 - Core v1 agent audit API: `/api/check/manifest` alias, authenticated `/api/check/batch`, npm/Go lockfile formats (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.sum`), canonical dependency identity/state/freshness fields, and optional policy evaluation.
 - Package-first lookup for humans and agents: npm packages and Go modules can now be resolved via `/api/resolve/{ecosystem}/{packageName}` and checked via `/api/check/package/{ecosystem}/{packageName}` before falling back to GitHub repo-level maintenance-health scoring.
+- Optional `X-IsItAlive-Client` attribution for distinguishing agents, CLIs, CI, and browsers in aggregate analytics without using the header for authentication.
 - D1-backed analytics/storage refactor: Queue ingestion writes hot raw event rows, long-term daily rollups, API keys, waitlist signups, cache metadata, recent queries, first-seen, OIDC quota counters, and admin state into `isitalive-db`.
 - R2 JSONL archive for analytics events under partitioned `events/raw/type=.../dt=.../hour=...` keys, with `archive_batches` coverage tracking and Queue/DLQ retry handling.
 - D1 `discovered_repos` registry for repositories found through external feeds such as GitHub Trending.
@@ -33,7 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Refresh workflows now keep externally discovered repositories fresh on a tiered cadence, separate from user/request-tracked repositories.
 - `/health` now probes D1 in production.
 - Public, README, and agent-facing copy now positions Is It Alive as a maintenance-risk signal for humans and AI agents choosing open-source dependencies, not as a security scanner.
-- README now leads with the one-call value proposition, documents how to obtain an API key for the authenticated manifest/batch endpoints, and adds an explicit limitations section; result-page share metadata now leads with the score and verdict.
+- The landing page now leads with the AI-agent use case and exposes both `signals` and `drivers` in its API example.
 
 ### Removed
 
@@ -43,13 +54,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 
 - Analytics cache-hit paths no longer enqueue duplicate score-producing events, preventing cache traffic from inflating result score aggregates.
+- Result-page score history now reads the aggregate time series instead of the legacy raw-event path.
 - Trending score metadata now comes from the latest trusted score-bearing row instead of `MAX(latest_score)` / `MAX(latest_verdict)`, and excludes `cron` and `page-view` sources.
 - Page-view analytics beacons ignore client-supplied score/verdict values and store non-authoritative usage metadata only.
 - Queue aggregate upserts preserve latest score/verdict metadata when out-of-order events arrive.
-- Footer copyright text now omits the incorrect year and renders as `© Is It Alive` across shared UI pages.
 - `/_data/recent` now returns an empty list instead of 500 when a local or partially migrated D1 database does not have the optional `recent_queries` table.
+- Deploy checks now fail early when D1 migrations have not been applied.
 
-## [0.12.0] - 2026-04-21
+### Security
+
+- Hono was updated to a patched release and the CI audit was scoped to production dependencies that ship in the Worker.
+
+## [0.12.0] - 2026-04-24
 
 ### Security
 
@@ -74,10 +90,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **HTTP status remap for upstream errors on `/api/check`** — previously all non-404 upstream failures returned 502. Now: 504 on timeout, 503 on GitHub rate-limit and when the circuit is open, 502 only on other upstream errors. Responses also include `error_code` (see Added). Callers parsing the old `{error: string}` shape continue to work since the new fields are additive.
 
+### Fixed
 
+- Footer copyright text now omits the incorrect year and renders as `© Is It Alive` across shared UI pages.
+
+## [0.11.0] - 2026-03-30
 
 ### Added
 
+- Agent-ready check responses with a stable methodology version, normalized metrics, sampling metadata, machine-readable signals, and concise positive/negative drivers.
 - **Result page rework** — 2-column dashboard grid with stacked dep count chips, slim 30-day score history bar chart with hover tooltips, collapsible Embed & API section, install CTA, and skeleton shimmer loading
 - **Pricing page** with tier cards and Turnstile-protected waitlist email collection (constant-time response, SHA-256 hashed KV keys)
 - **ADR-007: GTM & Billing** — Go-to-market strategy and billing architecture
