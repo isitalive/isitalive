@@ -147,4 +147,13 @@ if (existsSync(jsSrc)) {
   console.log('  ✅ js/ (copied from src/js/)');
 }
 
+// Binary assets (Open Graph share card, etc.) — served as static assets
+const assetsSrc = resolve(ROOT, 'src/assets');
+if (existsSync(assetsSrc)) {
+  const assetsDest = resolve(OUT, 'assets');
+  rmSync(assetsDest, { recursive: true, force: true });
+  cpSync(assetsSrc, assetsDest, { recursive: true });
+  console.log('  ✅ assets/ (copied from src/assets/)');
+}
+
 console.log(`\n✨ Done — static assets written to public/`);
