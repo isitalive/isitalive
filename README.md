@@ -10,7 +10,7 @@ curl -s https://isitalive.dev/api/check/package/npm/react | jq
 # { "score": 96, "verdict": "healthy", "signals": [...], "drivers": [...] }
 ```
 
-No signup. No API key for single checks. Works with npm packages, Go modules, and any public GitHub repository.
+No signup. No API key for single checks. Works with npm packages, Go modules, PyPI packages, and any public GitHub repository.
 
 ## Why
 
@@ -29,6 +29,9 @@ This is a maintenance-risk signal, **not** a security, license, or compliance ve
 ```bash
 # npm package
 curl -s https://isitalive.dev/api/check/package/npm/react | jq
+
+# Python package
+curl -s https://isitalive.dev/api/check/package/pypi/requests | jq
 
 # Go module
 curl -s https://isitalive.dev/api/check/package/go/golang.org/x/crypto | jq
@@ -49,7 +52,17 @@ The scoring methodology — weights, thresholds, sampling strategy, and known bl
 
 ## Put it where dependencies enter your codebase
 
-**AI agents.** The API is built to be called by Claude Code, Codex, Cursor, or any MCP-style tool: [llms.txt](https://isitalive.dev/llms.txt), [openapi.json](https://isitalive.dev/openapi.json), and [ai-plugin.json](https://isitalive.dev/.well-known/ai-plugin.json) are all published, responses include machine-readable `signals` and `drivers` rationale, and an optional `X-IsItAlive-Client: my-agent/0.3` header attributes traffic (it is not authentication and must not contain secrets).
+**AI agents.** IsItAlive is a native [MCP](https://modelcontextprotocol.io) server — add it to Claude Code, Codex, Cursor, or any MCP-capable agent and it gets `check_package`, `check_repo`, and `audit_manifest` as first-class tools:
+
+```bash
+claude mcp add --transport http isitalive https://isitalive.dev/mcp
+```
+
+```json
+{ "mcpServers": { "isitalive": { "type": "http", "url": "https://isitalive.dev/mcp" } } }
+```
+
+Prefer raw HTTP? [llms.txt](https://isitalive.dev/llms.txt), [openapi.json](https://isitalive.dev/openapi.json), and [ai-plugin.json](https://isitalive.dev/.well-known/ai-plugin.json) are all published, responses include machine-readable `signals` and `drivers` rationale, and an optional `X-IsItAlive-Client: my-agent/0.3` header attributes traffic (it is not authentication and must not contain secrets).
 
 ```bash
 curl -s https://isitalive.dev/api/check/package/npm/react \
@@ -91,11 +104,11 @@ curl -s -X POST https://isitalive.dev/api/check/batch \
 
 These endpoints require authentication. In GitHub Actions on public repos, OIDC handles it automatically. Standalone API keys are hand-issued while the service is in its free phase — email [hi@isitalive.dev](mailto:hi@isitalive.dev) or open an issue.
 
-Supported formats: `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`. Full API reference: [isitalive.dev/api](https://isitalive.dev/api).
+Supported formats: `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`, `requirements.txt`, `pyproject.toml`. Full API reference: [isitalive.dev/api](https://isitalive.dev/api).
 
 ## Honest limitations
 
-- **Ecosystems**: npm and Go today (plus any public GitHub repo). Python and Rust are on the radar.
+- **Ecosystems**: npm, Go, and PyPI today (plus any public GitHub repo). Rust is on the radar.
 - **Signals are GitHub-based**: packages resolve to their linked GitHub repository. A package published from a monorepo inherits the monorepo's activity, and projects hosted elsewhere can't be scored yet.
 - **The score is a heuristic**: thresholds are published, sampling is disclosed per signal, and archived repos hard-zero — but no single number replaces reading the `signals` and `drivers` for anything you're about to build on.
 - **Rate limits are infrastructure protection**: 5 req/min anonymous, 50 req/min authenticated.

@@ -212,4 +212,67 @@ describe('resolvePackageDependency', () => {
     expect(result.resolved.github).toBeNull()
     expect(result.resolved.unresolvedReason).toBe('package_not_found')
   })
+
+  it('normalizes PyPI names per PEP 503', () => {
+    expect(normalizePackageName('pypi', 'Django')).toBe('django')
+    expect(normalizePackageName('pypi', 'typing_extensions')).toBe('typing-extensions')
+    expect(normalizePackageName('pypi', 'zope.interface')).toBe('zope-interface')
+    expect(normalizePackageName('pypi', 'requests==2.0')).toBeNull()
+    expect(normalizePackageName('pypi', '-leading-hyphen')).toBeNull()
+  })
+
+  it('resolves PyPI packages from project_urls source entries', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe('https://pypi.org/pypi/requests/json')
+      return Response.json({
+        info: {
+          home_page: 'https://requests.readthedocs.io',
+          project_urls: {
+            Documentation: 'https://requests.readthedocs.io',
+            Source: 'https://github.com/psf/requests',
+          },
+        },
+      })
+    }))
+
+    const result = await resolvePackageDependency('pypi', 'requests', {} as Env)
+
+    expect(result.package).toEqual({ ecosystem: 'pypi', name: 'requests', version: '' })
+    expect(result.resolved.github).toEqual({ owner: 'psf', repo: 'requests' })
+    expect(result.resolved.resolvedFrom).toBe('registry')
+  })
+
+  it('falls back to home_page for PyPI packages hosted on GitHub', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      info: {
+        home_page: 'https://github.com/pallets/flask',
+        project_urls: null,
+      },
+    })))
+
+    const result = await resolvePackageDependency('pypi', 'flask', {} as Env)
+
+    expect(result.resolved.github).toEqual({ owner: 'pallets', repo: 'flask' })
+    expect(result.resolved.resolvedFrom).toBe('registry')
+  })
+
+  it('marks PyPI packages without GitHub metadata as unresolved', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      info: { home_page: 'https://example.com', project_urls: { Homepage: 'https://example.com' } },
+    })))
+
+    const result = await resolvePackageDependency('pypi', 'internal-pkg', {} as Env)
+
+    expect(result.resolved.github).toBeNull()
+    expect(result.resolved.unresolvedReason).toBe('no_github_repo')
+  })
+
+  it('marks missing PyPI packages with package_not_found', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })))
+
+    const result = await resolvePackageDependency('pypi', 'missing-package', {} as Env)
+
+    expect(result.resolved.github).toBeNull()
+    expect(result.resolved.unresolvedReason).toBe('package_not_found')
+  })
 })

@@ -4,6 +4,7 @@
 
 import { parse as parseYaml } from 'yaml';
 import { parse as parseYarnLock } from '@yarnpkg/lockfile';
+import { parse as parseToml } from 'smol-toml';
 
 export type ManifestFormat =
   | 'go.mod'
@@ -11,11 +12,13 @@ export type ManifestFormat =
   | 'package.json'
   | 'package-lock.json'
   | 'pnpm-lock.yaml'
-  | 'yarn.lock';
+  | 'yarn.lock'
+  | 'requirements.txt'
+  | 'pyproject.toml';
 
 export type DependencyType = 'direct' | 'dev' | 'transitive';
 
-export type ParsedEcosystem = 'npm' | 'go' | 'github' | 'unsupported';
+export type ParsedEcosystem = 'npm' | 'go' | 'pypi' | 'github' | 'unsupported';
 
 export interface ParsedDep {
   /** Package name: "lodash" (npm) or "github.com/zitadel/zitadel" (go) */
@@ -384,6 +387,158 @@ function dedupeDeps(deps: ParsedDep[]): ParsedDep[] {
 }
 
 // ---------------------------------------------------------------------------
+// Python parsers — requirements.txt and pyproject.toml
+// ---------------------------------------------------------------------------
+
+/** PEP 503 name normalization: lowercase, runs of -_. collapse to a hyphen */
+export function normalizePypiName(name: string): string {
+  return name.toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+/**
+ * Parse a single PEP 508 requirement string into a dep.
+ * Handles extras (`name[extra]`), version specifiers, environment markers
+ * (`; python_version < "3.11"`), and direct URL references (`name @ url`).
+ * Returns null for lines that don't declare a named package.
+ */
+export function parsePep508(spec: string, dev = false, sourceFormat: ManifestFormat = 'requirements.txt'): ParsedDep | null {
+  // Strip environment markers and comments
+  const base = spec.split(';')[0].split('#')[0].trim();
+  if (!base) return null;
+
+  // name[extras] @ url  |  name[extras] (specifier)  |  name[extras] specifier
+  const match = base.match(/^([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)\s*(?:\[[^\]]*\])?\s*(.*)$/);
+  if (!match) return null;
+
+  const name = normalizePypiName(match[1]);
+  let version = '';
+  const rest = match[2].trim();
+  if (rest && !rest.startsWith('@')) {
+    // Version specifier: strip parentheses, keep the raw constraint
+    version = rest.replace(/^\(|\)$/g, '').trim();
+  }
+
+  return makeDep({
+    name,
+    version,
+    dev,
+    ecosystem: 'pypi',
+    dependencyType: dev ? 'dev' : 'direct',
+    sourceFormat,
+  });
+}
+
+/**
+ * Parse a requirements.txt file (pip requirements format).
+ * Skips comments, pip options (-r, -e, --index-url, ...), bare URLs,
+ * and local paths — only named PEP 508 requirements are returned.
+ */
+export function parseRequirementsTxt(content: string): ParsedDep[] {
+  const deps: ParsedDep[] = [];
+
+  // Join backslash line continuations before splitting into logical lines
+  const logical = content.replace(/\\\r?\n/g, ' ');
+
+  for (const line of logical.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    // pip options: -r other.txt, -e ., --index-url, --hash, etc.
+    if (trimmed.startsWith('-')) continue;
+    // Bare URLs and local paths have no registry name to resolve
+    if (/^(https?|git\+|file:)/i.test(trimmed) || trimmed.startsWith('.') || trimmed.startsWith('/')) continue;
+
+    const dep = parsePep508(trimmed);
+    if (dep) deps.push(dep);
+  }
+
+  return dedupeDeps(deps);
+}
+
+/**
+ * Parse a pyproject.toml and extract dependencies.
+ * Supports PEP 621 (`[project] dependencies` + `[project.optional-dependencies]`)
+ * and Poetry (`[tool.poetry.dependencies]`, dependency groups, and legacy
+ * `[tool.poetry.dev-dependencies]`).
+ */
+export function parsePyprojectToml(content: string): ParsedDep[] {
+  let doc: Record<string, any>;
+  try {
+    doc = parseToml(content) as Record<string, any>;
+  } catch {
+    throw new Error('Invalid pyproject.toml: could not parse TOML');
+  }
+
+  const deps: ParsedDep[] = [];
+
+  // ── PEP 621 ────────────────────────────────────────────────────────
+  const project = doc.project;
+  if (project && typeof project === 'object') {
+    for (const spec of asStringArray(project.dependencies)) {
+      const dep = parsePep508(spec, false, 'pyproject.toml');
+      if (dep) deps.push(dep);
+    }
+    const optional = project['optional-dependencies'];
+    if (optional && typeof optional === 'object') {
+      for (const specs of Object.values(optional)) {
+        for (const spec of asStringArray(specs)) {
+          const dep = parsePep508(spec, true, 'pyproject.toml');
+          if (dep) deps.push(dep);
+        }
+      }
+    }
+  }
+
+  // ── Poetry ─────────────────────────────────────────────────────────
+  const poetry = doc.tool?.poetry;
+  if (poetry && typeof poetry === 'object') {
+    deps.push(...parsePoetryTable(poetry.dependencies, false));
+    deps.push(...parsePoetryTable(poetry['dev-dependencies'], true));
+    if (poetry.group && typeof poetry.group === 'object') {
+      for (const group of Object.values(poetry.group as Record<string, any>)) {
+        deps.push(...parsePoetryTable(group?.dependencies, true));
+      }
+    }
+  }
+
+  return dedupeDeps(deps);
+}
+
+/** Poetry dependency tables: name = "^1.0" or name = { version = "^1.0", ... } */
+function parsePoetryTable(table: unknown, dev: boolean): ParsedDep[] {
+  const deps: ParsedDep[] = [];
+  if (!table || typeof table !== 'object') return deps;
+
+  for (const [rawName, value] of Object.entries(table as Record<string, unknown>)) {
+    const name = normalizePypiName(rawName);
+    if (name === 'python') continue; // interpreter constraint, not a package
+    let version = '';
+    if (typeof value === 'string') {
+      version = value;
+    } else if (value && typeof value === 'object') {
+      const spec = value as { version?: unknown; git?: unknown; path?: unknown; url?: unknown };
+      // Git/path/url deps have no PyPI registry entry to resolve
+      if (typeof spec.version === 'string') version = spec.version;
+      else if (spec.git || spec.path || spec.url) continue;
+    }
+    deps.push(makeDep({
+      name,
+      version,
+      dev,
+      ecosystem: 'pypi',
+      dependencyType: dev ? 'dev' : 'direct',
+      sourceFormat: 'pyproject.toml',
+    }));
+  }
+
+  return deps;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+// ---------------------------------------------------------------------------
 // Format detection + dispatch
 // ---------------------------------------------------------------------------
 
@@ -401,6 +556,10 @@ export function parseManifest(format: ManifestFormat, content: string): ParsedDe
       return parsePnpmLock(content);
     case 'yarn.lock':
       return parseYarnLockFile(content);
+    case 'requirements.txt':
+      return parseRequirementsTxt(content);
+    case 'pyproject.toml':
+      return parsePyprojectToml(content);
     default:
       throw new Error(`Unsupported format: ${format}`);
   }

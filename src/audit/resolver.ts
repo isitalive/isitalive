@@ -2,9 +2,10 @@
 // Resolver — maps package names to GitHub owner/repo
 //
 // Strategies by ecosystem:
-//   Go:  Direct extraction from github.com paths, go-import meta tags for
-//        vanity URLs, known mappings for gopkg.in
-//   npm: npm registry API → repository.url field
+//   Go:   Direct extraction from github.com paths, go-import meta tags for
+//         vanity URLs, known mappings for gopkg.in
+//   npm:  npm registry API → repository.url field
+//   PyPI: PyPI JSON API → project_urls / home_page fields
 // ---------------------------------------------------------------------------
 
 import type { ParsedDep } from './parsers';
@@ -112,7 +113,9 @@ async function resolveSingle(
   // Resolve fresh
   const result = dep.ecosystem === 'go'
     ? await resolveGo(dep)
-    : await resolveNpm(dep);
+    : dep.ecosystem === 'pypi'
+      ? await resolvePypi(dep)
+      : await resolveNpm(dep);
 
   // Cache the result (even nulls to avoid re-fetching)
   const cacheValue = result.github
@@ -328,6 +331,59 @@ async function resolveNpm(dep: ParsedDep): Promise<ResolvedDep> {
     const homepage: string | undefined = data.homepage;
     if (homepage) {
       const gh = extractGitHub(homepage);
+      if (gh) return { ...dep, github: gh, resolvedFrom: 'registry' };
+    }
+
+    return { ...dep, github: null, resolvedFrom: null, unresolvedReason: 'no_github_repo' };
+  } catch {
+    return { ...dep, github: null, resolvedFrom: null, unresolvedReason: 'registry_timeout' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PyPI resolver
+// ---------------------------------------------------------------------------
+
+/** project_urls keys that most reliably point at the source repository */
+const PYPI_SOURCE_URL_KEYS = [
+  'source', 'source code', 'repository', 'code', 'github', 'homepage', 'home',
+]
+
+async function resolvePypi(dep: ParsedDep): Promise<ResolvedDep> {
+  try {
+    const res = await fetchWithTimeout(`https://pypi.org/pypi/${encodeURIComponent(dep.name)}/json`, {
+      headers: { Accept: 'application/json' },
+      timeoutMs: 3_000,
+      timeoutMessage: `PyPI registry lookup timed out after 3000ms for ${dep.name}`,
+    });
+
+    if (!res.ok) {
+      return {
+        ...dep,
+        github: null,
+        resolvedFrom: null,
+        unresolvedReason: res.status === 404 ? 'package_not_found' : 'registry_error',
+      };
+    }
+
+    const data = await res.json() as { info?: { project_urls?: Record<string, string> | null; home_page?: string | null } };
+    const info = data.info ?? {};
+    const projectUrls = info.project_urls ?? {};
+
+    // Prefer explicit source/repository URLs, then any project URL, then home_page
+    const candidates: string[] = [];
+    for (const key of PYPI_SOURCE_URL_KEYS) {
+      for (const [label, url] of Object.entries(projectUrls)) {
+        if (label.toLowerCase() === key && typeof url === 'string') candidates.push(url);
+      }
+    }
+    for (const url of Object.values(projectUrls)) {
+      if (typeof url === 'string') candidates.push(url);
+    }
+    if (typeof info.home_page === 'string' && info.home_page) candidates.push(info.home_page);
+
+    for (const candidate of candidates) {
+      const gh = extractGitHub(candidate);
       if (gh) return { ...dep, github: gh, resolvedFrom: 'registry' };
     }
 

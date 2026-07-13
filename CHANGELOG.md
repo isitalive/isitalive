@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Dynamic Open Graph share cards at `/og/{provider}/{owner}/{repo}.png`: result links shared on social platforms and chat apps now render a 1200×630 PNG card with the live score and verdict (rendered on-Worker via workers-og). Result pages use these per-repo cards; the landing page keeps the static `/assets/og-card.png` brand card.
+- MCP server at `/mcp` (Model Context Protocol over Streamable HTTP): `check_package`, `check_repo`, and `audit_manifest` tools so AI agents can install IsItAlive as a first-class tool. Anonymous access for checks, API key or OIDC for manifest audits, same rate limits as the REST API.
+- PyPI ecosystem support: `pypi` package checks and resolution via `/api/check/package/pypi/{name}` and `/api/resolve/pypi/{name}`, `pkg:pypi/...` purls in `/api/check/batch`, and `requirements.txt` / `pyproject.toml` (PEP 621 and Poetry) manifest audits.
 - Open Graph share card image (`/assets/og-card.png`, 1200×630) for the landing and result pages, with `summary_large_image` Twitter cards and image dimension/alt metadata, so shared links render a branded preview instead of a bare text card.
 - Social media launch kit under `docs/social-media-kit.md` with positioning, proof points, and per-platform copy.
 

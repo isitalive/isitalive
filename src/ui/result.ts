@@ -214,7 +214,7 @@ export function resultPage(result: ScoringResult, rawOwner: string, rawRepo: str
     title: `${rawOwner}/${rawRepo}: ${result.score}/100 (${label}) — Is It Alive?`,
     description: `Is ${rawOwner}/${rawRepo} still maintained? Maintenance-health score ${result.score}/100 (${label}), from eight observable signals: commits, releases, PR responsiveness, issue triage, contributors, and more.`,
     url: `https://isitalive.dev/github/${encodedOwner}/${encodedRepo}`,
-    image: 'https://isitalive.dev/assets/og-card.png',
+    image: `https://isitalive.dev/og/github/${encodedOwner}/${encodedRepo}.png`,
     imageWidth: 1200,
     imageHeight: 630,
     imageAlt: `Is It Alive? maintenance-health check — ${rawOwner}/${rawRepo} scores ${result.score}/100 (${label}).`,

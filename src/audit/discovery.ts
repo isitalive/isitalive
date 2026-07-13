@@ -25,6 +25,8 @@ const MANIFEST_FILENAMES: Record<string, ManifestFormat> = {
   'yarn.lock': 'yarn.lock',
   'go.mod': 'go.mod',
   'go.sum': 'go.sum',
+  'requirements.txt': 'requirements.txt',
+  'pyproject.toml': 'pyproject.toml',
 }
 
 const DISCOVERY_CACHE_PREFIX = 'discover:'

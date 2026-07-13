@@ -92,6 +92,9 @@ export function buildPackagePurl(
       if (!goNamespace || !goName) return null
       return new PackageURL('golang', goNamespace, goName, version || null, null, null).toString()
     }
+    if (ecosystem === 'pypi') {
+      return new PackageURL('pypi', null, name, version || null, null, null).toString()
+    }
     if (ecosystem === 'github') {
       const [owner, repo] = name.split('/')
       if (!owner || !repo) return null
@@ -123,6 +126,10 @@ export function parseSupportedPurl(value: string): {
   if (parsed.type === 'golang') {
     const name = parsed.namespace ? `${parsed.namespace}/${parsed.name}` : parsed.name
     return { ecosystem: 'go', name, version: parsed.version ?? '' }
+  }
+
+  if (parsed.type === 'pypi') {
+    return { ecosystem: 'pypi', name: parsed.name, version: parsed.version ?? '' }
   }
 
   if (parsed.type === 'github' && parsed.namespace) {

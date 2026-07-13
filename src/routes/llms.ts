@@ -36,9 +36,23 @@ IsItAlive is free to use for public maintenance-health checks. Infrastructure li
 - JSON score, verdict, signals, and drivers via \`/api/check\`
 - Package-first checks via \`/api/check/package\` and package-to-GitHub resolution via \`/api/resolve\`
 - SVG README badges
-- Manifest and lockfile audits for \`package.json\`, \`package-lock.json\`, \`pnpm-lock.yaml\`, \`yarn.lock\`, \`go.mod\`, and \`go.sum\` with API key or public GitHub Actions OIDC
+- Manifest and lockfile audits for \`package.json\`, \`package-lock.json\`, \`pnpm-lock.yaml\`, \`yarn.lock\`, \`go.mod\`, \`go.sum\`, \`requirements.txt\`, and \`pyproject.toml\` with API key or public GitHub Actions OIDC
 - OpenAPI, \`llms.txt\`, and AI plugin manifest for agents
 - Methodology, trending, recent queries, and score history where data is available
+
+## MCP Server
+
+IsItAlive is also a native Model Context Protocol server at \`https://isitalive.dev/mcp\` (Streamable HTTP, stateless, JSON responses). Tools: \`check_package\`, \`check_repo\`, and \`audit_manifest\`.
+
+\`\`\`
+# Claude Code
+claude mcp add --transport http isitalive https://isitalive.dev/mcp
+
+# Generic MCP client config
+{"mcpServers": {"isitalive": {"type": "http", "url": "https://isitalive.dev/mcp"}}}
+\`\`\`
+
+\`check_package\` and \`check_repo\` work anonymously. \`audit_manifest\` requires authentication — add \`"headers": {"Authorization": "Bearer sk_your_api_key"}\` to the server config.
 
 ## Agent Quick Start
 
@@ -66,13 +80,14 @@ curl -s -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,sign
 ### Check Package Health
 \`GET /api/check/package/{ecosystem}/{packageName}\`
 
-Resolves an npm package or Go module to GitHub, then returns the normal maintenance-health response for that repository with package context attached. Supported ecosystems: \`npm\`, \`go\`.
+Resolves an npm package, Go module, or PyPI package to GitHub, then returns the normal maintenance-health response for that repository with package context attached. Supported ecosystems: \`npm\`, \`go\`, \`pypi\`.
 
 **Examples:**
 \`\`\`
 curl https://isitalive.dev/api/check/package/npm/react
 curl 'https://isitalive.dev/api/check/package/npm?name=@types/node'
 curl https://isitalive.dev/api/check/package/go/golang.org/x/crypto
+curl https://isitalive.dev/api/check/package/pypi/requests
 \`\`\`
 
 **Resolve only:**
@@ -110,7 +125,7 @@ curl https://isitalive.dev/api/check/github/vercel/next.js
 ### Batch Check Dependencies
 \`POST /api/check/batch\`
 
-**Requires authentication.** Accepts up to 200 mixed inputs: npm/Go package descriptors, package URLs (purls), or GitHub owner/repo objects. Returns the same maintenance-health result shape used by manifest audits, plus \`batchHash\` and \`results[]\`.
+**Requires authentication.** Accepts up to 200 mixed inputs: npm/Go/PyPI package descriptors, package URLs (purls), or GitHub owner/repo objects. Returns the same maintenance-health result shape used by manifest audits, plus \`batchHash\` and \`results[]\`.
 
 **Request body (JSON):**
 - \`items[]\`: \`{kind:"package", ecosystem, name, version?}\`, \`{kind:"purl", purl}\`, or \`{kind:"github", owner, repo, version?}\`
@@ -136,7 +151,7 @@ curl -X POST https://isitalive.dev/api/check/batch \\
 - \`include=signals\`: include per-dependency signal breakdowns
 
 **Request body (JSON):**
-- \`format\`: "package.json" | "package-lock.json" | "pnpm-lock.yaml" | "yarn.lock" | "go.mod" | "go.sum"
+- \`format\`: "package.json" | "package-lock.json" | "pnpm-lock.yaml" | "yarn.lock" | "go.mod" | "go.sum" | "requirements.txt" | "pyproject.toml"
 - \`content\`: Raw manifest file content
 - \`policy\`, \`maxAgeSeconds\`, \`preferFresh\`: optional policy/freshness controls
 

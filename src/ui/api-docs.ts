@@ -316,25 +316,30 @@ export function apiDocsPage(analyticsToken?: string): string {
     <p>Start from package names when possible. Add <span class="inline-code">X-IsItAlive-Client</span> so aggregate analytics can distinguish agent and client integrations. This header is not authentication and should not contain secrets.</p>
     <div class="code-block"><span class="comment"># Package-first check</span><br>curl -s https://isitalive.dev/api/check/package/npm/react \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> | jq<br><br><span class="comment"># Repo-first check when you already know owner/repo</span><br>curl -s https://isitalive.dev/api/check/github/vercel/next.js \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> | jq<br><br><span class="comment"># Manifest audit; retry after retryAfterMs when complete is false</span><br>curl -s -X POST 'https://isitalive.dev/api/manifest?include=drivers,metrics,signals' \\<br>&nbsp;&nbsp;-H <span class="str">"Authorization: Bearer sk_your_api_key"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"X-IsItAlive-Client: codex/1.0"</span> \\<br>&nbsp;&nbsp;-H <span class="str">"Content-Type: application/json"</span> \\<br>&nbsp;&nbsp;-d <span class="str">'{"format":"package.json","content":"&lt;package.json contents&gt;"}'</span> | jq</div>
 
+    <h2>MCP Server</h2>
+    <p>IsItAlive ships a native <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a> server, so agents can call <span class="inline-code">check_package</span>, <span class="inline-code">check_repo</span>, and <span class="inline-code">audit_manifest</span> as first-class tools instead of raw HTTP. Streamable HTTP transport, no session state, works anonymously.</p>
+    <div class="code-block"><span class="comment"># Claude Code</span><br>claude mcp add --transport http isitalive https://isitalive.dev/mcp<br><br><span class="comment"># Generic MCP client config</span><br>{<br>&nbsp;&nbsp;<span class="str">"mcpServers"</span>: {<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="str">"isitalive"</span>: { <span class="str">"type"</span>: <span class="str">"http"</span>, <span class="str">"url"</span>: <span class="str">"https://isitalive.dev/mcp"</span> }<br>&nbsp;&nbsp;}<br>}</div>
+    <p><span class="inline-code">audit_manifest</span> requires authentication — add <span class="inline-code">"headers": {"Authorization": "Bearer sk_your_api_key"}</span> to the server config. <span class="inline-code">check_package</span> and <span class="inline-code">check_repo</span> work without a key at the anonymous rate limit.</p>
+
     <h2>Endpoints</h2>
 
     <h3>Check Package Maintenance</h3>
     <div class="endpoint">
       <span class="endpoint-method method-get">GET</span>
       <span class="endpoint-path">/api/check/package/{ecosystem}/{packageName}</span>
-      <p class="endpoint-desc">Resolve an npm package or Go module to GitHub, then return the normal maintenance-health score with package context attached. Use this when an agent or human starts from a dependency name such as <span class="inline-code">react</span>, <span class="inline-code">@types/node</span>, or <span class="inline-code">golang.org/x/crypto</span>. Query fallback: <span class="inline-code">/api/check/package/{ecosystem}?name=...</span>.</p>
+      <p class="endpoint-desc">Resolve an npm package, Go module, or PyPI package to GitHub, then return the normal maintenance-health score with package context attached. Use this when an agent or human starts from a dependency name such as <span class="inline-code">react</span>, <span class="inline-code">@types/node</span>, <span class="inline-code">golang.org/x/crypto</span>, or <span class="inline-code">requests</span>. Query fallback: <span class="inline-code">/api/check/package/{ecosystem}?name=...</span>.</p>
 
       <table class="params-table">
         <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
         <tr>
           <td><span class="param-name">ecosystem</span><span class="param-required">required</span></td>
           <td><span class="param-type">string</span></td>
-          <td><span class="inline-code">npm</span> or <span class="inline-code">go</span></td>
+          <td><span class="inline-code">npm</span>, <span class="inline-code">go</span>, or <span class="inline-code">pypi</span></td>
         </tr>
         <tr>
           <td><span class="param-name">packageName</span><span class="param-required">required</span></td>
           <td><span class="param-type">string</span></td>
-          <td>Package name or Go module path. Use URL encoding when needed.</td>
+          <td>Package name, Go module path, or PyPI package name. Use URL encoding when needed.</td>
         </tr>
         <tr>
           <td><span class="param-name">include</span></td>
@@ -471,12 +476,12 @@ export function apiDocsPage(analyticsToken?: string): string {
     <div class="endpoint">
       <span class="endpoint-method" style="background: rgba(99,102,241,0.15); color: #818cf8;">POST</span>
       <span class="endpoint-path">/api/manifest</span>
-      <p class="endpoint-desc">Upload a <span class="inline-code">package.json</span>, <span class="inline-code">package-lock.json</span>, <span class="inline-code">pnpm-lock.yaml</span>, <span class="inline-code">yarn.lock</span>, <span class="inline-code">go.mod</span>, or <span class="inline-code">go.sum</span> and get a scored maintenance-health report for every dependency. Alias: <span class="inline-code">/api/check/manifest</span>. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
+      <p class="endpoint-desc">Upload a <span class="inline-code">package.json</span>, <span class="inline-code">package-lock.json</span>, <span class="inline-code">pnpm-lock.yaml</span>, <span class="inline-code">yarn.lock</span>, <span class="inline-code">go.mod</span>, <span class="inline-code">go.sum</span>, <span class="inline-code">requirements.txt</span>, or <span class="inline-code">pyproject.toml</span> and get a scored maintenance-health report for every dependency. Alias: <span class="inline-code">/api/check/manifest</span>. Authentication is required: API key for any repo, or GitHub Actions OIDC for public repos. Add <span class="inline-code">?include=drivers,metrics,signals</span> for richer agent output.</p>
     </div>
 
     <h3>Request Body</h3>
     <div class="field-list">
-      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"package.json"</span>, <span class="inline-code">"package-lock.json"</span>, <span class="inline-code">"pnpm-lock.yaml"</span>, <span class="inline-code">"yarn.lock"</span>, <span class="inline-code">"go.mod"</span>, or <span class="inline-code">"go.sum"</span></span></div>
+      <div class="field-item"><span class="field-name">format</span><span class="field-desc"><span class="inline-code">"package.json"</span>, <span class="inline-code">"package-lock.json"</span>, <span class="inline-code">"pnpm-lock.yaml"</span>, <span class="inline-code">"yarn.lock"</span>, <span class="inline-code">"go.mod"</span>, <span class="inline-code">"go.sum"</span>, <span class="inline-code">"requirements.txt"</span>, or <span class="inline-code">"pyproject.toml"</span></span></div>
       <div class="field-item"><span class="field-name">content</span><span class="field-desc">Raw manifest file content (max 512KB)</span></div>
       <div class="field-item"><span class="field-name">policy</span><span class="field-desc">Optional policy thresholds for score, unresolved deps, confidence, dev deps, and release age</span></div>
       <div class="field-item"><span class="field-name">maxAgeSeconds</span><span class="field-desc">Optional best-effort freshness target; stale cached data is flagged with <span class="inline-code">stale_data</span></span></div>
@@ -536,6 +541,13 @@ export function apiDocsPage(analyticsToken?: string): string {
     </div>
 
     <div class="code-block"><span class="comment"># Markdown</span><br>[![Is It Alive?](https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO)](https://isitalive.dev/github/YOUR_ORG/YOUR_REPO)<br><br><span class="comment"># HTML</span><br>&lt;a href="https://isitalive.dev/github/YOUR_ORG/YOUR_REPO"&gt;<br>&nbsp;&nbsp;&lt;img src="https://isitalive.dev/api/badge/github/YOUR_ORG/YOUR_REPO" alt="Is It Alive?"&gt;<br>&lt;/a&gt;</div>
+
+    <h3>Get Share Card (PNG)</h3>
+    <div class="endpoint">
+      <span class="endpoint-method method-get">GET</span>
+      <span class="endpoint-path">/og/{provider}/{owner}/{repo}.png</span>
+      <p class="endpoint-desc">A 1200×630 Open Graph card with the live score and verdict — the image behind shared result links. Use it directly in blog posts or dashboards. Edge-cached for 24 hours.</p>
+    </div>
 
     <h2>Rate Limits</h2>
     <p>IsItAlive is free to use for public maintenance-health checks. Infrastructure limits apply. Freshness is the same for anonymous and authenticated requests; request limits vary by authentication state.</p>

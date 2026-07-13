@@ -56,6 +56,11 @@ async function drainExecutionCtx(ctx: ExecutionContext & { pending: Promise<unkn
   }
 }
 
+/** Relative dates keep scoring fixtures from decaying as wall-clock time passes */
+function daysAgoIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+}
+
 function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProjectData {
   return {
     archived: false,
@@ -69,8 +74,8 @@ function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProject
     homepageUrl: null,
     language: 'TypeScript',
     languageColor: '#3178c6',
-    lastCommitDate: new Date(Date.now() - 5 * 86400000).toISOString(),
-    lastReleaseDate: new Date(Date.now() - 10 * 86400000).toISOString(),
+    lastCommitDate: daysAgoIso(3),
+    lastReleaseDate: daysAgoIso(8),
     issueStalenessMedianDays: 2,
     issueSampleSize: 4,
     issueSampleLimit: 50,
@@ -87,7 +92,7 @@ function makeRawProjectData(overrides: Partial<RawProjectData> = {}): RawProject
     contributorWindowDays: 90,
     topContributorCommitShare: 0.5,
     hasCi: true,
-    lastCiRunDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+    lastCiRunDate: daysAgoIso(1),
     ciRunSuccessRate: 0.9,
     ciRunCount: 12,
     ciWorkflowRunSampleSize: 10,
@@ -399,7 +404,7 @@ describe('agent-ready health API', () => {
   it('returns stable package route errors', async () => {
     const env = createEnv(cacheKv)
 
-    const unsupported = await app.fetch(new Request('https://isitalive.dev/api/resolve/pypi/django'), env, makeExecutionCtx())
+    const unsupported = await app.fetch(new Request('https://isitalive.dev/api/resolve/cargo/serde'), env, makeExecutionCtx())
     expect(unsupported.status).toBe(400)
     await expect(unsupported.json()).resolves.toMatchObject({ error_code: 'unsupported_ecosystem' })
 
@@ -612,7 +617,7 @@ describe('agent-ready health API', () => {
             { kind: 'package', ecosystem: 'npm', name: 'react', version: '18.2.0' },
             { kind: 'purl', purl: 'pkg:golang/golang.org/x/crypto' },
             { kind: 'github', owner: 'vercel', repo: 'next.js' },
-            { kind: 'package', ecosystem: 'pypi', name: 'django' },
+            { kind: 'package', ecosystem: 'cargo', name: 'serde' },
           ],
           policy: {
             requireResolutionConfidence: 'high',

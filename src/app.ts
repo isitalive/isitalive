@@ -7,9 +7,11 @@ import { version } from '../package.json';
 import { apiKeyAuth } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
 import { check } from './routes/check';
+import { mcp } from './routes/mcp';
 import { packageCheck, packageResolve } from './routes/package';
 import { batch } from './routes/batch';
 import { badge } from './routes/badge';
+import { og } from './routes/og';
 import { audit } from './routes/manifest';
 import { githubWebhook } from './github/webhook';
 import { admin } from './routes/admin';
@@ -54,6 +56,19 @@ app.use('/api/*', cors({
   maxAge: 86400,
 }));
 
+// CORS for MCP — browser-based MCP clients send protocol headers.
+// GET/DELETE are deliberately allowed even though the route answers 405:
+// the MCP spec has clients probe GET (SSE stream) and DELETE (session
+// teardown) and expects the server's 405 — blocking them at CORS preflight
+// would surface as an opaque network error instead.
+app.use('/mcp', cors({
+  origin: '*',
+  allowMethods: ['POST', 'GET', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Authorization', 'Content-Type', 'Mcp-Session-Id', 'Mcp-Protocol-Version', 'X-IsItAlive-Client'],
+  exposeHeaders: ['Mcp-Session-Id'],
+  maxAge: 86400,
+}));
+
 // Auth + rate limiting — skip badge (CDN-cached, embedded as <img> tags)
 app.use('/api/check/*', apiKeyAuth);
 app.use('/api/check/*', rateLimit);
@@ -65,6 +80,9 @@ app.use('/_data/deps/*', apiKeyAuth);
 app.use('/_data/deps/*', rateLimit);
 app.use('/_view', apiKeyAuth);
 app.use('/_view', rateLimit);
+// MCP gets auth only — tool calls rate-limit themselves so the
+// initialize/tools-list handshake doesn't eat the anonymous budget
+app.use('/mcp', apiKeyAuth);
 
 app.route('/api/resolve', packageResolve);
 app.route('/api/check/package', packageCheck);
@@ -72,7 +90,10 @@ app.route('/api/check/manifest', audit);
 app.route('/api/check/batch', batch);
 app.route('/api/check', check);
 app.route('/api/badge', badge);
+// OG share cards — like badges: no auth/rate-limit, CDN-cached, fetched by crawlers
+app.route('/og', og);
 app.route('/api/manifest', audit);
+app.route('/mcp', mcp);
 
 // Deprecation redirect: /api/audit → /api/manifest
 app.all('/api/audit', (c) => {

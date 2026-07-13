@@ -63,6 +63,21 @@ src/
 - Keep PRs focused — one feature or fix per PR
 - Update `CHANGELOG.md` for user-facing changes
 
+## MCP Server
+
+IsItAlive is a native Model Context Protocol server at `https://isitalive.dev/mcp` (Streamable HTTP, stateless). Tools: `check_package`, `check_repo`, and `audit_manifest`.
+
+```bash
+# Claude Code
+claude mcp add --transport http isitalive https://isitalive.dev/mcp
+```
+
+```json
+{ "mcpServers": { "isitalive": { "type": "http", "url": "https://isitalive.dev/mcp" } } }
+```
+
+`check_package` and `check_repo` work anonymously. `audit_manifest` requires authentication — add `"headers": {"Authorization": "Bearer sk_your_api_key"}` to the server config.
+
 ## Quick Check API
 
 For package-first dependency checks:
@@ -72,7 +87,7 @@ GET https://isitalive.dev/api/check/package/{ecosystem}/{packageName}
 GET https://isitalive.dev/api/resolve/{ecosystem}/{packageName}
 ```
 
-Supported ecosystems: `npm`, `go`.
+Supported ecosystems: `npm`, `go`, `pypi`.
 Use the query fallback when path encoding is awkward: `/api/check/package/npm?name=@types/node`.
 
 Examples:
@@ -81,6 +96,7 @@ Examples:
 curl -s https://isitalive.dev/api/check/package/npm/react | jq
 curl -s 'https://isitalive.dev/api/check/package/npm?name=@types/node' | jq
 curl -s https://isitalive.dev/api/check/package/go/golang.org/x/crypto | jq
+curl -s https://isitalive.dev/api/check/package/pypi/requests | jq
 ```
 
 Package checks resolve to GitHub and score the underlying repository. They are still maintenance-health checks, not package security, license, provenance, or registry-health verdicts.
@@ -179,7 +195,7 @@ Content-Type: application/json
 Audits all dependencies in a manifest file and returns per-dependency maintenance-health scores.
 Requires authentication (API key or GitHub Actions OIDC token). The old `/api/audit` path redirects here.
 
-Supported formats: `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`.
+Supported formats: `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`, `requirements.txt`, `pyproject.toml`.
 
 Optional query params:
 
@@ -265,7 +281,7 @@ Rate limiting is purely infrastructure protection (not billing):
 ## Tips for Agents
 
 1. **Treat this as maintenance-health** — the score is useful for maintainer activity and project durability, not security posture
-2. **Use package-first endpoints** when you have an npm package or Go module name; use repo checks when you already know the GitHub repository
+2. **Use package-first endpoints** when you have an npm package, Go module, or PyPI package name; use repo checks when you already know the GitHub repository
 3. **Cache results** — free access uses 24h fresh / 48h stale repo-score freshness for anonymous and authenticated requests
 4. **Use `GET /api/check/...` first** for individual dependencies — it returns `methodology`, `signals`, and `drivers` by default
 5. **Use `?include=metrics`** on `GET /api/check/...` when you need normalized raw measurements and sampling metadata
