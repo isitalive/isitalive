@@ -233,10 +233,13 @@ export function changelogPage(analyticsToken?: string): string {
 
   <script>
     var TYPE_CONFIG = {
-      added:   { label: 'Added',   color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-      changed: { label: 'Changed', color: '#eab308', bg: 'rgba(234,179,8,0.12)' },
-      fixed:   { label: 'Fixed',   color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
-      removed: { label: 'Removed', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+      added:      { label: 'Added',      color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+      changed:    { label: 'Changed',    color: '#eab308', bg: 'rgba(234,179,8,0.12)' },
+      deprecated: { label: 'Deprecated', color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
+      removed:    { label: 'Removed',    color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+      fixed:      { label: 'Fixed',      color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+      security:   { label: 'Security',   color: '#f97316', bg: 'rgba(249,115,22,0.12)' },
+      breaking:   { label: 'Breaking',   color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
     };
 
     function groupEntries(entries) {
@@ -259,10 +262,11 @@ export function changelogPage(analyticsToken?: string): string {
           + '<ul>' + items + '</ul>'
           + '</div>';
       }
+      var label = /^\d/.test(v.version) ? 'v' + v.version : v.version;
       return '<div class="version-card">'
         + '<div class="version-header">'
-        + '<span class="version-tag">v' + v.version + '</span>'
-        + '<span class="version-date">' + v.date + '</span>'
+        + '<span class="version-tag">' + label + '</span>'
+        + (v.date ? '<span class="version-date">' + v.date + '</span>' : '')
         + '</div>'
         + groupsHtml
         + '</div>';

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { test, fc } from '@fast-check/vitest'
+import { version as packageVersion } from '../../package.json'
+import changelog from '../../CHANGELOG.md'
 import { parseChangelog } from './parser'
 
 describe('parseChangelog', () => {
@@ -48,12 +50,29 @@ describe('parseChangelog', () => {
     expect(versions[1].version).toBe('1.0.0')
   })
 
-  it('ignores unknown section types', () => {
+  it('parses the full Keep a Changelog section vocabulary', () => {
     const markdown = `
 ## [1.0.0] - 2026-03-20
 
 ### Security
-- Security patch
+- Patched an auth bypass
+
+### Deprecated
+- Old endpoint scheduled for removal
+
+### ⚠ BREAKING CHANGES
+- Renamed the response field
+`
+    const versions = parseChangelog(markdown)
+    expect(versions[0].entries.map(e => e.type)).toEqual(['security', 'deprecated', 'breaking'])
+  })
+
+  it('ignores unknown section types', () => {
+    const markdown = `
+## [1.0.0] - 2026-03-20
+
+### Notes
+- A note that is not a changelog category
 
 ### Added
 - Real feature
@@ -61,6 +80,39 @@ describe('parseChangelog', () => {
     const versions = parseChangelog(markdown)
     expect(versions[0].entries).toHaveLength(1)
     expect(versions[0].entries[0].type).toBe('added')
+  })
+
+  it('parses a dateless Unreleased heading', () => {
+    const markdown = `
+## [Unreleased]
+
+### Added
+- Work in progress
+`
+    const versions = parseChangelog(markdown)
+    expect(versions).toEqual([{
+      version: 'Unreleased',
+      date: '',
+      entries: [{ type: 'added', text: 'Work in progress' }],
+    }])
+  })
+
+  it('parses Release Please headings and asterisk bullets', () => {
+    const markdown = `
+## [1.2.0](https://github.com/example/project/compare/v1.1.0...v1.2.0) (2026-07-13)
+
+### Added
+* **api:** add package checks ([#42](https://github.com/example/project/pull/42))
+`
+    const versions = parseChangelog(markdown)
+    expect(versions[0]).toEqual({
+      version: '1.2.0',
+      date: '2026-07-13',
+      entries: [{
+        type: 'added',
+        text: '**api:** add package checks ([#42](https://github.com/example/project/pull/42))',
+      }],
+    })
   })
 
   it('returns empty array for empty input', () => {
@@ -124,11 +176,17 @@ Another paragraph.
     expect(versions[0].version).toBe('0.1.0')
     expect(versions[0].date).toBe('2026-01-15')
   })
+
+  it('keeps the current package version in sync with the latest release', () => {
+    const latestRelease = parseChangelog(changelog).find(version => version.version !== 'Unreleased')
+
+    expect(latestRelease?.version).toBe(packageVersion)
+  })
 })
 
 // ── Fuzz: parseChangelog never throws (fast-check) ────────────────────
 describe('parseChangelog fuzz', () => {
-  const validTypes = new Set(['added', 'changed', 'fixed', 'removed'])
+  const validTypes = new Set(['added', 'changed', 'deprecated', 'removed', 'fixed', 'security', 'breaking'])
 
   test.prop([fc.string()])('never throws on arbitrary input', (input) => {
     expect(() => parseChangelog(input)).not.toThrow()
@@ -151,7 +209,7 @@ describe('parseChangelog fuzz', () => {
     fc.array(fc.record({
       version: fc.stringMatching(/^\d{1,3}\.\d{1,3}\.\d{1,3}$/),
       date: fc.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      section: fc.constantFrom('Added', 'Changed', 'Fixed', 'Removed'),
+      section: fc.constantFrom('Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'),
       items: fc.array(fc.lorem({ maxCount: 5 }), { minLength: 1, maxLength: 5 }),
     }), { minLength: 1, maxLength: 5 }),
   ])('round-trips structured changelog entries', (versions) => {

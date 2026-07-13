@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "2a1b7dffd4a46133b37990223b1234aad29eb71e",
+  "release-type": "node",
+  "include-component-in-tag": false,
+  "pull-request-title-pattern": "chore(release): ${version}",
+  "changelog-sections": [
+    { "type": "feat", "section": "Added" },
+    { "type": "fix", "section": "Fixed" },
+    { "type": "perf", "section": "Changed" },
+    { "type": "refactor", "section": "Changed" },
+    { "type": "revert", "section": "Changed" },
+    { "type": "security", "section": "Security" },
+    { "type": "docs", "section": "Changed", "hidden": true },
+    { "type": "test", "section": "Changed", "hidden": true },
+    { "type": "build", "section": "Changed", "hidden": true },
+    { "type": "ci", "section": "Changed", "hidden": true },
+    { "type": "chore", "section": "Changed", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "isitalive",
+      "extra-files": ["src/routes/openapi.ts"]
+    }
+  }
+}
