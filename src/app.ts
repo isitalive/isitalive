@@ -56,7 +56,11 @@ app.use('/api/*', cors({
   maxAge: 86400,
 }));
 
-// CORS for MCP — browser-based MCP clients send protocol headers
+// CORS for MCP — browser-based MCP clients send protocol headers.
+// GET/DELETE are deliberately allowed even though the route answers 405:
+// the MCP spec has clients probe GET (SSE stream) and DELETE (session
+// teardown) and expects the server's 405 — blocking them at CORS preflight
+// would surface as an opaque network error instead.
 app.use('/mcp', cors({
   origin: '*',
   allowMethods: ['POST', 'GET', 'DELETE', 'OPTIONS'],

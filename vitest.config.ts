@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, configDefaults } from 'vitest/config'
 
 export default defineConfig({
@@ -6,7 +7,7 @@ export default defineConfig({
     alias: {
       // workers-og ships Workers-runtime wasm imports Node can't evaluate —
       // tests run against a stub; the real bundle is verified by wrangler.
-      'workers-og': new URL('./src/test-stubs/workers-og.ts', import.meta.url).pathname,
+      'workers-og': fileURLToPath(new URL('./src/test-stubs/workers-og.ts', import.meta.url)),
     },
   },
   plugins: [
