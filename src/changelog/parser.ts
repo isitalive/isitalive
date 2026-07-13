@@ -58,7 +58,7 @@ export function parseChangelog(markdown: string): Version[] {
       continue;
     }
 
-    // Full Keep a Changelog section vocabulary.
+    // Supported Keep a Changelog and Release Please section headings.
     const sectionMatch = line.match(/^###\s+(.+)$/);
     if (sectionMatch) {
       const key = sectionMatch[1].toLowerCase().trim();

@@ -54,8 +54,9 @@ import {
   cachePutText,
 } from '../db/state'
 
-// Parse changelog once at module scope. Empty placeholders (usually
-// [Unreleased]) should not consume a page or render as blank cards.
+// Parse changelog once at module scope. Versions with no parsed entries should
+// not consume a page or render as blank cards, whether they are empty
+// placeholders or contain only unsupported section headings.
 const ALL_CHANGELOG_VERSIONS = parseChangelogMd(changelogMd).filter((version) => version.entries.length > 0)
 
 const ui = new Hono<{ Bindings: Env }>()
